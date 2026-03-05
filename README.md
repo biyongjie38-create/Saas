@@ -26,7 +26,6 @@ supabase/
 docs/
   api-contracts.md
   deployment-vercel.md
-vercel.json     # force Vercel to build apps/web Next entry (apps/web/next.config.ts)
 ```
 
 ## Environment
@@ -105,10 +104,18 @@ npm install
 npm run dev
 ```
 
-## Deployment
+## Deployment (Vercel Monorepo)
 
-- Production deploy checklist: `docs/deployment-vercel.md`
-- Preflight check command (inside `apps/web`):
+Use Vercel project settings:
+
+1. Framework Preset: `Next.js`
+2. Root Directory: `apps/web`
+3. Build Command: `npm run build` (default)
+4. Output Directory: keep empty
+
+Do not use root-level `vercel.json` build overrides for this repo.
+
+Preflight check command (inside `apps/web`):
 
 ```bash
 npm run deploy:check
@@ -147,4 +154,3 @@ npm run deploy:check
 - Pinecone-based benchmark retrieval
 - Real model provider usage/token tracing
 - Stripe billing
-
