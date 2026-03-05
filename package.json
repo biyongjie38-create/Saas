@@ -1,0 +1,10 @@
+{
+  "name": "viralbrain-saas",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:ai": "python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir apps/ai-service",
+    "check:ai": "python -m compileall apps/ai-service/app"
+  }
+}

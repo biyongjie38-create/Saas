@@ -1,0 +1,50 @@
+{
+  "users": [
+    {
+      "id": "local-user",
+      "email": "local@viralbrain.ai",
+      "plan": "free"
+    }
+  ],
+  "videos": [],
+  "reports": [],
+  "usageLogs": [],
+  "library": [
+    {
+      "id": "lib-1",
+      "title": "The 5-Second Hook Formula for Tutorials",
+      "sourceUrl": "https://youtube.com/watch?v=hook001",
+      "summary": "Open with outcome, then risk of failure, then roadmap.",
+      "tags": {
+        "hookType": "result-first",
+        "topic": "education",
+        "durationBucket": "5-10m"
+      },
+      "createdAt": "2025-09-01T08:00:00Z"
+    },
+    {
+      "id": "lib-2",
+      "title": "Before/After Story Arc for Product Videos",
+      "sourceUrl": "https://youtube.com/watch?v=arc002",
+      "summary": "Use before/after contrast and three turning points.",
+      "tags": {
+        "hookType": "contrast",
+        "topic": "productivity",
+        "durationBucket": "8-15m"
+      },
+      "createdAt": "2025-09-09T09:00:00Z"
+    },
+    {
+      "id": "lib-3",
+      "title": "Emotional Tension + Fast Cuts for Vlog Growth",
+      "sourceUrl": "https://youtube.com/watch?v=vlog003",
+      "summary": "Fast cuts plus emotional spikes; CTA follows peak by 20 seconds.",
+      "tags": {
+        "hookType": "emotion-spike",
+        "topic": "vlog",
+        "durationBucket": "10-20m"
+      },
+      "createdAt": "2025-10-16T10:00:00Z"
+    }
+  ]
+}
