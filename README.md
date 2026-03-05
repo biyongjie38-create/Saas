@@ -113,7 +113,7 @@ Use Vercel project settings:
 3. Build Command: `npm run build` (default)
 4. Output Directory: keep empty
 
-Do not use root-level `vercel.json` build overrides for this repo.
+This repo includes a root-level `vercel.json` that forces Vercel to build `apps/web` via `@vercel/next` (prevents empty 404 deployments when project preset/root directory are mis-detected).
 
 Preflight check command (inside `apps/web`):
 
@@ -154,3 +154,4 @@ npm run deploy:check
 - Pinecone-based benchmark retrieval
 - Real model provider usage/token tracing
 - Stripe billing
+

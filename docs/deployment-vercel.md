@@ -9,9 +9,9 @@ Make ViralBrain accessible to external users with stable email/Google login.
 Recommended: Vercel.
 
 - Import repo.
-- Set project root to `apps/web`.
-- Build command: `npm run build`.
-- Output: default Next.js output.
+- Keep repository root as `./` (default) or set `apps/web`; both work with this repo.
+- Root `vercel.json` forces `apps/web/package.json` to use `@vercel/next`.
+- If Project Preset shows `Other`, deployment still works because `vercel.json` overrides builder selection.
 
 ## 2) Set production env vars
 
