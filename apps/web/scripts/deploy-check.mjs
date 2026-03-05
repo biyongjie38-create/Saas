@@ -75,6 +75,28 @@ function isPrivateIp(hostname) {
   return false;
 }
 
+function isVercelAppHost(hostname) {
+  return hostname.endsWith(".vercel.app");
+}
+
+function normalizeOrigin(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const candidate = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+    ? trimmed
+    : `https://${trimmed}`;
+
+  const parsed = parseUrl(candidate);
+  return parsed ? parsed.origin : null;
+}
+
 const required = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY"
@@ -132,12 +154,27 @@ if (appUrl) {
     console.warn("Warning: NEXT_PUBLIC_APP_URL points to LAN/private host. Only local-network users can access it.");
   }
 
+  if (isVercelAppHost(host)) {
+    console.warn("Warning: NEXT_PUBLIC_APP_URL uses *.vercel.app. If users see 401, disable Deployment Protection or use a custom production domain.");
+  }
+
   console.log("Suggested Supabase Auth URL Configuration:");
   console.log(`- Site URL: ${appUrl.origin}`);
   console.log(`- Redirect URL: ${appUrl.origin}/auth/callback`);
 } else {
-  console.log("NEXT_PUBLIC_APP_URL not set. App will use runtime origin.");
-  console.log("For production, set NEXT_PUBLIC_APP_URL to your public HTTPS domain.");
+  const vercelProdOrigin =
+    normalizeOrigin(readEnv("PUBLIC_VERCEL_PROJECT_PRODUCTION_URL")) ??
+    normalizeOrigin(readEnv("VERCEL_PROJECT_PRODUCTION_URL"));
+
+  if (vercelProdOrigin) {
+    console.log(`Detected Vercel production domain: ${vercelProdOrigin}`);
+    console.log(`Suggested NEXT_PUBLIC_APP_URL=${vercelProdOrigin}`);
+    console.log("Suggested Supabase Redirect URL:");
+    console.log(`- ${vercelProdOrigin}/auth/callback`);
+  } else {
+    console.log("NEXT_PUBLIC_APP_URL not set. App will use runtime origin.");
+    console.log("For production, set NEXT_PUBLIC_APP_URL to your public HTTPS domain.");
+  }
 }
 
 if (process.exitCode && process.exitCode !== 0) {

@@ -101,6 +101,15 @@ function isPrivateHost(origin: string): boolean {
   }
 }
 
+function isVercelAppHost(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname.endsWith(".vercel.app");
+  } catch {
+    return false;
+  }
+}
+
 function isHttpsOrigin(origin: string): boolean {
   try {
     return new URL(origin).protocol === "https:";
@@ -110,6 +119,20 @@ function isHttpsOrigin(origin: string): boolean {
 }
 
 function chooseRedirectOrigin(runtimeOrigin: string | null, configuredOrigin: string | null): string | null {
+  if (configuredOrigin) {
+    if (!runtimeOrigin) {
+      return configuredOrigin;
+    }
+
+    if (
+      isLoopbackHost(runtimeOrigin) ||
+      isPrivateHost(runtimeOrigin) ||
+      isVercelAppHost(runtimeOrigin)
+    ) {
+      return configuredOrigin;
+    }
+  }
+
   if (runtimeOrigin && !isLoopbackHost(runtimeOrigin)) {
     return runtimeOrigin;
   }
@@ -170,6 +193,10 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
       return "No redirect origin available. Set NEXT_PUBLIC_APP_URL or open this page from your real domain.";
     }
 
+    if (runtimeOrigin && isVercelAppHost(runtimeOrigin) && !configuredOrigin) {
+      return "Current domain is *.vercel.app. Set NEXT_PUBLIC_APP_URL to your public domain to avoid protected login callbacks.";
+    }
+
     if (isLoopbackHost(redirectOrigin)) {
       return "Redirect target is localhost. Magic Link only works on the same device/browser that can access localhost.";
     }
@@ -178,12 +205,16 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
       return "Redirect target is a private LAN address. It only works for users on the same local network.";
     }
 
+    if (isVercelAppHost(redirectOrigin)) {
+      return "Redirect target is a vercel.app domain. If users see 401, disable Deployment Protection or use a custom domain.";
+    }
+
     if (!isHttpsOrigin(redirectOrigin)) {
       return "Redirect target is not HTTPS. Public users should sign in through an HTTPS domain.";
     }
 
     return null;
-  }, [redirectOrigin]);
+  }, [redirectOrigin, runtimeOrigin, configuredOrigin]);
 
   function buildRedirectUrl() {
     if (!redirectOrigin) {

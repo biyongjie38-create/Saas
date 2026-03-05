@@ -63,3 +63,9 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 
 - Localhost/LAN origin cannot serve public users.
 - For production traffic, always use HTTPS domain.
+
+## 7) Common Vercel Domain Errors
+
+- `401` on `*.vercel.app`: Deployment Protection is active. Disable protection for Production or use a custom production domain.
+- `404` + `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`: the domain alias points to a missing/deleted deployment. Re-assign that domain in `Project -> Domains`.
+

@@ -115,6 +115,10 @@ Use Vercel project settings:
 
 This repo includes a root-level `vercel.json` that forces Vercel to build `apps/web` via `@vercel/next` (prevents empty 404 deployments when project preset/root directory are mis-detected).
 
+Troubleshooting:
+- `401` on `*.vercel.app` means Deployment Protection is blocking public access. Disable protection for Production or use a custom production domain.
+- `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND` means that domain alias is detached/stale. Re-assign the domain in Vercel `Project -> Domains`.
+
 Preflight check command (inside `apps/web`):
 
 ```bash

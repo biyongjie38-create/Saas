@@ -1,4 +1,4 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { SiteNav } from "@/components/site-nav";
 import { LoginForm } from "@/components/login-form";
 import { getOptionalAuthUser } from "@/lib/auth";
@@ -13,6 +13,40 @@ function normalizeNextPath(input: string | undefined): string {
     return input;
   }
   return "/dashboard";
+}
+
+function normalizePublicOrigin(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const candidate = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePublicAppUrl(): string | null {
+  const configured = normalizePublicOrigin(process.env.NEXT_PUBLIC_APP_URL ?? null);
+  if (configured) {
+    return configured;
+  }
+
+  const vercelProduction =
+    normalizePublicOrigin(process.env.PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ?? null) ??
+    normalizePublicOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL ?? null);
+
+  return vercelProduction;
 }
 
 export default async function LoginPage({ searchParams }: Props) {
@@ -37,7 +71,7 @@ export default async function LoginPage({ searchParams }: Props) {
         <p>Sign in to access your reports and usage.</p>
         <LoginForm
           nextPath={nextPath}
-          appUrl={process.env.NEXT_PUBLIC_APP_URL ?? null}
+          appUrl={resolvePublicAppUrl()}
           authConfig={authConfig}
         />
       </section>
