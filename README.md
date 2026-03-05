@@ -26,7 +26,7 @@ supabase/
 docs/
   api-contracts.md
   deployment-vercel.md
-vercel.json     # force Vercel to build apps/web in monorepo
+vercel.json     # force Vercel to build apps/web Next entry (apps/web/next.config.ts)
 ```
 
 ## Environment
@@ -147,3 +147,4 @@ npm run deploy:check
 - Pinecone-based benchmark retrieval
 - Real model provider usage/token tracing
 - Stripe billing
+
