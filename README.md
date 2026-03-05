@@ -26,6 +26,7 @@ supabase/
 docs/
   api-contracts.md
   deployment-vercel.md
+vercel.json     # force Vercel to build apps/web in monorepo
 ```
 
 ## Environment
