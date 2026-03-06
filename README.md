@@ -1,4 +1,4 @@
-﻿# ViralBrain.ai MVP
+# ViralBrain.ai MVP
 
 This build uses Supabase Auth users (Google + Email Magic Link) and stores data with RLS-scoped user sessions.
 
@@ -48,6 +48,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # Optional server aliases (fallback)
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
+
 ```
 
 Notes:
@@ -83,7 +84,8 @@ Localhost/LAN (`localhost`, `192.168.x.x`) only works on same device/network and
 1. Open SQL Editor in Supabase.
 2. Run `supabase/schema.sql`.
 3. Ensure tables exist: `videos`, `reports`, `usage_logs`, `viral_library_items`.
-4. Confirm RLS is enabled on these tables and policies are created.
+4. Confirm trigger `usage_logs_daily_limit_guard` exists on `usage_logs` (hard quota intercept).
+5. Confirm RLS is enabled on these tables and policies are created.
 
 ## Run
 
@@ -147,6 +149,7 @@ npm run deploy:check
 
 - Unified JSON envelope for non-stream routes: `ok/data/error/request_id`
 - `POST /api/analyze` enforces daily quota and returns `429 USAGE_LIMIT_EXCEEDED` when exceeded
+- Quota is hard-enforced in DB trigger (`usage_logs_daily_limit_guard`) to prevent concurrent bypass
 - `POST /api/analyze` (requires auth)
 - `GET /api/reports` (requires auth)
 - `GET /api/reports/{id}` (requires auth, owner only)
@@ -160,6 +163,3 @@ npm run deploy:check
 - Pinecone-based benchmark retrieval
 - Real model provider usage/token tracing
 - Stripe billing
-
-
-

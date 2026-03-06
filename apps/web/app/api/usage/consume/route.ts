@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createRequestId, errorJsonResponse, okJsonResponse } from "@/lib/api-response";
-import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
-import { consumeUsage } from "@/lib/report-store";
+import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
+import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
+import { consumeUsage, countUsageForDay } from "@/lib/report-store";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -33,15 +34,59 @@ export async function POST(request: Request) {
   }
 
   const supabaseClient = await createServerSupabaseClient();
-  const usage = await consumeUsage(
-    {
-      userId: authUser.id,
-      action: parsed.data.action,
-      costTokens: parsed.data.costTokens,
-      costUsd: parsed.data.costUsd
-    },
-    { supabaseClient }
-  );
+  const appUser = toAppUser(authUser);
 
-  return okJsonResponse({ usage }, requestId);
+  if (parsed.data.action === "analyze") {
+    const usedToday = await countUsageForDay(appUser.id, {
+      supabaseClient,
+      action: "analyze"
+    });
+
+    try {
+      assertUsageWithinLimit(appUser.plan, usedToday);
+    } catch (error) {
+      if (error instanceof UsageLimitExceededError) {
+        return errorJsonResponse(
+          {
+            code: error.code,
+            message: error.message,
+            details: error.details
+          },
+          requestId,
+          429
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  try {
+    const usage = await consumeUsage(
+      {
+        userId: authUser.id,
+        plan: appUser.plan,
+        action: parsed.data.action,
+        costTokens: parsed.data.costTokens,
+        costUsd: parsed.data.costUsd
+      },
+      { supabaseClient }
+    );
+
+    return okJsonResponse({ usage }, requestId);
+  } catch (error) {
+    if (error instanceof UsageLimitExceededError) {
+      return errorJsonResponse(
+        {
+          code: error.code,
+          message: error.message,
+          details: error.details
+        },
+        requestId,
+        429
+      );
+    }
+
+    throw error;
+  }
 }

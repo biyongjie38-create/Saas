@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
@@ -197,7 +197,19 @@ export function DashboardClient({ lang }: Props) {
 
           if (event.stage === "error") {
             const message = event.payload.message;
-            setError(typeof message === "string" ? message : copy.analysisFailed);
+            const details = event.payload.details as
+              | { used_today?: number; limit_per_day?: number }
+              | undefined;
+
+            if (
+              typeof message === "string" &&
+              typeof details?.used_today === "number" &&
+              typeof details?.limit_per_day === "number"
+            ) {
+              setError(message + " (" + details.used_today + "/" + details.limit_per_day + ")");
+            } else {
+              setError(typeof message === "string" ? message : copy.analysisFailed);
+            }
           }
         }
       }
@@ -254,5 +266,3 @@ export function DashboardClient({ lang }: Props) {
     </div>
   );
 }
-
-

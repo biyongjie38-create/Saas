@@ -1,13 +1,19 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readDb, writeDb } from "@/lib/db";
 import { fallbackLibrary } from "@/lib/mock-data";
+import {
+  assertUsageWithinLimit,
+  toUsageLimitDetails,
+  UsageLimitExceededError
+} from "@/lib/quota";
 import { normalizeUserIdForBackend, useSupabaseBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import type { Report, ReportStatus, UsageLog, ViralLibraryItem } from "@/lib/types";
+import type { Report, ReportStatus, UsageLog, User, ViralLibraryItem } from "@/lib/types";
 
 type QueryOptions = {
   supabaseClient?: SupabaseClient | null;
+  action?: string;
 };
 
 type ReportRow = {
@@ -40,6 +46,28 @@ function toReport(row: ReportRow): Report {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function parseUsageLimitDetails(raw: unknown): {
+  plan?: string;
+  used_today?: number;
+  limit_per_day?: number;
+} | null {
+  if (!raw || typeof raw !== "string") {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      plan?: string;
+      used_today?: number;
+      limit_per_day?: number;
+    };
+
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function toUsage(row: {
@@ -293,12 +321,21 @@ export async function listReports(
 export async function consumeUsage(
   input: {
     userId: string;
+    plan: User["plan"];
     action: string;
     costTokens: number;
     costUsd?: number | null;
   },
   options?: QueryOptions
 ): Promise<UsageLog> {
+  if (input.action === "analyze") {
+    const usedToday = await countUsageForDay(input.userId, {
+      ...options,
+      action: "analyze"
+    });
+    assertUsageWithinLimit(input.plan, usedToday);
+  }
+
   const client = await getSupabaseUserClient(options);
   if (client) {
     const payload = {
@@ -315,6 +352,22 @@ export async function consumeUsage(
       .single();
 
     if (error) {
+      if (error.message.includes("USAGE_LIMIT_EXCEEDED")) {
+        const parsedDetails = parseUsageLimitDetails(error.details);
+        const usedToday =
+          typeof parsedDetails?.used_today === "number" ? parsedDetails.used_today : 0;
+        const fallback = toUsageLimitDetails(input.plan, usedToday);
+
+        throw new UsageLimitExceededError({
+          plan: parsedDetails?.plan === "pro" ? "pro" : fallback.plan,
+          used_today: usedToday,
+          limit_per_day:
+            typeof parsedDetails?.limit_per_day === "number"
+              ? parsedDetails.limit_per_day
+              : fallback.limit_per_day
+        });
+      }
+
       throw new Error(`SUPABASE_CONSUME_USAGE_FAILED:${error.message}`);
     }
 
@@ -351,10 +404,16 @@ export async function countUsageForDay(userId: string, options?: QueryOptions): 
     const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const dayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
 
-    const { count, error } = await client
+    let query = client
       .from("usage_logs")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", normalizedUserId)
+      .eq("user_id", normalizedUserId);
+
+    if (options?.action) {
+      query = query.eq("action", options.action);
+    }
+
+    const { count, error } = await query
       .gte("created_at", dayStart.toISOString())
       .lt("created_at", dayEnd.toISOString());
 
@@ -373,7 +432,10 @@ export async function countUsageForDay(userId: string, options?: QueryOptions): 
   const dayKey = `${yyyy}-${mm}-${dd}`;
 
   return db.usageLogs.filter(
-    (item) => item.userId === userId && item.createdAt.startsWith(dayKey)
+    (item) =>
+      item.userId === userId &&
+      item.createdAt.startsWith(dayKey) &&
+      (options?.action ? item.action === options.action : true)
   ).length;
 }
 

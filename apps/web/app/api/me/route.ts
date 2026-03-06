@@ -1,5 +1,6 @@
 import { createRequestId, okJsonResponse } from "@/lib/api-response";
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
+import { getDailyLimitByPlan } from "@/lib/quota";
 import { countUsageForDay } from "@/lib/report-store";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -14,8 +15,11 @@ export async function GET() {
 
   const supabaseClient = await createServerSupabaseClient();
   const user = toAppUser(authUser);
-  const usedToday = await countUsageForDay(user.id, { supabaseClient });
-  const limitPerDay = user.plan === "free" ? 5 : 200;
+  const usedToday = await countUsageForDay(user.id, {
+    supabaseClient,
+    action: "analyze"
+  });
+  const limitPerDay = getDailyLimitByPlan(user.plan);
 
   return okJsonResponse(
     {

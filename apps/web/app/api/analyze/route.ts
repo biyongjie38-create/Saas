@@ -12,6 +12,7 @@ import {
   updateReport
 } from "@/lib/report-store";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { fetchYoutubeData } from "@/lib/youtube";
 
 export const runtime = "nodejs";
@@ -29,6 +30,7 @@ const requestSchema = z.object({
 async function executeAnalyzeTask(input: {
   url: string;
   userId: string;
+  plan: "free" | "pro";
   supabaseClient: SupabaseClient;
   onStage?: (stage: string, payload?: Record<string, unknown>) => void;
 }): Promise<AnalyzeExecutionResult> {
@@ -36,6 +38,17 @@ async function executeAnalyzeTask(input: {
   let reportId: string | null = null;
 
   try {
+    await consumeUsage(
+      {
+        userId: input.userId,
+        plan: input.plan,
+        action: "analyze",
+        costTokens: 0,
+        costUsd: null
+      },
+      { supabaseClient: input.supabaseClient }
+    );
+
     input.onStage?.("fetching_youtube", { message: "Fetching video metadata and comments" });
     const video = await fetchYoutubeData(input.url, { supabaseClient: input.supabaseClient });
 
@@ -82,16 +95,6 @@ async function executeAnalyzeTask(input: {
           totalLatencyMs: Date.now() - startedAt,
           retries: 0
         }
-      },
-      { supabaseClient: input.supabaseClient }
-    );
-
-    await consumeUsage(
-      {
-        userId: input.userId,
-        action: "analyze",
-        costTokens: Math.round((score.total + video.durationSec / 10) * 12),
-        costUsd: Number((score.total * 0.00008).toFixed(4))
       },
       { supabaseClient: input.supabaseClient }
     );
@@ -144,23 +147,27 @@ export async function POST(request: Request) {
 
   const supabaseClient = await createServerSupabaseClient();
   const appUser = toAppUser(authUser);
-  const usedToday = await countUsageForDay(appUser.id, { supabaseClient });
-  const limitPerDay = appUser.plan === "free" ? 5 : 200;
+  const usedToday = await countUsageForDay(appUser.id, {
+    supabaseClient,
+    action: "analyze"
+  });
 
-  if (usedToday >= limitPerDay) {
-    return errorJsonResponse(
-      {
-        code: "USAGE_LIMIT_EXCEEDED",
-        message: "Daily usage limit reached for your plan.",
-        details: {
-          plan: appUser.plan,
-          used_today: usedToday,
-          limit_per_day: limitPerDay
-        }
-      },
-      requestId,
-      429
-    );
+  try {
+    assertUsageWithinLimit(appUser.plan, usedToday);
+  } catch (error) {
+    if (error instanceof UsageLimitExceededError) {
+      return errorJsonResponse(
+        {
+          code: error.code,
+          message: error.message,
+          details: error.details
+        },
+        requestId,
+        429
+      );
+    }
+
+    throw error;
   }
 
   const { url, stream } = parsed.data;
@@ -170,6 +177,7 @@ export async function POST(request: Request) {
       const result = await executeAnalyzeTask({
         url,
         userId: authUser.id,
+        plan: appUser.plan,
         supabaseClient
       });
 
@@ -182,6 +190,18 @@ export async function POST(request: Request) {
         requestId
       );
     } catch (error) {
+      if (error instanceof UsageLimitExceededError) {
+        return errorJsonResponse(
+          {
+            code: error.code,
+            message: error.message,
+            details: error.details
+          },
+          requestId,
+          429
+        );
+      }
+
       return errorJsonResponse(
         {
           code: "ANALYZE_FAILED",
@@ -206,12 +226,22 @@ export async function POST(request: Request) {
       executeAnalyzeTask({
         url,
         userId: authUser.id,
+        plan: appUser.plan,
         supabaseClient,
         onStage(stage, payload) {
           send(stage, payload ?? {});
         }
       })
         .catch((error) => {
+          if (error instanceof UsageLimitExceededError) {
+            send("error", {
+              code: error.code,
+              message: error.message,
+              details: error.details
+            });
+            return;
+          }
+
           send("error", {
             code: "ANALYZE_FAILED",
             message: error instanceof Error ? error.message : "Analyze task failed"

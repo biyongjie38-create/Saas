@@ -1,6 +1,7 @@
-﻿import { SiteNav } from "@/components/site-nav";
+import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser, toAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
+import { getDailyLimitByPlan } from "@/lib/quota";
 import { countUsageForDay } from "@/lib/report-store";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -9,8 +10,11 @@ export default async function SettingsPage() {
   const lang = await getServerLang();
   const supabaseClient = await createServerSupabaseClient();
   const user = toAppUser(authUser);
-  const usedToday = await countUsageForDay(user.id, { supabaseClient });
-  const dailyLimit = user.plan === "free" ? 5 : 200;
+  const usedToday = await countUsageForDay(user.id, {
+    supabaseClient,
+    action: "analyze"
+  });
+  const dailyLimit = getDailyLimitByPlan(user.plan);
 
   return (
     <main>
@@ -44,4 +48,3 @@ export default async function SettingsPage() {
     </main>
   );
 }
-

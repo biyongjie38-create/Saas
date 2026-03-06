@@ -1,4 +1,4 @@
-﻿-- ViralBrain.ai Supabase Schema (MVP)
+-- ViralBrain.ai Supabase Schema (MVP)
 
 create extension if not exists "pgcrypto";
 
@@ -129,3 +129,68 @@ using (auth.uid() = user_id);
 create policy usage_insert_own on usage_logs
 for insert
 with check (auth.uid() = user_id);
+
+-- Hard quota intercept for analyze usage (DB-level, concurrency-safe)
+create or replace function resolve_auth_plan()
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    nullif(auth.jwt() -> 'app_metadata' ->> 'plan', ''),
+    nullif(auth.jwt() -> 'user_metadata' ->> 'plan', ''),
+    'free'
+  );
+$$;
+
+create or replace function enforce_usage_logs_daily_limit()
+returns trigger
+language plpgsql
+as $$
+declare
+  request_plan text;
+  limit_per_day int;
+  used_today int;
+  day_start timestamptz;
+  day_end timestamptz;
+begin
+  if new.action <> 'analyze' then
+    return new;
+  end if;
+
+  request_plan := resolve_auth_plan();
+  limit_per_day := case when request_plan = 'pro' then 200 else 5 end;
+
+  day_start := date_trunc('day', timezone('utc', now())) at time zone 'utc';
+  day_end := day_start + interval '1 day';
+
+  -- Serialize inserts per user/day to prevent concurrent bypass.
+  perform pg_advisory_xact_lock(hashtext(new.user_id::text || ':' || day_start::text));
+
+  select count(*)
+    into used_today
+    from usage_logs
+   where user_id = new.user_id
+     and action = 'analyze'
+     and created_at >= day_start
+     and created_at < day_end;
+
+  if used_today >= limit_per_day then
+    raise exception 'USAGE_LIMIT_EXCEEDED'
+      using
+        errcode = 'P0001',
+        detail = json_build_object(
+          'plan', request_plan,
+          'used_today', used_today,
+          'limit_per_day', limit_per_day
+        )::text;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists usage_logs_daily_limit_guard on usage_logs;
+create trigger usage_logs_daily_limit_guard
+before insert on usage_logs
+for each row execute function enforce_usage_logs_daily_limit();
