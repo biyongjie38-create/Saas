@@ -1,4 +1,4 @@
--- ViralBrain.ai Supabase Schema (MVP)
+﻿-- ViralBrain.ai Supabase Schema (MVP)
 
 create extension if not exists "pgcrypto";
 
@@ -116,6 +116,7 @@ with check (auth.uid() = user_id);
 drop policy if exists viral_library_select_authenticated on viral_library_items;
 drop policy if exists viral_library_insert_authenticated on viral_library_items;
 drop policy if exists viral_library_update_authenticated on viral_library_items;
+drop policy if exists viral_library_delete_authenticated on viral_library_items;
 
 create policy viral_library_select_authenticated on viral_library_items
 for select
@@ -129,6 +130,10 @@ create policy viral_library_update_authenticated on viral_library_items
 for update
 using (auth.role() = 'authenticated')
 with check (auth.role() = 'authenticated');
+
+create policy viral_library_delete_authenticated on viral_library_items
+for delete
+using (auth.role() = 'authenticated');
 
 -- Usage policies (strictly user-owned)
 drop policy if exists usage_select_own on usage_logs;
@@ -206,5 +211,6 @@ drop trigger if exists usage_logs_daily_limit_guard on usage_logs;
 create trigger usage_logs_daily_limit_guard
 before insert on usage_logs
 for each row execute function enforce_usage_logs_daily_limit();
+
 
 

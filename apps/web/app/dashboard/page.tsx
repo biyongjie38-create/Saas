@@ -1,6 +1,7 @@
-﻿import Link from "next/link";
-import { SiteNav } from "@/components/site-nav";
+﻿import { SiteNav } from "@/components/site-nav";
+import { ApiConnectionPanel } from "@/components/api-connection-panel";
 import { DashboardClient } from "@/components/dashboard-client";
+import { RecentReportsPanel } from "@/components/recent-reports-panel";
 import { requirePageAuthUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { listReports } from "@/lib/report-store";
@@ -21,27 +22,19 @@ export default async function DashboardPage() {
       <SiteNav />
       <section className="shell section">
         <h1 style={{ marginTop: 0 }}>{text(lang, "Dashboard", "控制台")}</h1>
-        <p>{text(lang, "Analyze a YouTube URL with streaming task updates and report history.", "输入 YouTube 链接，实时查看任务进度并管理历史报告。")}</p>
+        <p>
+          {text(
+            lang,
+            "Analyze a YouTube URL, connect your own APIs, and manage historical reports in one console.",
+            "在同一个控制台里输入 YouTube 链接、对接你自己的 API，并管理历史报告。"
+          )}
+        </p>
 
         <DashboardClient lang={lang} />
-
-        <section style={{ marginTop: 24 }} className="card panel">
-          <h2>{text(lang, "Recent Reports", "最近报告")}</h2>
-          {recentReports.length === 0 ? (
-            <p className="small">{text(lang, "No reports yet. Run your first analysis.", "还没有报告，先运行一次分析吧。")}</p>
-          ) : (
-            <ul className="list">
-              {recentReports.map((report) => (
-                <li key={report.id}>
-                  <Link href={`/report/${report.id}`}>
-                    {report.id.slice(0, 8)} - {report.videoId} - {report.status}
-                    {report.scoreTotal ? ` - ${text(lang, "Score", "评分")} ${report.scoreTotal}` : ""}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+        <section style={{ marginTop: 24 }}>
+          <ApiConnectionPanel lang={lang} />
         </section>
+        <RecentReportsPanel lang={lang} initialReports={recentReports} />
       </section>
     </main>
   );

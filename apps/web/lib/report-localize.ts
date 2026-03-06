@@ -1,34 +1,44 @@
-import type { Lang } from "@/lib/i18n-shared";
+﻿import type { Lang } from "@/lib/i18n-shared";
 import type { AnalysisJson, BenchmarksJson, ScoreJson, VideoDataSource } from "@/lib/types";
 
 const zhTextMap: Record<string, string> = {
-  "Title has high information density. Move the outcome promise earlier and reduce extra wording.": "标题信息密度偏高，建议把结果承诺前置并减少冗余表述。",
-  "Title length is healthy and the value promise is clear for first-screen attention.": "标题长度合理，价值承诺清晰，能抓住首屏注意力。",
-  "Show the final outcome within 0-15 seconds before background context.": "先在 0-15 秒内展示最终结果，再补充背景上下文。",
-  "Add one contrastive case around 35% runtime to improve retention.": "在视频约 35% 处加入一个对比案例，提升留存。",
-  "Tie CTA to the next specific video topic instead of generic subscription ask.": "把 CTA 绑定到下一个具体选题，不要只做泛化订阅引导。",
-  "CTA is actionable but should include one concrete next action and expected payoff.": "CTA 具备可执行性，但还应加入一个明确的下一步动作和预期收益。",
-  "Main subject is clear, but contrast hierarchy and text layering can be improved.": "主体清晰，但对比层次和文字排布还有优化空间。",
-  "Keep overlay text under 4 words and start with action verbs.": "封面叠字控制在 4 个词以内，并优先使用动作动词开头。",
-  "Increase brightness contrast between face/object and background.": "提升人物/主体与背景之间的亮度对比。",
-  "Use before/after visual contrast to increase click intent.": "使用前后对比的视觉结构，提升点击意图。",
-  "Growth-focused creators looking for reusable scripts and repeatable workflows.": "以增长为目标的创作者，关注可复用脚本与可复制流程。",
-  "Reuse proven script patterns": "复用已验证的脚本结构",
+  "Title has high information density. Move the outcome promise earlier and reduce extra wording.":
+    "标题信息密度偏高，建议把结果承诺前置，并减少多余表述。",
+  "Title length is healthy and the value promise is clear for first-screen attention.":
+    "标题长度合理，价值承诺清晰，能抓住首屏注意力。",
+  "Show the final outcome within 0-15 seconds before background context.":
+    "先在 0-15 秒内展示最终结果，再补充背景上下文。",
+  "Add one contrastive case around 35% runtime to improve retention.":
+    "在视频约 35% 位置加入一个对比案例，以提升留存。",
+  "Tie CTA to the next specific video topic instead of generic subscription ask.":
+    "把 CTA 绑定到下一个具体选题，而不是泛化地引导订阅。",
+  "CTA is actionable but should include one concrete next action and expected payoff.":
+    "CTA 具备可执行性，但还应加入一个明确的下一步动作和预期收益。",
+  "Main subject is clear, but contrast hierarchy and text layering can be improved.":
+    "主体清晰，但对比层次和文字排布仍有优化空间。",
+  "Keep overlay text under 4 words and start with action verbs.":
+    "封面叠字控制在 4 个词以内，并优先使用动作动词开头。",
+  "Increase brightness contrast between face/object and background.":
+    "提升人物或主体与背景之间的亮度对比。",
+  "Use before/after visual contrast to increase click intent.":
+    "使用前后对比的视觉结构，提升点击意图。",
+  "Growth-focused creators looking for reusable scripts and repeatable workflows.":
+    "以增长为目标的创作者，关注可复用脚本与可复制流程。",
+  "Reuse proven script patterns": "复用已经验证有效的脚本模式",
   "Increase thumbnail CTR": "提升封面点击率（CTR）",
   "Reduce creative trial-and-error": "减少内容创作中的试错成本",
-  "Not enough cases": "案例数量不够",
+  "Not enough cases": "案例数量还不够",
   "Need more measurable advanced detail": "需要更多可量化的进阶细节",
   "Show final outcome footage in first 10 seconds.": "前 10 秒先展示最终结果画面。",
-  "Reduce thumbnail words to 3-4 and highlight conflict keyword.": "将封面文字压缩到 3-4 个词，并突出冲突关键词。",
-  "Insert one failure case around 40% timeline to boost value density.": "在约 40% 时间点插入一个失败案例，提高信息密度。",
+  "Reduce thumbnail words to 3-4 and highlight conflict keyword.": "把封面文案压缩到 3-4 个词，并突出冲突关键词。",
+  "Insert one failure case around 40% timeline to boost value density.": "在约 40% 的时间点插入一个失败案例，提升价值密度。",
   "Rewrite CTA with clear promise for the next video.": "重写 CTA，明确下一条视频的具体收益承诺。",
   "Live API": "实时 API",
   "Mock Demo": "演示数据",
   "Mock Synthetic": "合成数据",
   "Avoid generic intro context before the main payoff.": "避免在主要结果出现前铺垫过多泛化背景。",
-  "Avoid long intro setup": "避免冗长的开场铺垫",
-  "Avoid late CTA placement": "避免把 CTA 放得过晚",
-  "Pull one concrete benchmark beat into the first third of the script.": "把一个具体对标节奏点放进脚本前三分之一。"
+  "Avoid long intro setup": "避免过长的开场铺垫",
+  "Avoid late CTA placement": "避免把 CTA 放得过晚"
 };
 
 const sentimentMap: Record<string, string> = {
@@ -84,16 +94,21 @@ function localizeBenchmarkLine(lang: Lang, value: string): string {
     return `命中的钩子模式：${value.slice("Retrieved with hook pattern: ".length)}`;
   }
   if (value.startsWith("Benchmark duration bucket is ")) {
-    const rest = value.slice("Benchmark duration bucket is ".length).replace(", so pacing may differ from the current video.", "");
-    return `对标案例时长分段为 ${rest}，节奏可能与当前视频不同。`;
+    const rest = value
+      .slice("Benchmark duration bucket is ".length)
+      .replace(", so pacing may differ from the current video.", "");
+    return `对标案例的时长分段是 ${rest}，因此节奏可能与当前视频不同。`;
   }
   if (value.startsWith("Adapt the ") && value.endsWith(" opening pattern into the first 10-15 seconds.")) {
     const hook = value.slice("Adapt the ".length, -" opening pattern into the first 10-15 seconds.".length);
-    return `把 ${hook} 的开场模式压进前 10-15 秒。`;
+    return `把 ${hook} 的开场模式压缩进前 10-15 秒。`;
   }
   if (value.startsWith("Reuse the ") && value.endsWith(" framing from this benchmark while keeping your original promise specific.")) {
-    const topic = value.slice("Reuse the ".length, -" framing from this benchmark while keeping your original promise specific.".length);
-    return `复用这个 ${topic} 主题的表达框架，同时保留你原本明确的结果承诺。`;
+    const topic = value.slice(
+      "Reuse the ".length,
+      -" framing from this benchmark while keeping your original promise specific.".length
+    );
+    return `复用这个 ${topic} 主题的表达框架，同时保留你原本清晰具体的结果承诺。`;
   }
   if (value.startsWith("Avoid drifting away from the query focus: ")) {
     return `避免偏离当前 query 重点：${value.slice("Avoid drifting away from the query focus: ".length)}`;

@@ -627,3 +627,29 @@ export async function importLibraryItems(
   await writeDb(db);
   return db.library;
 }
+
+export async function deleteLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { error, count } = await client
+      .from("viral_library_items")
+      .delete({ count: "exact" })
+      .eq("id", id);
+
+    if (error) {
+      throw new Error(`SUPABASE_DELETE_LIBRARY_FAILED:${error.message}`);
+    }
+
+    return (count ?? 0) > 0;
+  }
+
+  const db = await readDb();
+  const before = db.library.length;
+  db.library = db.library.filter((item) => item.id !== id);
+  if (db.library.length === before) {
+    return false;
+  }
+
+  await writeDb(db);
+  return true;
+}

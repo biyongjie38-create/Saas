@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -10,6 +10,12 @@ try:
     from openai import OpenAI
 except Exception:
     OpenAI = None
+
+
+@dataclass(frozen=True)
+class ProviderOverrides:
+    api_key: str | None = None
+    base_url: str | None = None
 
 
 @dataclass
@@ -24,6 +30,14 @@ class ModelExecution:
     output_tokens: int
     total_tokens: int
     provider_request_id: str | None = None
+
+
+def build_provider_overrides(api_key: str | None = None, base_url: str | None = None) -> ProviderOverrides | None:
+    resolved_key = (api_key or "").strip() or None
+    resolved_base_url = (base_url or "").strip() or None
+    if not resolved_key and not resolved_base_url:
+        return None
+    return ProviderOverrides(api_key=resolved_key, base_url=resolved_base_url)
 
 
 def get_provider_mode() -> str:
@@ -41,28 +55,34 @@ def _resolve_timeout() -> float:
         return 20.0
 
 
-def _has_openai_credentials() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY")) and OpenAI is not None
+def _has_openai_credentials(overrides: ProviderOverrides | None = None) -> bool:
+    if OpenAI is None:
+        return False
+    if overrides and overrides.api_key:
+        return True
+    return bool(os.getenv("OPENAI_API_KEY"))
 
 
-def _should_try_openai() -> bool:
+def _should_try_openai(overrides: ProviderOverrides | None = None) -> bool:
     mode = get_provider_mode()
     if mode == "local":
         return False
-    return _has_openai_credentials()
+    return _has_openai_credentials(overrides)
 
 
-def _create_openai_client() -> Any:
+def _create_openai_client(overrides: ProviderOverrides | None = None) -> Any:
     if OpenAI is None:
         raise RuntimeError("OPENAI_SDK_MISSING")
 
+    api_key = overrides.api_key if overrides and overrides.api_key else os.getenv("OPENAI_API_KEY")
+    base_url = overrides.base_url if overrides and overrides.base_url else os.getenv("OPENAI_BASE_URL")
+
     kwargs: dict[str, Any] = {
-        "api_key": os.getenv("OPENAI_API_KEY"),
+        "api_key": api_key,
         "timeout": _resolve_timeout(),
         "max_retries": 0,
     }
 
-    base_url = os.getenv("OPENAI_BASE_URL")
     if base_url:
         kwargs["base_url"] = base_url
 
@@ -115,8 +135,9 @@ def _call_openai_json(
     system_prompt: str,
     user_prompt: str,
     temperature: float,
+    provider_overrides: ProviderOverrides | None = None,
 ) -> tuple[dict[str, Any], str, int, int, int, str | None]:
-    client = _create_openai_client()
+    client = _create_openai_client(provider_overrides)
     response = client.chat.completions.create(
         model=model,
         temperature=temperature,
@@ -146,12 +167,13 @@ def run_json_task(
     validator: Callable[[dict[str, Any]], Any],
     temperature: float = 0.3,
     max_retries: int = 1,
+    provider_overrides: ProviderOverrides | None = None,
 ) -> ModelExecution:
     started = time.perf_counter()
     mode = get_provider_mode()
     last_error: Exception | None = None
 
-    if _should_try_openai():
+    if _should_try_openai(provider_overrides):
         for attempt in range(max_retries + 1):
             try:
                 payload, resolved_model, input_tokens, output_tokens, total_tokens, provider_request_id = _call_openai_json(
@@ -159,6 +181,7 @@ def run_json_task(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     temperature=temperature,
+                    provider_overrides=provider_overrides,
                 )
                 validator(payload)
                 return ModelExecution(

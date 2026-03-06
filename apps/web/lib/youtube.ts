@@ -12,6 +12,7 @@ type FetchMode = "auto" | "live" | "mock";
 
 type QueryOptions = {
   supabaseClient?: SupabaseClient | null;
+  apiKeyOverride?: string | null;
 };
 
 type YoutubeApiVideoItem = {
@@ -133,11 +134,7 @@ async function getSupabaseUserClient(options?: QueryOptions): Promise<SupabaseCl
 async function getCachedVideo(videoId: string, options?: QueryOptions): Promise<YoutubeVideo | null> {
   const client = await getSupabaseUserClient(options);
   if (client) {
-    const { data, error } = await client
-      .from("videos")
-      .select("*")
-      .eq("video_id", videoId)
-      .maybeSingle();
+    const { data, error } = await client.from("videos").select("*").eq("video_id", videoId).maybeSingle();
 
     if (error) {
       throw new Error(`SUPABASE_GET_VIDEO_FAILED:${error.message}`);
@@ -155,11 +152,7 @@ async function saveVideo(video: YoutubeVideo, options?: QueryOptions): Promise<Y
   if (client) {
     const primaryPayload = toVideoRow(video, true);
 
-    const firstTry = await client
-      .from("videos")
-      .upsert(primaryPayload, { onConflict: "video_id" })
-      .select("*")
-      .single();
+    const firstTry = await client.from("videos").upsert(primaryPayload, { onConflict: "video_id" }).select("*").single();
 
     if (!firstTry.error) {
       return toVideoFromRow(firstTry.data as Record<string, unknown>);
@@ -168,11 +161,7 @@ async function saveVideo(video: YoutubeVideo, options?: QueryOptions): Promise<Y
     const compatibilityPayload = toVideoRow(video, false);
     delete compatibilityPayload.description;
 
-    const fallbackTry = await client
-      .from("videos")
-      .upsert(compatibilityPayload, { onConflict: "video_id" })
-      .select("*")
-      .single();
+    const fallbackTry = await client.from("videos").upsert(compatibilityPayload, { onConflict: "video_id" }).select("*").single();
 
     if (fallbackTry.error) {
       throw new Error(`SUPABASE_SAVE_VIDEO_FAILED:${firstTry.error.message};${fallbackTry.error.message}`);
@@ -301,11 +290,7 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function fetchFromYoutubeApi(
-  videoId: string,
-  url: string,
-  apiKey: string
-): Promise<Omit<YoutubeVideo, "id" | "fetchedAt">> {
+async function fetchFromYoutubeApi(videoId: string, url: string, apiKey: string): Promise<Omit<YoutubeVideo, "id" | "fetchedAt">> {
   const videoApiUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
   videoApiUrl.searchParams.set("part", "snippet,contentDetails,statistics");
   videoApiUrl.searchParams.set("id", videoId);
@@ -386,11 +371,12 @@ export async function fetchYoutubeData(url: string, options?: QueryOptions): Pro
   }
 
   const mode = resolveFetchMode();
-  const apiKey = process.env.YOUTUBE_API_KEY;
+  const apiKey = (options?.apiKeyOverride ?? process.env.YOUTUBE_API_KEY ?? "").trim();
+  const shouldAttemptLiveFetch = mode !== "mock" || Boolean(apiKey);
 
   let record: Omit<YoutubeVideo, "id" | "fetchedAt"> | null = null;
 
-  if (mode !== "mock") {
+  if (shouldAttemptLiveFetch) {
     if (!apiKey && mode === "live") {
       throw new Error("YOUTUBE_KEY_MISSING");
     }
@@ -407,9 +393,7 @@ export async function fetchYoutubeData(url: string, options?: QueryOptions): Pro
   }
 
   if (!record) {
-    const mockSource: "mock_demo" | "mock_synthetic" = demoVideos[videoId]
-      ? "mock_demo"
-      : "mock_synthetic";
+    const mockSource: "mock_demo" | "mock_synthetic" = demoVideos[videoId] ? "mock_demo" : "mock_synthetic";
     record = createMockVideo(videoId, url, mockSource);
   }
 

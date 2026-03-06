@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -40,6 +40,26 @@ HOOK_KEYWORDS: dict[str, tuple[str, ...]] = {
 }
 
 
+def build_rag_provider_overrides(
+    *,
+    openai_api_key: str | None = None,
+    openai_base_url: str | None = None,
+    pinecone_api_key: str | None = None,
+    pinecone_index_host: str | None = None,
+    pinecone_index_name: str | None = None,
+    pinecone_namespace: str | None = None,
+) -> dict[str, str] | None:
+    payload = {
+        "openai_api_key": (openai_api_key or "").strip(),
+        "openai_base_url": (openai_base_url or "").strip(),
+        "pinecone_api_key": (pinecone_api_key or "").strip(),
+        "pinecone_index_host": (pinecone_index_host or "").strip(),
+        "pinecone_index_name": (pinecone_index_name or "").strip(),
+        "pinecone_namespace": (pinecone_namespace or "").strip(),
+    }
+    return payload if any(payload.values()) else None
+
+
 def _tokenize(text: str) -> set[str]:
     pieces = text.lower().replace("/", " ").replace("-", " ").split()
     return {piece.strip() for piece in pieces if piece.strip()}
@@ -66,9 +86,9 @@ def _load_library() -> list[dict[str, Any]]:
 def _coerce_tags(item: dict[str, Any]) -> dict[str, str]:
     tags = item.get("tags") or {}
     return {
-        "hook_type": str(tags.get("hook_type") or "unknown"),
+        "hook_type": str(tags.get("hook_type") or tags.get("hookType") or "unknown"),
         "topic": str(tags.get("topic") or "general"),
-        "duration_bucket": str(tags.get("duration_bucket") or "unknown"),
+        "duration_bucket": str(tags.get("duration_bucket") or tags.get("durationBucket") or "unknown"),
     }
 
 
@@ -188,7 +208,7 @@ def _fallback_payload(data: RagCompareRequest) -> dict[str, Any]:
             {
                 "id": item["id"],
                 "title": item["title"],
-                "source_url": item["source_url"],
+                "source_url": item.get("source_url") or item.get("sourceUrl") or "https://youtube.com",
                 "similarity": similarity,
                 "shared_points": [
                     f"Topic alignment: {tags['topic']}",
@@ -227,6 +247,25 @@ def _get_openai_client() -> Any:
     return OpenAI(**kwargs)
 
 
+def _create_openai_client(provider_overrides: dict[str, str] | None = None) -> Any:
+    if OpenAI is None:
+        raise RuntimeError("OPENAI_SDK_MISSING")
+
+    if not provider_overrides or not (
+        provider_overrides.get("openai_api_key") or provider_overrides.get("openai_base_url")
+    ):
+        return _get_openai_client()
+
+    kwargs: dict[str, Any] = {
+        "api_key": provider_overrides.get("openai_api_key") or os.getenv("OPENAI_API_KEY"),
+        "max_retries": 0,
+    }
+    base_url = provider_overrides.get("openai_base_url") or os.getenv("OPENAI_BASE_URL")
+    if base_url:
+        kwargs["base_url"] = base_url
+    return OpenAI(**kwargs)
+
+
 def _get_host_from_description(described: Any) -> str | None:
     if isinstance(described, dict):
         return described.get("host")
@@ -259,8 +298,40 @@ def _get_pinecone_index() -> Any:
     return pc.Index(host=host)
 
 
-def _embed_query(text: str) -> tuple[list[float], str, int, int, int, str | None]:
-    client = _get_openai_client()
+def _create_pinecone_index(provider_overrides: dict[str, str] | None = None) -> Any:
+    if not provider_overrides or not (
+        provider_overrides.get("pinecone_api_key")
+        or provider_overrides.get("pinecone_index_host")
+        or provider_overrides.get("pinecone_index_name")
+    ):
+        return _get_pinecone_index()
+
+    if Pinecone is None:
+        raise RuntimeError("PINECONE_SDK_MISSING")
+
+    api_key = provider_overrides.get("pinecone_api_key") or os.getenv("PINECONE_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("PINECONE_API_KEY_MISSING")
+
+    host = provider_overrides.get("pinecone_index_host") or os.getenv("PINECONE_INDEX_HOST", "").strip()
+    index_name = provider_overrides.get("pinecone_index_name") or os.getenv("PINECONE_INDEX_NAME", "").strip()
+
+    pc = Pinecone(api_key=api_key)
+
+    if not host:
+        if not index_name:
+            raise RuntimeError("PINECONE_INDEX_CONFIG_MISSING")
+        described = pc.describe_index(name=index_name)
+        host = _get_host_from_description(described) or ""
+
+    if not host:
+        raise RuntimeError("PINECONE_INDEX_HOST_MISSING")
+
+    return pc.Index(host=host)
+
+
+def _embed_query(text: str, provider_overrides: dict[str, str] | None = None) -> tuple[list[float], str, int, int, int, str | None]:
+    client = _create_openai_client(provider_overrides)
     model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
     response = client.embeddings.create(
         model=model,
@@ -289,7 +360,11 @@ def _build_local_execution(mode: str, data: RagCompareRequest, started: float) -
     )
 
 
-def run_benchmark_retrieval(data: RagCompareRequest, top_k: int) -> ModelExecution:
+def run_benchmark_retrieval(
+    data: RagCompareRequest,
+    top_k: int,
+    provider_overrides: dict[str, str] | None = None,
+) -> ModelExecution:
     started = time.perf_counter()
     mode = get_provider_mode()
     resolved_top_k = max(1, int(top_k or data.top_k or 3))
@@ -301,11 +376,14 @@ def run_benchmark_retrieval(data: RagCompareRequest, top_k: int) -> ModelExecuti
     filter_expression = _build_filter(data)
 
     try:
-        vector, embedding_model, input_tokens, output_tokens, total_tokens, provider_request_id = _embed_query(query_text)
-        index = _get_pinecone_index()
+        vector, embedding_model, input_tokens, output_tokens, total_tokens, provider_request_id = _embed_query(
+            query_text,
+            provider_overrides,
+        )
+        index = _create_pinecone_index(provider_overrides)
 
         kwargs: dict[str, Any] = {
-            "namespace": os.getenv("PINECONE_NAMESPACE", "viral-library"),
+            "namespace": provider_overrides.get("pinecone_namespace") if provider_overrides and provider_overrides.get("pinecone_namespace") else os.getenv("PINECONE_NAMESPACE", "viral-library"),
             "vector": vector,
             "top_k": resolved_top_k,
             "include_metadata": True,
@@ -353,7 +431,7 @@ def build_embedding_records(items: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "content": _compose_document(item),
                 "title": str(item.get("title") or ""),
                 "summary": str(item.get("summary") or ""),
-                "source_url": str(item.get("source_url") or ""),
+                "source_url": str(item.get("source_url") or item.get("sourceUrl") or ""),
                 "topic": tags["topic"],
                 "hook_type": tags["hook_type"],
                 "duration_bucket": tags["duration_bucket"],

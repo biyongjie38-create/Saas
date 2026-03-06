@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import type { Lang } from "@/lib/i18n-shared";
@@ -11,28 +11,42 @@ type Props = {
 
 type ImportFormat = "json" | "csv";
 
+type ApiError = {
+  code?: string;
+  message?: string;
+};
+
 type ImportResponse = {
   ok: boolean;
   data: {
     imported_count: number;
     items: ViralLibraryItem[];
   } | null;
-  error: {
-    code: string;
-    message: string;
+  error?: ApiError | null;
+};
+
+type DeleteResponse = {
+  ok: boolean;
+  data: {
+    deleted: boolean;
+    id: string;
   } | null;
+  error?: ApiError | null;
 };
 
 const copyByLang = {
   en: {
     title: "Viral Library",
-    subtitle: "Search benchmark references, paste JSON/CSV snippets, or upload a local file for future retrieval.",
+    subtitle:
+      "Search benchmark references, paste JSON/CSV snippets, or upload a local file for future retrieval and manual curation.",
     searchLabel: "Search",
     searchPlaceholder: "Search title, summary, topic, hook type...",
     importTitle: "Import Items",
-    importHelpJson: "JSON must be an array of items. Supported fields: title, sourceUrl, summary, tags.hookType/topic/durationBucket.",
+    importHelpJson:
+      "JSON must be an array of items. Supported fields: title, sourceUrl, summary, tags.hookType/topic/durationBucket.",
     importHelpCsv: "CSV header must be: title,sourceUrl,summary,hookType,topic,durationBucket",
-    fileRule: "Only .json or .csv files can be imported. Unsupported files will be rejected and cannot enter the library.",
+    fileRule:
+      "Only .json or .csv files can be imported. Unsupported files will be rejected and cannot enter the library.",
     json: "JSON",
     csv: "CSV",
     uploadFile: "Upload File",
@@ -52,37 +66,46 @@ const copyByLang = {
     filtered: "Filtered",
     open: "Open source",
     tagHook: "Hook",
-    tagDuration: "Duration"
+    tagDuration: "Duration",
+    deleteItem: "Delete",
+    deleting: "Deleting...",
+    deleteFailed: "Delete failed.",
+    deleted: "Item deleted."
   },
   zh: {
-    title: "\u7206\u6b3e\u5e93",
-    subtitle: "\u641c\u7d22\u5bf9\u6807\u7d20\u6750\u5e93\uff0c\u53ef\u7c98\u8d34 JSON/CSV\uff0c\u4e5f\u53ef\u4e0a\u4f20\u672c\u5730\u6587\u4ef6\uff0c\u4f9b\u540e\u7eed\u68c0\u7d22\u4e0e\u8fd0\u8425\u7ef4\u62a4\u4f7f\u7528\u3002",
-    searchLabel: "\u641c\u7d22",
-    searchPlaceholder: "\u641c\u7d22\u6807\u9898\u3001\u6458\u8981\u3001\u4e3b\u9898\u3001\u94a9\u5b50\u7c7b\u578b...",
-    importTitle: "\u5bfc\u5165\u6761\u76ee",
-    importHelpJson: "JSON \u5fc5\u987b\u662f\u6570\u7ec4\u683c\u5f0f\uff0c\u652f\u6301\u5b57\u6bb5\uff1atitle\u3001sourceUrl\u3001summary\u3001tags.hookType/topic/durationBucket\u3002",
-    importHelpCsv: "CSV \u8868\u5934\u5fc5\u987b\u662f\uff1atitle,sourceUrl,summary,hookType,topic,durationBucket",
-    fileRule: "\u53ea\u5141\u8bb8\u5bfc\u5165 .json \u6216 .csv \u6587\u4ef6\u3002\u683c\u5f0f\u4e0d\u6b63\u786e\u7684\u6587\u4ef6\u4f1a\u88ab\u62d2\u7edd\uff0c\u65e0\u6cd5\u8fdb\u5165\u7206\u6b3e\u5e93\u3002",
+    title: "爆款库",
+    subtitle: "搜索对标素材库，可粘贴 JSON/CSV，也可上传本地文件，供后续检索与运营维护使用。",
+    searchLabel: "搜索",
+    searchPlaceholder: "搜索标题、摘要、主题、钩子类型...",
+    importTitle: "导入条目",
+    importHelpJson:
+      "JSON 必须是数组格式，支持字段：title、sourceUrl、summary、tags.hookType/topic/durationBucket。",
+    importHelpCsv: "CSV 表头必须是：title,sourceUrl,summary,hookType,topic,durationBucket",
+    fileRule: "只允许导入 .json 或 .csv 文件。格式不正确的文件会被拒绝，无法进入爆款库。",
     json: "JSON",
     csv: "CSV",
-    uploadFile: "\u4e0a\u4f20\u6587\u4ef6",
-    importButton: "\u5bfc\u5165\u7206\u6b3e\u5e93\u6570\u636e",
-    importing: "\u5bfc\u5165\u4e2d...",
-    importFailed: "\u5bfc\u5165\u5931\u8d25\u3002",
-    emptyImport: "\u8bf7\u5148\u7c98\u8d34 JSON/CSV \u5185\u5bb9\uff0c\u6216\u5148\u4e0a\u4f20\u6587\u4ef6\u3002",
-    invalidFileType: "\u4ec5\u652f\u6301 JSON \u6216 CSV \u6587\u4ef6\u3002",
-    emptyFile: "\u6240\u9009\u6587\u4ef6\u4e3a\u7a7a\u3002",
-    fileReadFailed: "\u8bfb\u53d6\u6587\u4ef6\u5931\u8d25\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u3002",
-    fileReady: "\u6587\u4ef6\u5df2\u8f7d\u5165\uff0c\u8bf7\u786e\u8ba4\u5185\u5bb9\u540e\u6267\u884c\u5bfc\u5165\u3002",
-    loadedFile: "\u5df2\u8f7d\u5165\u6587\u4ef6",
-    emptyResult: "\u5f53\u524d\u641c\u7d22\u6ca1\u6709\u5339\u914d\u5230\u4efb\u4f55\u7206\u6b3e\u5e93\u6761\u76ee\u3002",
-    imported: "\u5df2\u5bfc\u5165",
-    items: "\u6761",
-    total: "\u603b\u6570",
-    filtered: "\u7b5b\u9009\u540e",
-    open: "\u6253\u5f00\u6765\u6e90",
-    tagHook: "\u94a9\u5b50",
-    tagDuration: "\u65f6\u957f"
+    uploadFile: "上传文件",
+    importButton: "导入爆款库数据",
+    importing: "导入中...",
+    importFailed: "导入失败。",
+    emptyImport: "请先粘贴 JSON/CSV 内容，或先上传文件。",
+    invalidFileType: "仅支持 JSON 或 CSV 文件。",
+    emptyFile: "所选文件为空。",
+    fileReadFailed: "读取文件失败，请重新选择。",
+    fileReady: "文件已载入，请确认内容后执行导入。",
+    loadedFile: "已载入文件",
+    emptyResult: "当前搜索没有匹配到任何爆款库条目。",
+    imported: "已导入",
+    items: "条",
+    total: "总数",
+    filtered: "筛选后",
+    open: "打开来源",
+    tagHook: "钩子",
+    tagDuration: "时长",
+    deleteItem: "删除",
+    deleting: "删除中...",
+    deleteFailed: "删除失败。",
+    deleted: "已删除该条爆款。"
   }
 } as const;
 
@@ -112,6 +135,7 @@ export function LibraryManager({ lang, initialItems }: Props) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loadedFileName, setLoadedFileName] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
@@ -175,6 +199,28 @@ export function LibraryManager({ lang, initialItems }: Props) {
     });
   }
 
+  async function handleDelete(itemId: string) {
+    setDeletingId(itemId);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/library/${itemId}`, { method: "DELETE" });
+      const payload = (await response.json().catch(() => null)) as DeleteResponse | null;
+      if (!response.ok || !payload?.ok || payload.data?.deleted !== true) {
+        setError(payload?.error?.message ?? copy.deleteFailed);
+        return;
+      }
+
+      setItems((current) => current.filter((item) => item.id !== itemId));
+      setMessage(copy.deleted);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.deleteFailed);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -223,15 +269,21 @@ export function LibraryManager({ lang, initialItems }: Props) {
           <p>{copy.subtitle}</p>
         </div>
         <div className="library-stats">
-          <span className="badge">{copy.total}: {items.length}</span>
-          <span className="badge">{copy.filtered}: {filtered.length}</span>
+          <span className="badge">
+            {copy.total}: {items.length}
+          </span>
+          <span className="badge">
+            {copy.filtered}: {filtered.length}
+          </span>
         </div>
       </div>
 
       <div className="library-layout">
         <section className="card panel">
           <div className="library-search-row">
-            <label className="small" htmlFor="library-search">{copy.searchLabel}</label>
+            <label className="small" htmlFor="library-search">
+              {copy.searchLabel}
+            </label>
             <input
               id="library-search"
               className="input"
@@ -251,13 +303,26 @@ export function LibraryManager({ lang, initialItems }: Props) {
                   </div>
                   <p>{item.summary}</p>
                   <p className="small mono">
-                    {copy.tagHook}: {item.tags.hookType} \u00b7 {copy.tagDuration}: {item.tags.durationBucket}
+                    {copy.tagHook}: {item.tags.hookType} {" · "}
+                    {copy.tagDuration}: {item.tags.durationBucket}
                   </p>
-                  {item.sourceUrl ? (
-                    <a href={item.sourceUrl} className="small library-link" target="_blank" rel="noreferrer">
-                      {copy.open}
-                    </a>
-                  ) : null}
+                  <div className="library-card-actions">
+                    {item.sourceUrl ? (
+                      <a href={item.sourceUrl} className="small library-link" target="_blank" rel="noreferrer">
+                        {copy.open}
+                      </a>
+                    ) : (
+                      <span className="small" />
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-ghost library-delete-button"
+                      onClick={() => handleDelete(item.id)}
+                      disabled={deletingId === item.id}
+                    >
+                      {deletingId === item.id ? copy.deleting : copy.deleteItem}
+                    </button>
+                  </div>
                 </article>
               ))
             ) : (
@@ -297,7 +362,11 @@ export function LibraryManager({ lang, initialItems }: Props) {
 
           <p className="small">{format === "json" ? copy.importHelpJson : copy.importHelpCsv}</p>
           <p className="small import-rule">{copy.fileRule}</p>
-          {loadedFileName ? <div className="import-file-chip">{copy.loadedFile}: {loadedFileName}</div> : null}
+          {loadedFileName ? (
+            <div className="import-file-chip">
+              {copy.loadedFile}: {loadedFileName}
+            </div>
+          ) : null}
 
           <textarea
             className="textarea"

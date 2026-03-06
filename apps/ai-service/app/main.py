@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 
 from app.runtime_env import load_runtime_env
 from app.schemas import (
@@ -23,8 +23,8 @@ from app.services.model_router import (
     route_analysis_model,
     route_score_model,
 )
-from app.services.provider import run_json_task
-from app.services.rag import run_benchmark_retrieval
+from app.services.provider import build_provider_overrides, run_json_task
+from app.services.rag import build_rag_provider_overrides, run_benchmark_retrieval
 from app.services.scoring import (
     build_score_payload,
     build_score_system_prompt,
@@ -42,8 +42,16 @@ def health() -> dict:
 
 
 @app.post("/ai/analyze", response_model=AnalyzeResponse)
-def analyze(data: AnalyzeRequest) -> AnalyzeResponse:
+def analyze(
+    data: AnalyzeRequest,
+    x_vb_openai_api_key: str | None = Header(default=None),
+    x_vb_openai_base_url: str | None = Header(default=None),
+) -> AnalyzeResponse:
     model = route_analysis_model(data.metadata)
+    provider_overrides = build_provider_overrides(
+        api_key=x_vb_openai_api_key,
+        base_url=x_vb_openai_base_url,
+    )
     result = run_json_task(
         task_name="analysis",
         model=model,
@@ -53,6 +61,7 @@ def analyze(data: AnalyzeRequest) -> AnalyzeResponse:
         validator=lambda payload: AnalysisPayload.model_validate(payload),
         temperature=0.4,
         max_retries=1,
+        provider_overrides=provider_overrides,
     )
 
     return AnalyzeResponse(
@@ -70,8 +79,24 @@ def analyze(data: AnalyzeRequest) -> AnalyzeResponse:
 
 
 @app.post("/ai/rag/compare", response_model=RagCompareResponse)
-def rag_compare(data: RagCompareRequest) -> RagCompareResponse:
-    result = run_benchmark_retrieval(data, data.top_k)
+def rag_compare(
+    data: RagCompareRequest,
+    x_vb_openai_api_key: str | None = Header(default=None),
+    x_vb_openai_base_url: str | None = Header(default=None),
+    x_vb_pinecone_api_key: str | None = Header(default=None),
+    x_vb_pinecone_index_host: str | None = Header(default=None),
+    x_vb_pinecone_index_name: str | None = Header(default=None),
+    x_vb_pinecone_namespace: str | None = Header(default=None),
+) -> RagCompareResponse:
+    provider_overrides = build_rag_provider_overrides(
+        openai_api_key=x_vb_openai_api_key,
+        openai_base_url=x_vb_openai_base_url,
+        pinecone_api_key=x_vb_pinecone_api_key,
+        pinecone_index_host=x_vb_pinecone_index_host,
+        pinecone_index_name=x_vb_pinecone_index_name,
+        pinecone_namespace=x_vb_pinecone_namespace,
+    )
+    result = run_benchmark_retrieval(data, data.top_k, provider_overrides)
 
     return RagCompareResponse(
         benchmarks=BenchmarksPayload.model_validate(result.payload),
@@ -88,8 +113,16 @@ def rag_compare(data: RagCompareRequest) -> RagCompareResponse:
 
 
 @app.post("/ai/score", response_model=ScoreResponse)
-def score(data: ScoreRequest) -> ScoreResponse:
+def score(
+    data: ScoreRequest,
+    x_vb_openai_api_key: str | None = Header(default=None),
+    x_vb_openai_base_url: str | None = Header(default=None),
+) -> ScoreResponse:
     model = route_score_model(data.metadata)
+    provider_overrides = build_provider_overrides(
+        api_key=x_vb_openai_api_key,
+        base_url=x_vb_openai_base_url,
+    )
     result = run_json_task(
         task_name="score",
         model=model,
@@ -99,6 +132,7 @@ def score(data: ScoreRequest) -> ScoreResponse:
         validator=lambda payload: ScorePayload.model_validate(payload),
         temperature=0.2,
         max_retries=1,
+        provider_overrides=provider_overrides,
     )
 
     return ScoreResponse(

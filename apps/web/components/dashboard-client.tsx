@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import type { Lang } from "@/lib/i18n-shared";
 
 type QuotaDetails = {
@@ -57,8 +58,10 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     analysisFailed: "Analysis failed",
     serviceUnavailable: "Could not connect to analysis service",
     requestFailed: "Analyze request failed",
-    mockHint: "This run used mock YouTube data. Verify the final recommendations against live video metrics before making release decisions.",
-    fallbackHint: "This run used local fallback analysis because the external AI service was unavailable or intentionally disabled for QA.",
+    mockHint:
+      "This run used mock YouTube data. Verify the final recommendations against live video metrics before making release decisions.",
+    fallbackHint:
+      "This run used local fallback analysis because the external AI service was unavailable or intentionally disabled for QA.",
     stageText: {
       fetching_youtube: "Fetching YouTube metadata",
       report_created: "Report record created",
@@ -160,7 +163,8 @@ export function DashboardClient({ lang }: Props) {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
         },
         body: JSON.stringify({
           url,
@@ -216,6 +220,7 @@ export function DashboardClient({ lang }: Props) {
             const id = event.envelope.data?.reportId;
             if (typeof id === "string") {
               setReportId(id);
+              window.dispatchEvent(new CustomEvent("viralbrain:reports-refresh"));
             }
 
             const fallbackUsed = event.envelope.data?.modelTrace;

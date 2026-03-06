@@ -9,14 +9,9 @@ import {
   withApiRoute
 } from "@/lib/api-response";
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
+import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { runAnalysis, runBenchmarks, runScoring } from "@/lib/ai-client";
-import {
-  consumeUsage,
-  countUsageForDay,
-  createReport,
-  listLibraryItems,
-  updateReport
-} from "@/lib/report-store";
+import { consumeUsage, countUsageForDay, createReport, listLibraryItems, updateReport } from "@/lib/report-store";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import type { ModelTrace } from "@/lib/types";
@@ -66,6 +61,7 @@ async function executeAnalyzeTask(input: {
   plan: "free" | "pro";
   supabaseClient: SupabaseClient | null;
   onStage?: (stage: string, payload?: Record<string, unknown>) => void;
+  providerConfig?: ReturnType<typeof readApiIntegrationConfigFromHeaders>;
 }): Promise<AnalyzeExecutionResult> {
   const startedAt = Date.now();
   let reportId: string | null = null;
@@ -83,7 +79,10 @@ async function executeAnalyzeTask(input: {
     );
 
     input.onStage?.("fetching_youtube", { message: "Fetching video metadata and comments" });
-    const video = await fetchYoutubeData(input.url, { supabaseClient: input.supabaseClient });
+    const video = await fetchYoutubeData(input.url, {
+      supabaseClient: input.supabaseClient,
+      apiKeyOverride: input.providerConfig?.youtubeApiKey
+    });
 
     const report = await createReport(
       {
@@ -102,14 +101,19 @@ async function executeAnalyzeTask(input: {
     });
 
     input.onStage?.("analysis", {});
-    const analysisResult = await runAnalysis(video);
+    const analysisResult = await runAnalysis(video, input.providerConfig);
 
     input.onStage?.("benchmark", {});
     const libraryItems = await listLibraryItems({ supabaseClient: input.supabaseClient });
-    const benchmarkResult = await runBenchmarks(video, analysisResult.analysis.structure.hookAnalysis, libraryItems);
+    const benchmarkResult = await runBenchmarks(
+      video,
+      analysisResult.analysis.structure.hookAnalysis,
+      libraryItems,
+      input.providerConfig
+    );
 
     input.onStage?.("score", {});
-    const scoreResult = await runScoring(video, analysisResult.analysis, benchmarkResult.benchmarks);
+    const scoreResult = await runScoring(video, analysisResult.analysis, benchmarkResult.benchmarks, input.providerConfig);
 
     const modelTrace = buildModelTrace({
       analysis: analysisResult.trace,
@@ -208,6 +212,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const { url, stream } = parsed.data;
+  const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
 
   if (!stream) {
     try {
@@ -215,7 +220,8 @@ export const POST = withApiRoute(async (request, { requestId }) => {
         url,
         userId: authUser.id,
         plan: appUser.plan,
-        supabaseClient
+        supabaseClient,
+        providerConfig
       });
 
       return okJsonResponse(
@@ -268,6 +274,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
         userId: authUser.id,
         plan: appUser.plan,
         supabaseClient,
+        providerConfig,
         onStage(stage, payload) {
           sendSuccess(stage, payload ?? {});
         }

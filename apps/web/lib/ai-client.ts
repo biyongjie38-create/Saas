@@ -1,4 +1,9 @@
-﻿import { generateLocalAnalysis, generateLocalBenchmarks, generateLocalScore } from "@/lib/local-ai";
+﻿import {
+  buildApiIntegrationHeaders,
+  createEmptyApiIntegrationConfig,
+  type ApiIntegrationConfig
+} from "@/lib/api-integrations";
+import { generateLocalAnalysis, generateLocalBenchmarks, generateLocalScore } from "@/lib/local-ai";
 import type {
   AnalysisJson,
   BenchmarksJson,
@@ -186,7 +191,7 @@ function fromAiScore(payload: AiScoreResponse["score"]): ScoreJson {
   };
 }
 
-async function postJson<TResponse>(path: string, payload: unknown): Promise<TResponse> {
+async function postJson<TResponse>(path: string, payload: unknown, providerConfig?: ApiIntegrationConfig): Promise<TResponse> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 18000);
 
@@ -194,7 +199,8 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
     const response = await fetch(`${AI_SERVICE_URL}${path}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...buildApiIntegrationHeaders(providerConfig ?? createEmptyApiIntegrationConfig())
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -211,7 +217,7 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
   }
 }
 
-export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisRunResult> {
+export async function runAnalysis(video: YoutubeVideo, providerConfig?: ApiIntegrationConfig): Promise<AnalysisRunResult> {
   if (shouldUseLocalAiMode()) {
     return {
       analysis: generateLocalAnalysis(video),
@@ -220,19 +226,23 @@ export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisRunResul
   }
 
   try {
-    const res = await postJson<AiAnalysisResponse>("/ai/analyze", {
-      metadata: {
-        video_id: video.videoId,
-        title: video.title,
-        description: video.description,
-        channel_name: video.channelName,
-        published_at: video.publishedAt,
-        duration_sec: video.durationSec,
-        stats: toAiStats(video.stats)
+    const res = await postJson<AiAnalysisResponse>(
+      "/ai/analyze",
+      {
+        metadata: {
+          video_id: video.videoId,
+          title: video.title,
+          description: video.description,
+          channel_name: video.channelName,
+          published_at: video.publishedAt,
+          duration_sec: video.durationSec,
+          stats: toAiStats(video.stats)
+        },
+        comments: video.topComments,
+        thumbnail_url: video.thumbnailUrl
       },
-      comments: video.topComments,
-      thumbnail_url: video.thumbnailUrl
-    });
+      providerConfig
+    );
 
     return {
       analysis: fromAiAnalysis(res.analysis),
@@ -249,7 +259,8 @@ export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisRunResul
 export async function runBenchmarks(
   video: YoutubeVideo,
   structureSummary: string,
-  libraryItems: ViralLibraryItem[]
+  libraryItems: ViralLibraryItem[],
+  providerConfig?: ApiIntegrationConfig
 ): Promise<BenchmarksRunResult> {
   if (shouldUseLocalAiMode()) {
     return {
@@ -259,12 +270,16 @@ export async function runBenchmarks(
   }
 
   try {
-    const res = await postJson<AiBenchmarksResponse>("/ai/rag/compare", {
-      video_id: video.videoId,
-      structure_summary: structureSummary,
-      topic_hint: video.title,
-      top_k: 3
-    });
+    const res = await postJson<AiBenchmarksResponse>(
+      "/ai/rag/compare",
+      {
+        video_id: video.videoId,
+        structure_summary: structureSummary,
+        topic_hint: video.title,
+        top_k: 3
+      },
+      providerConfig
+    );
 
     return {
       benchmarks: fromAiBenchmarks(res.benchmarks),
@@ -281,7 +296,8 @@ export async function runBenchmarks(
 export async function runScoring(
   video: YoutubeVideo,
   analysis: AnalysisJson,
-  benchmarks: BenchmarksJson
+  benchmarks: BenchmarksJson,
+  providerConfig?: ApiIntegrationConfig
 ): Promise<ScoreRunResult> {
   if (shouldUseLocalAiMode()) {
     return {
@@ -291,47 +307,51 @@ export async function runScoring(
   }
 
   try {
-    const res = await postJson<AiScoreResponse>("/ai/score", {
-      metadata: {
-        video_id: video.videoId,
-        title: video.title,
-        description: video.description,
-        channel_name: video.channelName,
-        published_at: video.publishedAt,
-        duration_sec: video.durationSec,
-        stats: toAiStats(video.stats)
-      },
-      analysis: {
-        structure: {
-          hook_analysis: analysis.structure.hookAnalysis,
-          pacing_notes: analysis.structure.pacingNotes,
-          cta_review: analysis.structure.ctaReview
+    const res = await postJson<AiScoreResponse>(
+      "/ai/score",
+      {
+        metadata: {
+          video_id: video.videoId,
+          title: video.title,
+          description: video.description,
+          channel_name: video.channelName,
+          published_at: video.publishedAt,
+          duration_sec: video.durationSec,
+          stats: toAiStats(video.stats)
         },
-        thumbnail_review: {
-          score: analysis.thumbnailReview.score,
-          diagnosis: analysis.thumbnailReview.diagnosis,
-          improvements: analysis.thumbnailReview.improvements
+        analysis: {
+          structure: {
+            hook_analysis: analysis.structure.hookAnalysis,
+            pacing_notes: analysis.structure.pacingNotes,
+            cta_review: analysis.structure.ctaReview
+          },
+          thumbnail_review: {
+            score: analysis.thumbnailReview.score,
+            diagnosis: analysis.thumbnailReview.diagnosis,
+            improvements: analysis.thumbnailReview.improvements
+          },
+          comments_insights: {
+            sentiment: analysis.commentsInsights.sentiment,
+            audience_persona: analysis.commentsInsights.audiencePersona,
+            motivations: analysis.commentsInsights.motivations,
+            concerns: analysis.commentsInsights.concerns
+          }
         },
-        comments_insights: {
-          sentiment: analysis.commentsInsights.sentiment,
-          audience_persona: analysis.commentsInsights.audiencePersona,
-          motivations: analysis.commentsInsights.motivations,
-          concerns: analysis.commentsInsights.concerns
+        benchmarks: {
+          top_matches: benchmarks.topMatches.map((item) => ({
+            id: item.id,
+            title: item.title,
+            source_url: item.sourceUrl,
+            similarity: item.similarity,
+            shared_points: item.sharedPoints,
+            differences: item.differences,
+            copy: item.copy,
+            avoid: item.avoid
+          }))
         }
       },
-      benchmarks: {
-        top_matches: benchmarks.topMatches.map((item) => ({
-          id: item.id,
-          title: item.title,
-          source_url: item.sourceUrl,
-          similarity: item.similarity,
-          shared_points: item.sharedPoints,
-          differences: item.differences,
-          copy: item.copy,
-          avoid: item.avoid
-        }))
-      }
-    });
+      providerConfig
+    );
 
     return {
       score: fromAiScore(res.score),

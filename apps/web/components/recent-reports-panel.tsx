@@ -1,0 +1,252 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import type { Lang } from "@/lib/i18n-shared";
+import {
+  localizeAnalysisJson,
+  localizeBenchmarksJson,
+  localizeScoreJson
+} from "@/lib/report-localize";
+import type { Report, YoutubeVideo } from "@/lib/types";
+import { ReportTabs } from "@/components/report-tabs";
+
+type Props = {
+  lang: Lang;
+  initialReports: Report[];
+};
+
+type ReportsEnvelope = {
+  ok: boolean;
+  data: {
+    items: Report[];
+  } | null;
+  error?: {
+    message?: string;
+  } | null;
+};
+
+type ReportDetailEnvelope = {
+  ok: boolean;
+  data: {
+    report: Report;
+    video: YoutubeVideo | null;
+  } | null;
+  error?: {
+    message?: string;
+  } | null;
+};
+
+type PreviewPayload = {
+  report: Report;
+  video: YoutubeVideo | null;
+};
+
+type Copy = {
+  title: string;
+  empty: string;
+  preview: string;
+  open: string;
+  loading: string;
+  previewTitle: string;
+  close: string;
+  openFull: string;
+  created: string;
+  score: string;
+  status: string;
+  failed: string;
+};
+
+const copyByLang: Record<Lang, Copy> = {
+  en: {
+    title: "Recent Reports",
+    empty: "No reports yet. Run your first analysis.",
+    preview: "View Report Analysis",
+    open: "Open Full Report",
+    loading: "Loading report preview...",
+    previewTitle: "Report Preview",
+    close: "Close",
+    openFull: "Open Full Report",
+    created: "Created",
+    score: "Score",
+    status: "Status",
+    failed: "Could not load report preview."
+  },
+  zh: {
+    title: "\u6700\u8fd1\u62a5\u544a",
+    empty: "\u8fd8\u6ca1\u6709\u62a5\u544a\uff0c\u5148\u8fd0\u884c\u4e00\u6b21\u5206\u6790\u5427\u3002",
+    preview: "\u67e5\u770b\u62a5\u544a\u5206\u6790",
+    open: "\u6253\u5f00\u5b8c\u6574\u62a5\u544a",
+    loading: "\u6b63\u5728\u52a0\u8f7d\u62a5\u544a\u9884\u89c8...",
+    previewTitle: "\u62a5\u544a\u9884\u89c8",
+    close: "\u5173\u95ed",
+    openFull: "\u6253\u5f00\u5b8c\u6574\u62a5\u544a",
+    created: "\u521b\u5efa\u65f6\u95f4",
+    score: "\u8bc4\u5206",
+    status: "\u72b6\u6001",
+    failed: "\u52a0\u8f7d\u62a5\u544a\u9884\u89c8\u5931\u8d25\u3002"
+  }
+};
+
+function classForStatus(status: string): string {
+  if (status === "done") {
+    return "status-done";
+  }
+  if (status === "failed") {
+    return "status-failed";
+  }
+  return "status-running";
+}
+
+export function RecentReportsPanel({ lang, initialReports }: Props) {
+  const copy = copyByLang[lang];
+  const [reports, setReports] = useState(initialReports);
+  const [loading, setLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const [previewPayload, setPreviewPayload] = useState<PreviewPayload | null>(null);
+
+  async function refreshReports() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/reports?limit=8", { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as ReportsEnvelope | null;
+      if (response.ok && payload?.ok && payload.data?.items) {
+        setReports(payload.data.items);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const handler = () => {
+      void refreshReports();
+    };
+
+    window.addEventListener("viralbrain:reports-refresh", handler);
+    return () => window.removeEventListener("viralbrain:reports-refresh", handler);
+  }, []);
+
+  async function openPreview(reportId: string) {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewError("");
+    setPreviewPayload(null);
+
+    try {
+      const response = await fetch(`/api/reports/${reportId}`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as ReportDetailEnvelope | null;
+      if (!response.ok || !payload?.ok || !payload.data) {
+        setPreviewError(payload?.error?.message ?? copy.failed);
+        return;
+      }
+
+      setPreviewPayload(payload.data);
+    } catch {
+      setPreviewError(copy.failed);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  const localizedPreview = useMemo(() => {
+    if (!previewPayload) {
+      return null;
+    }
+
+    return {
+      report: previewPayload.report,
+      video: previewPayload.video,
+      analysis: localizeAnalysisJson(lang, previewPayload.report.analysisJson),
+      benchmarks: localizeBenchmarksJson(lang, previewPayload.report.benchmarksJson),
+      score: localizeScoreJson(lang, previewPayload.report.scoreJson)
+    };
+  }, [lang, previewPayload]);
+
+  return (
+    <section style={{ marginTop: 24 }} className="card panel">
+      <div className="library-card-head">
+        <h2 style={{ margin: 0 }}>{copy.title}</h2>
+        {loading ? <span className="small">...</span> : null}
+      </div>
+
+      {reports.length === 0 ? (
+        <p className="small">{copy.empty}</p>
+      ) : (
+        <div className="recent-reports-stack">
+          {reports.map((report) => (
+            <article key={report.id} className="card panel recent-report-card">
+              <div className="recent-report-main">
+                <div>
+                  <p className="small mono">report_id: {report.id.slice(0, 8)}</p>
+                  <h3 style={{ margin: "4px 0 8px" }}>{report.videoId}</h3>
+                  <p className={`small mono ${classForStatus(report.status)}`}>{copy.status}: {report.status}</p>
+                  <p className="small">{copy.created}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}</p>
+                </div>
+                <div className="recent-report-score">
+                  <span className="small">{copy.score}</span>
+                  <strong>{report.scoreTotal ?? "--"}</strong>
+                </div>
+              </div>
+
+              <div className="recent-report-actions">
+                <button type="button" className="btn btn-primary report-history-action" onClick={() => openPreview(report.id)}>
+                  {copy.preview}
+                </button>
+                <Link href={`/report/${report.id}`} className="btn btn-ghost report-history-action">
+                  {copy.open}
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {previewOpen ? (
+        <div className="modal-backdrop" onClick={() => setPreviewOpen(false)}>
+          <div className="modal-shell report-preview-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="card-kicker">{copy.previewTitle}</p>
+                <h2 style={{ margin: 0 }}>{localizedPreview?.report.id.slice(0, 8) ?? "--"}</h2>
+              </div>
+              <button type="button" className="btn btn-ghost compact-button" onClick={() => setPreviewOpen(false)}>
+                {copy.close}
+              </button>
+            </div>
+
+            {previewLoading ? <p className="small">{copy.loading}</p> : null}
+            {previewError ? <p className="status-failed">{previewError}</p> : null}
+
+            {localizedPreview ? (
+              <div className="report-preview-body">
+                <aside className="card panel report-preview-side">
+                  <p className="small mono">report_id: {localizedPreview.report.id}</p>
+                  <p className={`mono ${classForStatus(localizedPreview.report.status)}`}>status: {localizedPreview.report.status}</p>
+                  <h3 style={{ marginBottom: 4 }}>{copy.score}</h3>
+                  <div style={{ fontSize: 42, fontWeight: 800 }}>{localizedPreview.score?.total ?? "--"}</div>
+                  <p className="small mono">video_id: {localizedPreview.report.videoId}</p>
+                  <p className="small">{copy.created}: {new Date(localizedPreview.report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}</p>
+                  <Link href={`/report/${localizedPreview.report.id}`} className="btn btn-primary report-history-action" style={{ marginTop: 16 }}>
+                    {copy.openFull}
+                  </Link>
+                </aside>
+
+                <ReportTabs
+                  lang={lang}
+                  video={localizedPreview.video}
+                  analysis={localizedPreview.analysis}
+                  benchmarks={localizedPreview.benchmarks}
+                  score={localizedPreview.score}
+                  trace={localizedPreview.report.modelTrace}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
