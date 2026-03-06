@@ -1,14 +1,11 @@
-﻿import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-
-function normalizeNextPath(input: string | null): string {
+﻿function normalizeNextPath(input: string | null): string {
   if (input && input.startsWith("/")) {
     return input;
   }
   return "/dashboard";
 }
 
-function fallbackHtml(nextPath: string): string {
+function fallbackHtml(defaultNextPath: string): string {
   return `<!doctype html>
 <html>
   <head>
@@ -19,27 +16,29 @@ function fallbackHtml(nextPath: string): string {
   <body>
     <script>
       (function() {
-        var next = ${JSON.stringify(nextPath)};
-        var hash = window.location.hash || "";
-        var target = "/auth/confirm?next=" + encodeURIComponent(next) + hash;
+        var url = new URL(window.location.href);
+        var params = new URLSearchParams(url.search);
+        var defaultNext = ${JSON.stringify(defaultNextPath)};
+        var next = params.get("next");
+        if (!next || next.charAt(0) !== "/") {
+          params.set("next", defaultNext);
+        }
+        var query = params.toString();
+        var target = "/auth/confirm" + (query ? "?" + query : "") + (url.hash || "");
         window.location.replace(target);
       })();
     </script>
-    Redirecting...
+    <noscript>
+      JavaScript is required to complete sign-in.
+      <a href="/login">Go to Login</a>
+    </noscript>
   </body>
 </html>`;
 }
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
   const nextPath = normalizeNextPath(requestUrl.searchParams.get("next"));
-
-  if (code) {
-    const supabase = await createServerSupabaseClient();
-    await supabase.auth.exchangeCodeForSession(code);
-    return NextResponse.redirect(new URL(nextPath, request.url));
-  }
 
   return new Response(fallbackHtml(nextPath), {
     status: 200,
@@ -49,4 +48,3 @@ export async function GET(request: Request) {
     }
   });
 }
-
