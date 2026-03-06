@@ -4,12 +4,12 @@ import { DashboardClient } from "@/components/dashboard-client";
 import { requirePageAuthUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { listReports } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
 export default async function DashboardPage() {
   const authUser = await requirePageAuthUser("/dashboard");
   const lang = await getServerLang();
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const result = await listReports(
     { userId: authUser.id, limit: 8 },
     { supabaseClient }
@@ -46,4 +46,3 @@ export default async function DashboardPage() {
     </main>
   );
 }
-

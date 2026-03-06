@@ -1,7 +1,8 @@
-import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
+﻿import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createRequestId, errorJsonResponse } from "@/lib/api-response";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getE2EAuthUser } from "@/lib/e2e-auth";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import type { User } from "@/lib/types";
 
 function resolvePlan(user: SupabaseAuthUser): User["plan"] {
@@ -18,8 +19,17 @@ export function toAppUser(user: SupabaseAuthUser): User {
 }
 
 export async function getOptionalAuthUser(): Promise<SupabaseAuthUser | null> {
+  const bypassUser = await getE2EAuthUser();
+  if (bypassUser) {
+    return bypassUser;
+  }
+
+  const supabase = await maybeCreateServerSupabaseClient();
+  if (!supabase) {
+    return null;
+  }
+
   try {
-    const supabase = await createServerSupabaseClient();
     const {
       data: { user }
     } = await supabase.auth.getUser();

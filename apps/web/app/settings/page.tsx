@@ -1,14 +1,14 @@
-import { SiteNav } from "@/components/site-nav";
+﻿import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser, toAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { getDailyLimitByPlan } from "@/lib/quota";
 import { countUsageForDay } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
 export default async function SettingsPage() {
   const authUser = await requirePageAuthUser("/settings");
   const lang = await getServerLang();
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const user = toAppUser(authUser);
   const usedToday = await countUsageForDay(user.id, {
     supabaseClient,
@@ -23,7 +23,7 @@ export default async function SettingsPage() {
         <h1 style={{ marginTop: 0 }}>{text(lang, "Settings", "设置")}</h1>
         <div className="grid-3">
           <article className="card panel">
-            <h3>{text(lang, "Account", "账号")}</h3>
+            <h3>{text(lang, "Account", "账户")}</h3>
             <p className="mono">{user.email}</p>
             <p className="small">{text(lang, "Plan", "套餐")}: {user.plan}</p>
           </article>
@@ -33,7 +33,13 @@ export default async function SettingsPage() {
             <p>
               {text(lang, "Today", "今日")} {usedToday} / {dailyLimit}
             </p>
-            <p className="small">{text(lang, "Data backend follows DATA_BACKEND setting (mock or supabase).", "数据后端遵循 DATA_BACKEND 配置（mock 或 supabase）。")}</p>
+            <p className="small">
+              {text(
+                lang,
+                "Data backend follows DATA_BACKEND setting (mock or supabase).",
+                "数据后端遵循 DATA_BACKEND 配置（mock 或 supabase）。"
+              )}
+            </p>
           </article>
 
           <article className="card panel">

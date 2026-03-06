@@ -2,6 +2,7 @@
 import { SiteNav } from "@/components/site-nav";
 import { LoginForm } from "@/components/login-form";
 import { getOptionalAuthUser } from "@/lib/auth";
+import { isE2EAuthBypassEnabled } from "@/lib/e2e-auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase-config";
 
@@ -76,9 +77,9 @@ export default async function LoginPage({ searchParams }: Props) {
           appUrl={resolvePublicAppUrl()}
           lang={lang}
           authConfig={authConfig}
+          enableE2EBypass={isE2EAuthBypassEnabled()}
         />
       </section>
     </main>
   );
 }
-

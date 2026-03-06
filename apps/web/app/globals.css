@@ -465,3 +465,15 @@ a {
   text-align: center;
 }
 
+
+.qa-banner {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 195, 107, 0.28);
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: #ffe1a7;
+  background:
+    radial-gradient(circle at top left, rgba(255, 195, 107, 0.16), transparent 44%),
+    linear-gradient(165deg, rgba(40, 26, 9, 0.92), rgba(18, 14, 10, 0.9));
+  box-shadow: 0 16px 28px rgba(7, 11, 20, 0.34);
+}

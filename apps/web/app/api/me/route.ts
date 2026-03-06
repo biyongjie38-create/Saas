@@ -2,7 +2,7 @@
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { getDailyLimitByPlan } from "@/lib/quota";
 import { countUsageForDay } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export const GET = withApiRoute(async (_request, { requestId }) => {
     return unauthorizedJsonResponse(requestId);
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const user = toAppUser(authUser);
   const usedToday = await countUsageForDay(user.id, {
     supabaseClient,

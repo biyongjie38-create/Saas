@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState, type FormEvent } from "react";
 import {
@@ -12,6 +12,7 @@ type Props = {
   nextPath: string;
   appUrl: string | null;
   lang: Lang;
+  enableE2EBypass?: boolean;
   authConfig: {
     url: string | null;
     anonKey: string | null;
@@ -23,6 +24,7 @@ type LoginCopy = {
   subtitle: string;
   callback: string;
   continueGoogle: string;
+  continueQa: string;
   sendMagicLink: string;
   emailPlaceholder: string;
   inputEmailRequired: string;
@@ -42,8 +44,9 @@ const copyByLang: Record<Lang, LoginCopy> = {
   en: {
     title: "Sign In",
     subtitle: "Use Google OAuth or Email Magic Link.",
-    callback: "callback",
+    callback: "Callback",
     continueGoogle: "Continue with Google",
+    continueQa: "Continue as QA User",
     sendMagicLink: "Send Email Magic Link",
     emailPlaceholder: "you@example.com",
     inputEmailRequired: "Please enter your email.",
@@ -63,6 +66,7 @@ const copyByLang: Record<Lang, LoginCopy> = {
     subtitle: "使用 Google OAuth 或邮箱魔法链接登录。",
     callback: "回调地址",
     continueGoogle: "使用 Google 登录",
+    continueQa: "使用 QA 账号继续",
     sendMagicLink: "发送邮箱魔法链接",
     emailPlaceholder: "you@example.com",
     inputEmailRequired: "请输入邮箱地址。",
@@ -70,11 +74,11 @@ const copyByLang: Record<Lang, LoginCopy> = {
     signInFailed: "登录失败。",
     missingConfigPrefix: "缺少 Supabase 登录配置",
     missingConfigFallback: "缺少 Supabase 登录配置。",
-    missingRedirectOrigin: "未找到回调来源域名。请设置 NEXT_PUBLIC_APP_URL，或从真实域名打开本页。",
+    missingRedirectOrigin: "没有可用的回调来源。请设置 NEXT_PUBLIC_APP_URL，或从真实域名打开当前页面。",
     hintVercelCurrent: "当前域名是 *.vercel.app。请设置 NEXT_PUBLIC_APP_URL 为正式域名，避免回调被保护策略拦截。",
-    hintLoopback: "回调目标是 localhost，仅在同一设备/浏览器可用。",
-    hintPrivate: "回调目标是局域网地址，仅同一网络可用。",
-    hintVercelTarget: "回调目标是 vercel.app 域名。如出现 401，请关闭 Deployment Protection 或使用自定义域名。",
+    hintLoopback: "回调目标是 localhost，仅在同一设备和同一浏览器内可用。",
+    hintPrivate: "回调目标是局域网地址，仅同一网络内可用。",
+    hintVercelTarget: "回调目标是 vercel.app 域名。如出现 401，请关闭 Deployment Protection 或改用自定义域名。",
     hintNonHttps: "回调目标不是 HTTPS。对外用户请使用 HTTPS 域名登录。"
   }
 };
@@ -118,12 +122,7 @@ function getRuntimeOrigin(): string | null {
 function isLoopbackHost(origin: string): boolean {
   try {
     const { hostname } = new URL(origin);
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "0.0.0.0" ||
-      hostname === "::1"
-    );
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1";
   } catch {
     return false;
   }
@@ -155,11 +154,7 @@ function isPrivateHost(origin: string): boolean {
       return true;
     }
 
-    if (nums[0] === 192 && nums[1] === 168) {
-      return true;
-    }
-
-    return false;
+    return nums[0] === 192 && nums[1] === 168;
   } catch {
     return false;
   }
@@ -188,11 +183,7 @@ function chooseRedirectOrigin(runtimeOrigin: string | null, configuredOrigin: st
       return configuredOrigin;
     }
 
-    if (
-      isLoopbackHost(runtimeOrigin) ||
-      isPrivateHost(runtimeOrigin) ||
-      isVercelAppHost(runtimeOrigin)
-    ) {
+    if (isLoopbackHost(runtimeOrigin) || isPrivateHost(runtimeOrigin) || isVercelAppHost(runtimeOrigin)) {
       return configuredOrigin;
     }
   }
@@ -230,7 +221,7 @@ function mapAuthError(error: unknown, configMessage: string | null, copy: LoginC
   return error instanceof Error ? error.message : copy.signInFailed;
 }
 
-export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
+export function LoginForm({ nextPath, appUrl, lang, authConfig, enableE2EBypass = false }: Props) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -241,17 +232,10 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
   const configMessage = useMemo(() => buildMissingAuthConfigMessage(authConfig, copy), [authConfig, copy]);
   const runtimeOrigin = useMemo(() => getRuntimeOrigin(), []);
   const configuredOrigin = useMemo(() => normalizeAppOrigin(appUrl), [appUrl]);
-  const callbackPath = useMemo(
-    () => `/auth/callback?next=${encodeURIComponent(safeNextPath)}`,
-    [safeNextPath]
-  );
-
-  const redirectOrigin = useMemo(
-    () => chooseRedirectOrigin(runtimeOrigin, configuredOrigin),
-    [runtimeOrigin, configuredOrigin]
-  );
-
+  const callbackPath = useMemo(() => `/auth/callback?next=${encodeURIComponent(safeNextPath)}`, [safeNextPath]);
+  const redirectOrigin = useMemo(() => chooseRedirectOrigin(runtimeOrigin, configuredOrigin), [runtimeOrigin, configuredOrigin]);
   const callbackPreview = `${redirectOrigin ?? "<missing-origin>"}${callbackPath}`;
+  const qaBypassHref = `/api/test-auth/login?next=${encodeURIComponent(safeNextPath)}`;
 
   const originHint = useMemo(() => {
     if (!redirectOrigin) {
@@ -311,8 +295,8 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
       if (authError) {
         throw authError;
       }
-    } catch (e) {
-      setError(mapAuthError(e, configMessage, copy));
+    } catch (cause) {
+      setError(mapAuthError(cause, configMessage, copy));
       setLoading(false);
     }
   }
@@ -348,8 +332,8 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
       }
 
       setMessage(copy.magicSent);
-    } catch (e) {
-      setError(mapAuthError(e, configMessage, copy));
+    } catch (cause) {
+      setError(mapAuthError(cause, configMessage, copy));
     } finally {
       setLoading(false);
     }
@@ -364,6 +348,17 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
       <p className="small mono" style={{ marginTop: 8 }}>
         {copy.callback}: {callbackPreview}
       </p>
+
+      {enableE2EBypass ? (
+        <a
+          className="btn btn-ghost"
+          href={qaBypassHref}
+          data-testid="qa-login-button"
+          style={{ marginBottom: 12, display: "inline-flex" }}
+        >
+          {copy.continueQa}
+        </a>
+      ) : null}
 
       <button className="btn btn-primary" onClick={signInWithGoogle} disabled={disableActions} type="button">
         {copy.continueGoogle}
@@ -385,29 +380,29 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
         </button>
       </form>
 
-      {originHint && (
+      {originHint ? (
         <p className="small" style={{ marginTop: 12, color: "#ffc36b" }}>
           {originHint}
         </p>
-      )}
+      ) : null}
 
-      {message && (
+      {message ? (
         <p className="small" style={{ marginTop: 12, color: "#66f0bf" }}>
           {message}
         </p>
-      )}
+      ) : null}
 
-      {configMessage && !error && (
+      {configMessage && !error ? (
         <p className="small status-failed" style={{ marginTop: 12 }}>
           {configMessage}
         </p>
-      )}
+      ) : null}
 
-      {error && (
+      {error ? (
         <p className="small status-failed" style={{ marginTop: 12 }}>
           {error}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

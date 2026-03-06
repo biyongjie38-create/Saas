@@ -3,7 +3,7 @@ import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-respo
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { runBenchmarks } from "@/lib/ai-client";
 import { listLibraryItems } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
     );
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const video = await getVideoByVideoId(body.data.videoId, { supabaseClient });
 
   if (!video) {

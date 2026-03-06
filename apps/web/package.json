@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy:check": "node scripts/deploy-check.mjs"
+    "deploy:check": "node scripts/deploy-check.mjs",
+    "qa:server": "node scripts/qa-dev.mjs",
+    "test:e2e": "playwright test",
+    "qa:release": "playwright test e2e/release-smoke.spec.ts",
+    "qa:release:20": "playwright test e2e/release-smoke.spec.ts --repeat-each=20"
   },
   "dependencies": {
     "@supabase/ssr": "0.5.2",
@@ -18,6 +22,7 @@
     "zod": "3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.51.1",
     "@types/node": "22.13.8",
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",

@@ -1,8 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
-import type { AnalysisJson, BenchmarksJson, ModelTrace, ModelTraceStep, ScoreJson, YoutubeVideo } from "@/lib/types";
+import type {
+  AnalysisJson,
+  BenchmarksJson,
+  ModelTrace,
+  ModelTraceStep,
+  ScoreJson,
+  YoutubeVideo
+} from "@/lib/types";
 
 type Props = {
   lang: Lang;
@@ -15,7 +22,51 @@ type Props = {
 
 type TabKey = "overview" | "structure" | "thumbnail" | "audience" | "playbook";
 
-const copyByLang = {
+type ReportTabCopy = {
+  tabs: Record<TabKey, string>;
+  source: string;
+  views: string;
+  likes: string;
+  comments: string;
+  sentiment: string;
+  score: string;
+  breakdown: string;
+  hook: string;
+  pacing: string;
+  cta: string;
+  motivations: string;
+  concerns: string;
+  titleLabel: string;
+  thumbnailLabel: string;
+  hookLabel: string;
+  pacingLabel: string;
+  valueLabel: string;
+  noVideo: string;
+  noAnalysis: string;
+  noThumbnail: string;
+  noAudience: string;
+  noPlaybook: string;
+  benchmarks: string;
+  actions: string;
+  trace: string;
+  latency: string;
+  fallback: string;
+  provider: string;
+  input: string;
+  output: string;
+  total: string;
+  retries: string;
+  yes: string;
+  no: string;
+  signals: string;
+  reuse: string;
+  differences: string;
+  avoid: string;
+  fallbackBanner: string;
+  mockBanner: string;
+};
+
+const copyByLang: Record<Lang, ReportTabCopy> = {
   en: {
     tabs: {
       overview: "Snapshot",
@@ -40,13 +91,13 @@ const copyByLang = {
     thumbnailLabel: "Thumbnail",
     hookLabel: "Hook",
     pacingLabel: "Pacing",
-    valueLabel: "Value",
+    valueLabel: "Value Density",
     noVideo: "No cached video data found.",
     noAnalysis: "Analysis not ready yet.",
     noThumbnail: "No thumbnail review yet.",
     noAudience: "No comments insight yet.",
     noPlaybook: "No playbook data yet.",
-    benchmarks: "Top3 Benchmarks",
+    benchmarks: "Top 3 Benchmarks",
     actions: "Action List",
     trace: "Model Trace",
     latency: "Latency",
@@ -55,12 +106,15 @@ const copyByLang = {
     input: "Input",
     output: "Output",
     total: "Total",
+    retries: "Retries",
     yes: "Yes",
     no: "No",
     signals: "Shared signals",
     reuse: "Reusable moves",
     differences: "Key differences",
-    avoid: "Avoid"
+    avoid: "Avoid",
+    fallbackBanner: "One or more analysis stages used local fallback output. Review the report before using it in customer-facing decisions.",
+    mockBanner: "This report is based on mock YouTube data. Re-run against live video data before release sign-off."
   },
   zh: {
     tabs: {
@@ -91,24 +145,27 @@ const copyByLang = {
     noAnalysis: "分析结果暂未就绪。",
     noThumbnail: "暂无封面评估。",
     noAudience: "暂无评论洞察。",
-    noPlaybook: "暂无行动方案数据。",
-    benchmarks: "Top3 对标案例",
+    noPlaybook: "暂无方案数据。",
+    benchmarks: "Top 3 对标案例",
     actions: "行动清单",
     trace: "模型追踪",
     latency: "耗时",
     fallback: "兜底",
-    provider: "供应商",
+    provider: "提供方",
     input: "输入",
     output: "输出",
     total: "总计",
+    retries: "重试",
     yes: "是",
     no: "否",
     signals: "相似信号",
-    reuse: "可复用点",
-    differences: "差异提醒",
-    avoid: "应避免"
+    reuse: "可复用动作",
+    differences: "关键差异",
+    avoid: "应避免",
+    fallbackBanner: "本报告有一个或多个阶段使用了本地兜底结果。正式对外使用前，请先人工复核。",
+    mockBanner: "本报告基于 mock YouTube 数据生成。发布前请使用真实视频数据重新跑一次。"
   }
-} as const;
+};
 
 const sourceLabelByLang = {
   en: {
@@ -169,8 +226,22 @@ export function ReportTabs({ lang, video, analysis, benchmarks, score, trace }: 
     ];
   }, [lang, trace]);
 
+  const notices = useMemo(() => {
+    const items: string[] = [];
+
+    if (video && video.dataSource !== "youtube_api") {
+      items.push(copy.mockBanner);
+    }
+
+    if (trace?.fallbackUsed) {
+      items.push(copy.fallbackBanner);
+    }
+
+    return items;
+  }, [copy, trace?.fallbackUsed, video]);
+
   return (
-    <div className="card panel">
+    <div className="card panel" data-testid="report-tabs">
       <div className="tab-bar">
         {(Object.keys(copy.tabs) as TabKey[]).map((key) => (
           <button
@@ -184,6 +255,16 @@ export function ReportTabs({ lang, video, analysis, benchmarks, score, trace }: 
         ))}
       </div>
 
+      {notices.length > 0 ? (
+        <div className="qa-banner" data-testid="report-notices">
+          <ul className="list" style={{ margin: 0 }}>
+            {notices.map((notice) => (
+              <li key={notice}>{notice}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="tab-panel">
         {activeTab === "overview" ? (
           <div className="content-stack">
@@ -194,7 +275,7 @@ export function ReportTabs({ lang, video, analysis, benchmarks, score, trace }: 
                   <p><strong>{video.title}</strong></p>
                   <p className="small">{video.channelName}</p>
                   <p className="small mono">
-                    {copy.views} {video.stats.viewCount.toLocaleString()} · {copy.likes} {video.stats.likeCount.toLocaleString()} · {copy.comments} {video.stats.commentCount.toLocaleString()}
+                    {copy.views} {video.stats.viewCount.toLocaleString()} - {copy.likes} {video.stats.likeCount.toLocaleString()} - {copy.comments} {video.stats.commentCount.toLocaleString()}
                   </p>
                   <p className="small mono">{copy.source}: {sourceLabelByLang[lang][video.dataSource]}</p>
                 </>
@@ -345,8 +426,8 @@ export function ReportTabs({ lang, video, analysis, benchmarks, score, trace }: 
                       <p style={{ margin: 0, fontWeight: 700 }}>{item.label}</p>
                       <p className="small mono">model: {item.step.model}</p>
                       <p className="small mono">{copy.provider}: {item.step.provider}</p>
-                      <p className="small mono">{copy.latency}: {item.step.latencyMs}ms · retries: {item.step.retries}</p>
-                      <p className="small mono">{copy.input}: {item.step.inputTokens} · {copy.output}: {item.step.outputTokens} · {copy.total}: {item.step.totalTokens}</p>
+                      <p className="small mono">{copy.latency}: {item.step.latencyMs}ms - {copy.retries}: {item.step.retries}</p>
+                      <p className="small mono">{copy.input}: {item.step.inputTokens} - {copy.output}: {item.step.outputTokens} - {copy.total}: {item.step.totalTokens}</p>
                       <p className="small mono">{copy.fallback}: {formatBoolean(item.step.fallbackUsed, lang)}</p>
                       {item.step.providerRequestId ? <p className="small mono">provider_request_id: {item.step.providerRequestId}</p> : null}
                     </div>

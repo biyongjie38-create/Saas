@@ -9,6 +9,7 @@ import type {
 } from "@/lib/types";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
+const AI_SERVICE_MODE = (process.env.AI_SERVICE_MODE ?? "remote").toLowerCase();
 
 type AiStats = {
   view_count: number;
@@ -116,6 +117,10 @@ function toTraceMeta(payload: AiTraceMeta): ModelTraceStep {
   };
 }
 
+function shouldUseLocalAiMode(): boolean {
+  return AI_SERVICE_MODE === "local";
+}
+
 function createLocalTrace(model: string): ModelTraceStep {
   return {
     model,
@@ -207,6 +212,13 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
 }
 
 export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisRunResult> {
+  if (shouldUseLocalAiMode()) {
+    return {
+      analysis: generateLocalAnalysis(video),
+      trace: createLocalTrace("local::analysis-mode")
+    };
+  }
+
   try {
     const res = await postJson<AiAnalysisResponse>("/ai/analyze", {
       metadata: {
@@ -239,6 +251,13 @@ export async function runBenchmarks(
   structureSummary: string,
   libraryItems: ViralLibraryItem[]
 ): Promise<BenchmarksRunResult> {
+  if (shouldUseLocalAiMode()) {
+    return {
+      benchmarks: generateLocalBenchmarks(video, libraryItems),
+      trace: createLocalTrace("local::benchmark-mode")
+    };
+  }
+
   try {
     const res = await postJson<AiBenchmarksResponse>("/ai/rag/compare", {
       video_id: video.videoId,
@@ -264,6 +283,13 @@ export async function runScoring(
   analysis: AnalysisJson,
   benchmarks: BenchmarksJson
 ): Promise<ScoreRunResult> {
+  if (shouldUseLocalAiMode()) {
+    return {
+      score: generateLocalScore(video, analysis),
+      trace: createLocalTrace("local::score-mode")
+    };
+  }
+
   try {
     const res = await postJson<AiScoreResponse>("/ai/score", {
       metadata: {

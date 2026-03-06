@@ -1,11 +1,11 @@
 ﻿import { NextResponse } from "next/server";
-import { getE2EAuthCookieName } from "@/lib/e2e-auth";
-import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
+import { getE2EAuthCookieName, isE2EAuthBypassEnabled } from "@/lib/e2e-auth";
 
-export async function POST(request: Request) {
-  const supabase = await maybeCreateServerSupabaseClient();
-  if (supabase) {
-    await supabase.auth.signOut();
+export const runtime = "nodejs";
+
+export async function GET(request: Request) {
+  if (!isE2EAuthBypassEnabled()) {
+    return new Response("Not Found", { status: 404 });
   }
 
   const response = NextResponse.redirect(new URL("/login", request.url), { status: 303 });

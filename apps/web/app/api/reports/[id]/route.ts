@@ -2,7 +2,7 @@
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { getReportById } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
 
 export const runtime = "nodejs";
@@ -33,7 +33,7 @@ export const GET = withApiRoute<Params>(async (_request, { requestId }, context)
     );
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const report = await getReportById(parsedParams.data.id, authUser.id, { supabaseClient });
 
   if (!report) {

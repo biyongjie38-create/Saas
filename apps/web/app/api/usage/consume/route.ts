@@ -3,7 +3,7 @@ import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-respo
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { consumeUsage, countUsageForDay } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -32,7 +32,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
     );
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const appUser = toAppUser(authUser);
 
   if (parsed.data.action === "analyze") {

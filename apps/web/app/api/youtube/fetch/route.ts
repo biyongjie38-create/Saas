@@ -1,7 +1,7 @@
 ﻿import { z } from "zod";
 import { errorJsonResponse, logApiError, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { fetchYoutubeData } from "@/lib/youtube";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   try {
-    const supabaseClient = await createServerSupabaseClient();
+    const supabaseClient = await maybeCreateServerSupabaseClient();
     const video = await fetchYoutubeData(parsed.data.url, { supabaseClient });
 
     return okJsonResponse(

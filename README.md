@@ -176,6 +176,67 @@ python scripts/index_viral_library.py --index-host=... --namespace=viral-library
 - `POST /api/youtube/fetch` (requires auth)
 - `POST /api/benchmarks` (requires auth)
 
+## Release QA
+
+Item 7 adds a release-gate QA harness focused on the core path:
+
+- Login
+- Analyze a YouTube URL
+- Open the generated report
+- Verify fallback/degradation notices are visible when mock or local fallback paths are used
+
+Run the smoke suite locally:
+
+```bash
+cd apps/web
+npm run qa:release
+```
+
+Run the 20-cycle stability gate:
+
+```bash
+cd apps/web
+npm run qa:release:20
+```
+
+The QA harness starts Next.js in a deterministic release-check mode with:
+
+```bash
+DATA_BACKEND=mock
+ENABLE_E2E_AUTH_BYPASS=true
+YOUTUBE_FETCH_MODE=mock
+AI_SERVICE_MODE=local
+```
+
+This avoids external auth/API dependence and verifies the release candidate can repeatedly complete the main product flow without interruption.
+
+## RLS Smoke Test
+
+Use the SQL smoke script before release to verify Supabase RLS behavior:
+
+```bash
+supabase/rls-smoke.sql
+```
+
+What it checks:
+
+- a user can read their own `reports`
+- a user can read their own `usage_logs`
+- another user cannot read or update those rows
+- authenticated users can read shared `videos`
+- authenticated users can read and update shared `viral_library_items`
+
+The script is wrapped in a transaction and ends with `rollback`, so it does not leave QA rows behind.
+
+## Fault Degradation UX
+
+The dashboard and report pages now surface explicit fallback notices when:
+
+- mock YouTube data is used
+- local AI fallback is used because the remote AI path is unavailable
+
+These notices are part of the release smoke flow so degraded behavior is visible to users instead of silently changing output quality.
+
 ## Next Upgrades
 
 - Stripe billing

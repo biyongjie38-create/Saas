@@ -1,7 +1,7 @@
 ﻿import { z } from "zod";
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { importLibraryItems, type LibraryImportInput } from "@/lib/report-store";
 
 export const runtime = "nodejs";
@@ -153,7 +153,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
     );
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const merged = await importLibraryItems(items, { supabaseClient });
 
   return okJsonResponse(

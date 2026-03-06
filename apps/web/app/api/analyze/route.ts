@@ -18,7 +18,7 @@ import {
   updateReport
 } from "@/lib/report-store";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import type { ModelTrace } from "@/lib/types";
 import { fetchYoutubeData } from "@/lib/youtube";
 
@@ -64,7 +64,7 @@ async function executeAnalyzeTask(input: {
   url: string;
   userId: string;
   plan: "free" | "pro";
-  supabaseClient: SupabaseClient;
+  supabaseClient: SupabaseClient | null;
   onStage?: (stage: string, payload?: Record<string, unknown>) => void;
 }): Promise<AnalyzeExecutionResult> {
   const startedAt = Date.now();
@@ -182,7 +182,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
     );
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const appUser = toAppUser(authUser);
   const usedToday = await countUsageForDay(appUser.id, {
     supabaseClient,

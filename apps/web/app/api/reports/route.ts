@@ -2,7 +2,7 @@
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { listReports } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,7 @@ export const GET = withApiRoute(async (request, { requestId }) => {
     return unauthorizedJsonResponse(requestId);
   }
 
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const { searchParams } = new URL(request.url);
   const parsed = querySchema.safeParse({
     cursor: searchParams.get("cursor") ?? undefined,

@@ -9,7 +9,7 @@ import {
   localizeScoreJson
 } from "@/lib/report-localize";
 import { getReportById } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
 
 type Props = {
@@ -30,7 +30,7 @@ export default async function ReportPage({ params }: Props) {
   const { id } = await params;
   const lang = await getServerLang();
   const authUser = await requirePageAuthUser(`/report/${id}`);
-  const supabaseClient = await createServerSupabaseClient();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
   const report = await getReportById(id, authUser.id, { supabaseClient });
 
   if (!report) {
@@ -55,7 +55,7 @@ export default async function ReportPage({ params }: Props) {
             <div style={{ fontSize: 42, fontWeight: 800 }}>{localizedScore?.total ?? "--"}</div>
             <p className="small">video_id: {report.videoId}</p>
             <p className="small">
-              {text(lang, "created", "创建时间")}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
+              {text(lang, "Created", "创建时间")}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
             </p>
           </aside>
 

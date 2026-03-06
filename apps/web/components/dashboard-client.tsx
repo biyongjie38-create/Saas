@@ -41,6 +41,8 @@ type DashboardCopy = {
   analysisFailed: string;
   serviceUnavailable: string;
   requestFailed: string;
+  mockHint: string;
+  fallbackHint: string;
   stageText: Record<string, string>;
 };
 
@@ -55,6 +57,8 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     analysisFailed: "Analysis failed",
     serviceUnavailable: "Could not connect to analysis service",
     requestFailed: "Analyze request failed",
+    mockHint: "This run used mock YouTube data. Verify the final recommendations against live video metrics before making release decisions.",
+    fallbackHint: "This run used local fallback analysis because the external AI service was unavailable or intentionally disabled for QA.",
     stageText: {
       fetching_youtube: "Fetching YouTube metadata",
       report_created: "Report record created",
@@ -75,6 +79,8 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     analysisFailed: "分析失败",
     serviceUnavailable: "无法连接分析服务",
     requestFailed: "分析请求失败",
+    mockHint: "本次分析使用了 mock YouTube 数据。正式发布前，请再用真实视频指标复核建议。",
+    fallbackHint: "本次分析使用了本地兜底结果，说明外部 AI 服务当前不可用，或已为 QA 显式关闭。",
     stageText: {
       fetching_youtube: "正在获取 YouTube 元数据",
       report_created: "已创建报告记录",
@@ -134,15 +140,21 @@ export function DashboardClient({ lang }: Props) {
   const [stages, setStages] = useState<StreamStage[]>([]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
 
   const copy = useMemo(() => copyByLang[lang], [lang]);
   const orderedStages = useMemo(() => stages.slice(-6), [stages]);
+
+  function pushNotice(message: string) {
+    setNotices((current) => (current.includes(message) ? current : [...current, message]));
+  }
 
   async function onAnalyze() {
     setLoading(true);
     setStages([]);
     setReportId(null);
     setError(null);
+    setNotices([]);
 
     try {
       const response = await fetch("/api/analyze", {
@@ -193,10 +205,26 @@ export function DashboardClient({ lang }: Props) {
 
           setStages((prev) => [...prev, event]);
 
+          if (event.stage === "report_created") {
+            const source = event.envelope.data?.source;
+            if (source === "mock_demo" || source === "mock_synthetic") {
+              pushNotice(copy.mockHint);
+            }
+          }
+
           if (event.stage === "done") {
             const id = event.envelope.data?.reportId;
             if (typeof id === "string") {
               setReportId(id);
+            }
+
+            const fallbackUsed = event.envelope.data?.modelTrace;
+            if (
+              fallbackUsed &&
+              typeof fallbackUsed === "object" &&
+              (fallbackUsed as { fallback_used?: unknown }).fallback_used === true
+            ) {
+              pushNotice(copy.fallbackHint);
             }
           }
 
@@ -232,17 +260,28 @@ export function DashboardClient({ lang }: Props) {
           value={url}
           onChange={(event) => setUrl(event.target.value)}
           placeholder="https://www.youtube.com/watch?v=..."
+          data-testid="analyze-url-input"
         />
-        <button className="btn btn-primary" onClick={onAnalyze} disabled={loading}>
+        <button className="btn btn-primary" onClick={onAnalyze} disabled={loading} data-testid="run-analysis-button">
           {loading ? copy.running : copy.run}
         </button>
       </div>
       <p className="small">{copy.demoHint}</p>
 
-      {orderedStages.length > 0 && (
+      {notices.length > 0 ? (
+        <div className="qa-banner" data-testid="analysis-notices">
+          <ul className="list" style={{ margin: 0 }}>
+            {notices.map((notice) => (
+              <li key={notice}>{notice}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {orderedStages.length > 0 ? (
         <div style={{ marginTop: 16 }}>
           <h3 style={{ marginBottom: 8 }}>{copy.streaming}</h3>
-          <ul className="list">
+          <ul className="list" data-testid="streaming-stages">
             {orderedStages.map((item, index) => (
               <li key={`${item.stage}-${index}`}>
                 <span className="mono">{item.stage}</span> - {copy.stageText[item.stage] ?? item.stage}
@@ -250,22 +289,22 @@ export function DashboardClient({ lang }: Props) {
             ))}
           </ul>
         </div>
-      )}
+      ) : null}
 
-      {error && (
-        <p className="status-failed" style={{ marginTop: 12 }}>
+      {error ? (
+        <p className="status-failed" style={{ marginTop: 12 }} data-testid="analysis-error">
           {error}
         </p>
-      )}
+      ) : null}
 
-      {reportId && (
+      {reportId ? (
         <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-          <a className="btn btn-primary" href={`/report/${reportId}`}>
+          <a className="btn btn-primary" href={`/report/${reportId}`} data-testid="view-report-button">
             {copy.viewReport}
           </a>
           <span className="small mono">report_id: {reportId}</span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
