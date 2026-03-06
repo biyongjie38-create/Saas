@@ -1,7 +1,8 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { getOptionalAuthUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { NavLinks } from "@/components/nav-links";
 
 export async function SiteNav() {
   const authUser = await getOptionalAuthUser();
@@ -21,13 +22,7 @@ export async function SiteNav() {
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <nav className="nav-links">
-            {links.map((item) => (
-              <Link href={item.href} key={item.href}>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <NavLinks links={links} />
 
           <LanguageSwitcher currentLang={lang} />
 
@@ -52,4 +47,3 @@ export async function SiteNav() {
     </header>
   );
 }
-

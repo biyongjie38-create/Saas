@@ -1,16 +1,16 @@
-﻿import { notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
+import {
+  localizeAnalysisJson,
+  localizeScoreJson,
+  localizeSentiment,
+  localizeSourceLabel
+} from "@/lib/report-localize";
 import { getReportById } from "@/lib/report-store";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
-
-const sourceLabel: Record<string, string> = {
-  youtube_api: "Live API",
-  mock_demo: "Mock Demo",
-  mock_synthetic: "Mock Synthetic"
-};
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -38,6 +38,8 @@ export default async function ReportPage({ params }: Props) {
   }
 
   const video = await getVideoByVideoId(report.videoId, { supabaseClient });
+  const localizedAnalysis = localizeAnalysisJson(lang, report.analysisJson);
+  const localizedScore = localizeScoreJson(lang, report.scoreJson);
 
   return (
     <main>
@@ -49,9 +51,11 @@ export default async function ReportPage({ params }: Props) {
             <p className="small mono">report_id: {report.id}</p>
             <p className={`mono ${classForStatus(report.status)}`}>status: {report.status}</p>
             <h3 style={{ marginBottom: 4 }}>{text(lang, "Viral Score", "爆款评分")}</h3>
-            <div style={{ fontSize: 42, fontWeight: 800 }}>{report.scoreJson?.total ?? "--"}</div>
+            <div style={{ fontSize: 42, fontWeight: 800 }}>{localizedScore?.total ?? "--"}</div>
             <p className="small">video_id: {report.videoId}</p>
-            <p className="small">{text(lang, "created", "创建时间")}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}</p>
+            <p className="small">
+              {text(lang, "created", "创建时间")}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
+            </p>
           </aside>
 
           <div style={{ display: "grid", gap: 16 }}>
@@ -64,7 +68,7 @@ export default async function ReportPage({ params }: Props) {
                   </p>
                   <p className="small">{video.channelName}</p>
                   <p className="small">
-                    {text(lang, "source", "来源")}: <span className="badge">{sourceLabel[video.dataSource] ?? video.dataSource}</span>
+                    {text(lang, "source", "来源")}: <span className="badge">{localizeSourceLabel(lang, video.dataSource)}</span>
                   </p>
                   <p className="small mono">
                     {text(lang, "views", "播放")} {video.stats.viewCount.toLocaleString()} - {text(lang, "likes", "点赞")} {video.stats.likeCount.toLocaleString()} - {text(lang, "comments", "评论")} {video.stats.commentCount.toLocaleString()}
@@ -77,15 +81,15 @@ export default async function ReportPage({ params }: Props) {
 
             <article className="card panel">
               <h2 style={{ marginTop: 0 }}>{text(lang, "Structure Breakdown", "结构拆解")}</h2>
-              {report.analysisJson ? (
+              {localizedAnalysis ? (
                 <>
-                  <p>{report.analysisJson.structure.hookAnalysis}</p>
+                  <p>{localizedAnalysis.structure.hookAnalysis}</p>
                   <ul className="list">
-                    {report.analysisJson.structure.pacingNotes.map((note) => (
+                    {localizedAnalysis.structure.pacingNotes.map((note) => (
                       <li key={note}>{note}</li>
                     ))}
                   </ul>
-                  <p className="small">CTA: {report.analysisJson.structure.ctaReview}</p>
+                  <p className="small">CTA: {localizedAnalysis.structure.ctaReview}</p>
                 </>
               ) : (
                 <p className="small">{text(lang, "Analysis not ready yet.", "分析结果暂未就绪。")}</p>
@@ -94,14 +98,14 @@ export default async function ReportPage({ params }: Props) {
 
             <article className="card panel">
               <h2 style={{ marginTop: 0 }}>{text(lang, "Thumbnail Review", "封面评估")}</h2>
-              {report.analysisJson ? (
+              {localizedAnalysis ? (
                 <>
                   <p>
-                    {text(lang, "score", "评分")} <strong>{report.analysisJson.thumbnailReview.score}</strong>/100
+                    {text(lang, "score", "评分")} <strong>{localizedAnalysis.thumbnailReview.score}</strong>/100
                   </p>
-                  <p>{report.analysisJson.thumbnailReview.diagnosis}</p>
+                  <p>{localizedAnalysis.thumbnailReview.diagnosis}</p>
                   <ul className="list">
-                    {report.analysisJson.thumbnailReview.improvements.map((item) => (
+                    {localizedAnalysis.thumbnailReview.improvements.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
@@ -113,12 +117,14 @@ export default async function ReportPage({ params }: Props) {
 
             <article className="card panel">
               <h2 style={{ marginTop: 0 }}>{text(lang, "Comments & Audience", "评论与受众")}</h2>
-              {report.analysisJson ? (
+              {localizedAnalysis ? (
                 <>
-                  <p className="small">{text(lang, "sentiment", "情绪")}: {report.analysisJson.commentsInsights.sentiment}</p>
-                  <p>{report.analysisJson.commentsInsights.audiencePersona}</p>
+                  <p className="small">
+                    {text(lang, "sentiment", "情绪")}: {localizeSentiment(lang, localizedAnalysis.commentsInsights.sentiment)}
+                  </p>
+                  <p>{localizedAnalysis.commentsInsights.audiencePersona}</p>
                   <ul className="list">
-                    {report.analysisJson.commentsInsights.motivations.map((item) => (
+                    {localizedAnalysis.commentsInsights.motivations.map((item) => (
                       <li key={item}>{item}</li>
                     ))}
                   </ul>
@@ -145,9 +151,9 @@ export default async function ReportPage({ params }: Props) {
 
             <article className="card panel">
               <h2 style={{ marginTop: 0 }}>{text(lang, "Action List", "行动清单")}</h2>
-              {report.scoreJson?.topActions?.length ? (
+              {localizedScore?.topActions?.length ? (
                 <ol className="list">
-                  {report.scoreJson.topActions.map((item) => (
+                  {localizedScore.topActions.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ol>
@@ -161,4 +167,3 @@ export default async function ReportPage({ params }: Props) {
     </main>
   );
 }
-

@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #070a12;
   --panel: #101827;
   --text: #f6f7fb;
@@ -71,8 +71,28 @@ a {
   display: flex;
   align-items: center;
   gap: 18px;
-  color: var(--muted);
   font-size: 14px;
+}
+
+.nav-link {
+  color: var(--muted);
+  border-radius: 12px;
+  padding: 7px 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.nav-link-active {
+  color: #dcf6ff;
+  background: linear-gradient(135deg, rgba(76, 198, 255, 0.2), rgba(50, 214, 160, 0.12));
+  border: 1px solid rgba(76, 198, 255, 0.35);
+  box-shadow:
+    0 8px 18px rgba(2, 22, 52, 0.5),
+    inset 0 -2px 0 rgba(76, 198, 255, 0.65);
 }
 
 .btn {
@@ -84,7 +104,7 @@ a {
   justify-content: center;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.22s ease;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease, background 0.22s ease, border-color 0.22s ease;
 }
 
 .btn-primary {
@@ -93,8 +113,8 @@ a {
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgba(76, 198, 255, 0.35);
+  transform: translateY(-3px) scale(1.015);
+  box-shadow: 0 14px 30px rgba(76, 198, 255, 0.35);
 }
 
 .btn-ghost {
@@ -103,15 +123,36 @@ a {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.btn-ghost:hover {
+  transform: translateY(-3px) scale(1.015);
+  box-shadow: 0 14px 28px rgba(1, 11, 26, 0.45);
+  border-color: rgba(76, 198, 255, 0.45);
+}
+
+.btn:disabled {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .card {
   border: 1px solid var(--border);
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+  background:
+    radial-gradient(circle at 12% 12%, rgba(76, 198, 255, 0.14), transparent 45%),
+    radial-gradient(circle at 88% 0%, rgba(50, 214, 160, 0.1), transparent 42%),
+    linear-gradient(160deg, rgba(13, 22, 41, 0.96), rgba(7, 14, 28, 0.92));
   border-radius: 18px;
   box-shadow: var(--shadow);
 }
 
 .hero {
   padding: 84px 0 70px;
+}
+
+.hero .badge {
+  display: inline-flex;
+  margin-bottom: 14px;
+  position: relative;
+  top: -8px;
 }
 
 .hero h1 {
@@ -260,4 +301,8 @@ a {
   }
 }
 
-
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    filter: brightness(1.03);
+  }
+}
