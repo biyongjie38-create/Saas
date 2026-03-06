@@ -15,6 +15,7 @@ type ConfirmCopy = {
   missingConfig: string;
   callbackFailed: string;
   missingPayload: string;
+  browserMismatchHint: string;
 };
 
 const copyByLang: Record<Lang, ConfirmCopy> = {
@@ -26,7 +27,8 @@ const copyByLang: Record<Lang, ConfirmCopy> = {
     backToLogin: "Back to Login",
     missingConfig: "Missing Supabase auth config on production env.",
     callbackFailed: "Sign-in callback failed.",
-    missingPayload: "No auth payload in callback URL."
+    missingPayload: "No auth payload in callback URL.",
+    browserMismatchHint: "Please open the magic link in the same browser where you requested it, or use Google sign-in."
   },
   zh: {
     workingTitle: "正在登录...",
@@ -36,7 +38,8 @@ const copyByLang: Record<Lang, ConfirmCopy> = {
     backToLogin: "返回登录页",
     missingConfig: "生产环境缺少 Supabase 登录配置。",
     callbackFailed: "登录回调失败。",
-    missingPayload: "回调地址中没有有效登录参数。"
+    missingPayload: "回调地址中没有有效登录参数。",
+    browserMismatchHint: "请在发起登录请求的同一浏览器中打开魔法链接，或改用 Google 登录。"
   }
 };
 
@@ -84,7 +87,15 @@ function mapErrorMessage(error: unknown, copy: ConfirmCopy): string {
     return copy.missingConfig;
   }
 
-  return error instanceof Error ? error.message : copy.callbackFailed;
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("code_verifier") || message.includes("code verifier") || message.includes("pkce")) {
+      return copy.browserMismatchHint;
+    }
+    return error.message;
+  }
+
+  return copy.callbackFailed;
 }
 
 export default function AuthConfirmPage() {
@@ -178,5 +189,6 @@ export default function AuthConfirmPage() {
     </main>
   );
 }
+
 
 
