@@ -9,9 +9,10 @@ Make ViralBrain accessible to external users with stable email/Google login.
 Recommended: Vercel.
 
 - Import repo.
-- Keep repository root as `./` (default) or set `apps/web`; both work with this repo.
-- Root `vercel.json` forces `apps/web/package.json` to use `@vercel/next`.
-- If Project Preset shows `Other`, deployment still works because `vercel.json` overrides builder selection.
+- Set Framework Preset to `Next.js`.
+- Set Root Directory to `apps/web`.
+- Keep Build Command as default (`npm run build`) and Output Directory empty.
+- Do not use root-level `vercel.json` legacy `builds` overrides.
 
 ## 2) Set production env vars
 
@@ -68,4 +69,3 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 
 - `401` on `*.vercel.app`: Deployment Protection is active. Disable protection for Production or use a custom production domain.
 - `404` + `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`: the domain alias points to a missing/deleted deployment. Re-assign that domain in `Project -> Domains`.
-

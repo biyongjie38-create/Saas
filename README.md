@@ -113,7 +113,7 @@ Use Vercel project settings:
 3. Build Command: `npm run build` (default)
 4. Output Directory: keep empty
 
-This repo includes a root-level `vercel.json` that forces Vercel to build `apps/web` via `@vercel/next` (prevents empty 404 deployments when project preset/root directory are mis-detected).
+Do not keep a root-level `vercel.json` with legacy `builds` entries. It triggers Vercel warning and bypasses Project Settings.
 
 Troubleshooting:
 - `401` on `*.vercel.app` means Deployment Protection is blocking public access. Disable protection for Production or use a custom production domain.
@@ -158,4 +158,5 @@ npm run deploy:check
 - Pinecone-based benchmark retrieval
 - Real model provider usage/token tracing
 - Stripe billing
+
 
