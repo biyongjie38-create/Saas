@@ -57,6 +57,7 @@ create table if not exists viral_library_items (
 );
 
 create index if not exists idx_viral_library_created on viral_library_items(created_at desc);
+create unique index if not exists idx_viral_library_embedding_key on viral_library_items(embedding_key);
 
 create table if not exists usage_logs (
   id uuid primary key default gen_random_uuid(),
@@ -111,12 +112,23 @@ for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
--- Viral library policies (read-only for authenticated users)
+-- Viral library policies (authenticated users can read/import/update)
 drop policy if exists viral_library_select_authenticated on viral_library_items;
+drop policy if exists viral_library_insert_authenticated on viral_library_items;
+drop policy if exists viral_library_update_authenticated on viral_library_items;
 
 create policy viral_library_select_authenticated on viral_library_items
 for select
 using (auth.role() = 'authenticated');
+
+create policy viral_library_insert_authenticated on viral_library_items
+for insert
+with check (auth.role() = 'authenticated');
+
+create policy viral_library_update_authenticated on viral_library_items
+for update
+using (auth.role() = 'authenticated')
+with check (auth.role() = 'authenticated');
 
 -- Usage policies (strictly user-owned)
 drop policy if exists usage_select_own on usage_logs;
@@ -194,3 +206,5 @@ drop trigger if exists usage_logs_daily_limit_guard on usage_logs;
 create trigger usage_logs_daily_limit_guard
 before insert on usage_logs
 for each row execute function enforce_usage_logs_daily_limit();
+
+

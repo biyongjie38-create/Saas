@@ -1,5 +1,12 @@
-import { generateLocalAnalysis, generateLocalBenchmarks, generateLocalScore } from "@/lib/local-ai";
-import type { AnalysisJson, BenchmarksJson, ScoreJson, ViralLibraryItem, YoutubeVideo } from "@/lib/types";
+﻿import { generateLocalAnalysis, generateLocalBenchmarks, generateLocalScore } from "@/lib/local-ai";
+import type {
+  AnalysisJson,
+  BenchmarksJson,
+  ModelTraceStep,
+  ScoreJson,
+  ViralLibraryItem,
+  YoutubeVideo
+} from "@/lib/types";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
 
@@ -9,7 +16,19 @@ type AiStats = {
   comment_count: number;
 };
 
-type AiAnalysisResponse = {
+type AiTraceMeta = {
+  model: string;
+  provider: string;
+  fallback_used: boolean;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  provider_request_id?: string | null;
+  retries: number;
+  latency_ms: number;
+};
+
+type AiAnalysisResponse = AiTraceMeta & {
   analysis: {
     structure: {
       hook_analysis: string;
@@ -30,7 +49,7 @@ type AiAnalysisResponse = {
   };
 };
 
-type AiBenchmarksResponse = {
+type AiBenchmarksResponse = AiTraceMeta & {
   benchmarks: {
     top_matches: {
       id: string;
@@ -45,7 +64,7 @@ type AiBenchmarksResponse = {
   };
 };
 
-type AiScoreResponse = {
+type AiScoreResponse = AiTraceMeta & {
   score: {
     total: number;
     breakdown: {
@@ -60,11 +79,54 @@ type AiScoreResponse = {
   };
 };
 
+type AnalysisRunResult = {
+  analysis: AnalysisJson;
+  trace: ModelTraceStep;
+};
+
+type BenchmarksRunResult = {
+  benchmarks: BenchmarksJson;
+  trace: ModelTraceStep;
+};
+
+type ScoreRunResult = {
+  score: ScoreJson;
+  trace: ModelTraceStep;
+};
+
 function toAiStats(stats: YoutubeVideo["stats"]): AiStats {
   return {
     view_count: stats.viewCount,
     like_count: stats.likeCount,
     comment_count: stats.commentCount
+  };
+}
+
+function toTraceMeta(payload: AiTraceMeta): ModelTraceStep {
+  return {
+    model: payload.model,
+    provider: payload.provider,
+    fallbackUsed: payload.fallback_used,
+    retries: payload.retries,
+    latencyMs: payload.latency_ms,
+    inputTokens: payload.input_tokens,
+    outputTokens: payload.output_tokens,
+    totalTokens: payload.total_tokens,
+    providerRequestId: payload.provider_request_id ?? null
+  };
+}
+
+function createLocalTrace(model: string): ModelTraceStep {
+  return {
+    model,
+    provider: "local",
+    fallbackUsed: true,
+    retries: 0,
+    latencyMs: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    providerRequestId: null
   };
 }
 
@@ -144,7 +206,7 @@ async function postJson<TResponse>(path: string, payload: unknown): Promise<TRes
   }
 }
 
-export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisJson> {
+export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisRunResult> {
   try {
     const res = await postJson<AiAnalysisResponse>("/ai/analyze", {
       metadata: {
@@ -160,9 +222,15 @@ export async function runAnalysis(video: YoutubeVideo): Promise<AnalysisJson> {
       thumbnail_url: video.thumbnailUrl
     });
 
-    return fromAiAnalysis(res.analysis);
+    return {
+      analysis: fromAiAnalysis(res.analysis),
+      trace: toTraceMeta(res)
+    };
   } catch {
-    return generateLocalAnalysis(video);
+    return {
+      analysis: generateLocalAnalysis(video),
+      trace: createLocalTrace("local::analysis-web-fallback")
+    };
   }
 }
 
@@ -170,7 +238,7 @@ export async function runBenchmarks(
   video: YoutubeVideo,
   structureSummary: string,
   libraryItems: ViralLibraryItem[]
-): Promise<BenchmarksJson> {
+): Promise<BenchmarksRunResult> {
   try {
     const res = await postJson<AiBenchmarksResponse>("/ai/rag/compare", {
       video_id: video.videoId,
@@ -179,9 +247,15 @@ export async function runBenchmarks(
       top_k: 3
     });
 
-    return fromAiBenchmarks(res.benchmarks);
+    return {
+      benchmarks: fromAiBenchmarks(res.benchmarks),
+      trace: toTraceMeta(res)
+    };
   } catch {
-    return generateLocalBenchmarks(video, libraryItems);
+    return {
+      benchmarks: generateLocalBenchmarks(video, libraryItems),
+      trace: createLocalTrace("local::benchmark-web-fallback")
+    };
   }
 }
 
@@ -189,7 +263,7 @@ export async function runScoring(
   video: YoutubeVideo,
   analysis: AnalysisJson,
   benchmarks: BenchmarksJson
-): Promise<ScoreJson> {
+): Promise<ScoreRunResult> {
   try {
     const res = await postJson<AiScoreResponse>("/ai/score", {
       metadata: {
@@ -233,8 +307,14 @@ export async function runScoring(
       }
     });
 
-    return fromAiScore(res.score);
+    return {
+      score: fromAiScore(res.score),
+      trace: toTraceMeta(res)
+    };
   } catch {
-    return generateLocalScore(video, analysis);
+    return {
+      score: generateLocalScore(video, analysis),
+      trace: createLocalTrace("local::score-web-fallback")
+    };
   }
 }

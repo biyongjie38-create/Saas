@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { createRequestId, errorJsonResponse, okJsonResponse } from "@/lib/api-response";
+﻿import { z } from "zod";
+import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { consumeUsage, countUsageForDay } from "@/lib/report-store";
@@ -13,8 +13,7 @@ const schema = z.object({
   costUsd: z.number().nonnegative().nullable().optional()
 });
 
-export async function POST(request: Request) {
-  const requestId = createRequestId();
+export const POST = withApiRoute(async (request, { requestId }) => {
   const authUser = await getApiAuthUser();
   if (!authUser) {
     return unauthorizedJsonResponse(requestId);
@@ -89,4 +88,4 @@ export async function POST(request: Request) {
 
     throw error;
   }
-}
+});

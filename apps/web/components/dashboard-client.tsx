@@ -1,25 +1,30 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
 
-type StreamStage = {
-  stage: string;
-  payload: Record<string, unknown>;
+type QuotaDetails = {
+  plan?: string;
+  used_today?: number;
+  limit_per_day?: number;
 };
 
-type ApiErrorEnvelope = {
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  details?: QuotaDetails;
+};
+
+type ApiEnvelope<T extends Record<string, unknown>> = {
   ok: boolean;
-  error?: {
-    code?: string;
-    message?: string;
-    details?: {
-      plan?: string;
-      used_today?: number;
-      limit_per_day?: number;
-    };
-  } | null;
+  data: T | null;
+  error?: ApiErrorPayload | null;
   request_id?: string;
+};
+
+type StreamStage = {
+  stage: string;
+  envelope: ApiEnvelope<Record<string, unknown>>;
 };
 
 type Props = {
@@ -64,7 +69,7 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     title: "通过 YouTube 链接生成爆款分析报告",
     run: "开始分析",
     running: "分析中...",
-    demoHint: "演示链接会返回稳定的预置数据，未知链接会使用模拟数据。",
+    demoHint: "演示链接会返回稳定预置数据，未知链接会使用合成模拟数据。",
     streaming: "实时进度",
     viewReport: "查看报告",
     analysisFailed: "分析失败",
@@ -94,7 +99,7 @@ function parseEventBlock(block: string): StreamStage | null {
   try {
     return {
       stage: event,
-      payload: JSON.parse(dataRaw) as Record<string, unknown>
+      envelope: JSON.parse(dataRaw) as ApiEnvelope<Record<string, unknown>>
     };
   } catch {
     return null;
@@ -102,10 +107,10 @@ function parseEventBlock(block: string): StreamStage | null {
 }
 
 async function parseResponseError(response: Response, copy: DashboardCopy): Promise<string> {
-  let payload: ApiErrorEnvelope | null = null;
+  let payload: ApiEnvelope<Record<string, unknown>> | null = null;
 
   try {
-    payload = (await response.json()) as ApiErrorEnvelope;
+    payload = (await response.json()) as ApiEnvelope<Record<string, unknown>>;
   } catch {
     return copy.serviceUnavailable;
   }
@@ -189,32 +194,30 @@ export function DashboardClient({ lang }: Props) {
           setStages((prev) => [...prev, event]);
 
           if (event.stage === "done") {
-            const id = event.payload.reportId;
+            const id = event.envelope.data?.reportId;
             if (typeof id === "string") {
               setReportId(id);
             }
           }
 
           if (event.stage === "error") {
-            const message = event.payload.message;
-            const details = event.payload.details as
-              | { used_today?: number; limit_per_day?: number }
-              | undefined;
+            const message = event.envelope.error?.message;
+            const details = event.envelope.error?.details;
 
             if (
               typeof message === "string" &&
               typeof details?.used_today === "number" &&
               typeof details?.limit_per_day === "number"
             ) {
-              setError(message + " (" + details.used_today + "/" + details.limit_per_day + ")");
+              setError(`${message} (${details.used_today}/${details.limit_per_day})`);
             } else {
               setError(typeof message === "string" ? message : copy.analysisFailed);
             }
           }
         }
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : copy.analysisFailed);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.analysisFailed);
     } finally {
       setLoading(false);
     }

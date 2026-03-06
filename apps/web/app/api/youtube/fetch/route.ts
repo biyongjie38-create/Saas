@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { createRequestId, errorJsonResponse, okJsonResponse } from "@/lib/api-response";
+﻿import { z } from "zod";
+import { errorJsonResponse, logApiError, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { fetchYoutubeData } from "@/lib/youtube";
@@ -10,8 +10,7 @@ const requestSchema = z.object({
   url: z.string().url()
 });
 
-export async function POST(request: Request) {
-  const requestId = createRequestId();
+export const POST = withApiRoute(async (request, { requestId }) => {
   const authUser = await getApiAuthUser();
   if (!authUser) {
     return unauthorizedJsonResponse(requestId);
@@ -64,6 +63,7 @@ export async function POST(request: Request) {
       );
     }
 
+    logApiError(request, requestId, error);
     return errorJsonResponse(
       {
         code: "YT_API_FAILED",
@@ -73,4 +73,4 @@ export async function POST(request: Request) {
       502
     );
   }
-}
+});

@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { createRequestId, errorJsonResponse, okJsonResponse } from "@/lib/api-response";
+﻿import { z } from "zod";
+import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { runBenchmarks } from "@/lib/ai-client";
 import { listLibraryItems } from "@/lib/report-store";
@@ -13,8 +13,7 @@ const schema = z.object({
   structureSummary: z.string().min(6)
 });
 
-export async function POST(request: Request) {
-  const requestId = createRequestId();
+export const POST = withApiRoute(async (request, { requestId }) => {
   const authUser = await getApiAuthUser();
   if (!authUser) {
     return unauthorizedJsonResponse(requestId);
@@ -47,7 +46,13 @@ export async function POST(request: Request) {
   }
 
   const libraryItems = await listLibraryItems({ supabaseClient });
-  const benchmarks = await runBenchmarks(video, body.data.structureSummary, libraryItems);
+  const result = await runBenchmarks(video, body.data.structureSummary, libraryItems);
 
-  return okJsonResponse({ benchmarks }, requestId);
-}
+  return okJsonResponse(
+    {
+      benchmarks: result.benchmarks,
+      model_trace: result.trace
+    },
+    requestId
+  );
+});

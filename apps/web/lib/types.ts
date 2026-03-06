@@ -1,4 +1,4 @@
-export type VideoStats = {
+﻿export type VideoStats = {
   viewCount: number;
   likeCount: number;
   commentCount: number;
@@ -78,12 +78,31 @@ export type ScoreJson = {
   topActions: string[];
 };
 
+export type ModelTraceStep = {
+  model: string;
+  provider: string;
+  fallbackUsed: boolean;
+  retries: number;
+  latencyMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  providerRequestId?: string | null;
+};
+
 export type ModelTrace = {
   analysisModel: string;
   benchmarkModel: string;
   scoreModel: string;
   totalLatencyMs: number;
   retries: number;
+  fallbackUsed?: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  analysis?: ModelTraceStep;
+  benchmark?: ModelTraceStep;
+  score?: ModelTraceStep;
 };
 
 export type ReportStatus = "queued" | "running" | "done" | "failed";

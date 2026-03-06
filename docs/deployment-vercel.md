@@ -24,7 +24,33 @@ In your deployment platform, set:
 - `NEXT_PUBLIC_APP_URL` (recommended): `https://your-domain.com`
 - `DATA_BACKEND=supabase`
 
-## 3) Configure Supabase Auth URLs
+For the FastAPI AI service, set:
+
+- `AI_PROVIDER=auto`
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL` (optional)
+- `OPENAI_ANALYSIS_MODEL` (optional)
+- `OPENAI_SCORE_MODEL` (optional)
+- `OPENAI_EMBEDDING_MODEL` (optional, default `text-embedding-3-small`)
+- `PINECONE_API_KEY`
+- `PINECONE_INDEX_HOST` or `PINECONE_INDEX_NAME`
+- `PINECONE_NAMESPACE` (optional, default `viral-library`)
+
+## 3) Prepare Pinecone benchmark index
+
+Before enabling real benchmark retrieval, create a Pinecone cosine index whose dimension matches your embedding model.
+
+- If you keep the default `OPENAI_EMBEDDING_MODEL=text-embedding-3-small`, create a `1536`-dimension cosine index.
+- Save either the index host as `PINECONE_INDEX_HOST` or the index name as `PINECONE_INDEX_NAME`.
+- From `apps/ai-service`, run:
+
+```bash
+python scripts/index_viral_library.py
+```
+
+This upserts the bundled viral library records with metadata fields used for retrieval filters: `topic`, `hook_type`, and `duration_bucket`.
+
+## 4) Configure Supabase Auth URLs
 
 In Supabase Dashboard -> Auth -> URL Configuration:
 
@@ -35,7 +61,7 @@ In Supabase Dashboard -> Auth -> URL Configuration:
 
 If you have preview domains, add each callback URL explicitly.
 
-## 4) Provider setup
+## 5) Provider setup
 
 In Supabase Dashboard -> Auth -> Providers:
 
@@ -44,7 +70,7 @@ In Supabase Dashboard -> Auth -> Providers:
 
 For Google OAuth, ensure Google console redirect URI matches Supabase provider requirements.
 
-## 5) Run deployment check
+## 6) Run deployment check
 
 Before going live, run locally inside `apps/web`:
 
@@ -54,21 +80,24 @@ npm run deploy:check
 
 This checks required env vars and warns for localhost/private/non-HTTPS callback origins.
 
-## 6) Verify end-to-end
+## 7) Verify end-to-end
 
 - Open `https://your-domain.com/login`
 - Confirm callback preview shows your public domain
 - Test Email Magic Link on mobile network (not your localhost)
 - Confirm redirect to `/dashboard`
 - Run one analysis and open report detail
+- Confirm report page shows model/provider/token/latency trace
+- Confirm benchmark trace shows `openai+pinecone` when Pinecone is configured
 
 ## Notes
 
 - Localhost/LAN origin cannot serve public users.
 - For production traffic, always use HTTPS domain.
+- `AI_PROVIDER=auto` will try OpenAI first and fall back to local logic if the model call fails.
+- If Pinecone config is missing, benchmark retrieval automatically falls back to local similarity ranking.
 
-## 7) Common Vercel Domain Errors
+## 8) Common Vercel Domain Errors
 
 - `401` on `*.vercel.app`: Deployment Protection is active. Disable protection for Production or use a custom production domain.
 - `404` + `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`: the domain alias points to a missing/deleted deployment. Re-assign that domain in `Project -> Domains`.
-

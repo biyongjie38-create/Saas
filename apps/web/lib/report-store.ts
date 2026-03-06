@@ -31,6 +31,23 @@ type ReportRow = {
   updated_at: string;
 };
 
+type LibraryRow = {
+  id: string;
+  title: string;
+  source_url: string | null;
+  summary: string | null;
+  tags: unknown;
+  created_at: string | null;
+  embedding_key?: string | null;
+};
+
+export type LibraryImportInput = {
+  title: string;
+  sourceUrl?: string;
+  summary: string;
+  tags?: Partial<ViralLibraryItem["tags"]>;
+};
+
 function toReport(row: ReportRow): Report {
   return {
     id: row.id,
@@ -458,12 +475,50 @@ function normalizeTags(value: unknown): ViralLibraryItem["tags"] {
   };
 }
 
+function toLibraryItem(row: LibraryRow): ViralLibraryItem {
+  return {
+    id: String(row.id),
+    title: String(row.title),
+    sourceUrl: String(row.source_url ?? ""),
+    summary: String(row.summary ?? ""),
+    tags: normalizeTags(row.tags),
+    createdAt: String(row.created_at ?? new Date().toISOString())
+  };
+}
+
+function normalizeLibraryImportItem(input: LibraryImportInput): LibraryImportInput {
+  return {
+    title: input.title.trim(),
+    sourceUrl: (input.sourceUrl ?? "").trim(),
+    summary: input.summary.trim(),
+    tags: {
+      hookType: input.tags?.hookType?.trim() || "unknown",
+      topic: input.tags?.topic?.trim() || "general",
+      durationBucket: input.tags?.durationBucket?.trim() || "5-10m"
+    }
+  };
+}
+
+function createLibraryEmbeddingKey(input: LibraryImportInput): string {
+  const normalized = normalizeLibraryImportItem(input);
+  const payload = [
+    normalized.title.toLowerCase(),
+    (normalized.sourceUrl ?? "").toLowerCase(),
+    normalized.summary.toLowerCase(),
+    normalized.tags?.hookType?.toLowerCase() ?? "unknown",
+    normalized.tags?.topic?.toLowerCase() ?? "general",
+    normalized.tags?.durationBucket?.toLowerCase() ?? "5-10m"
+  ].join("|");
+
+  return crypto.createHash("sha256").update(payload).digest("hex");
+}
+
 export async function listLibraryItems(options?: QueryOptions): Promise<ViralLibraryItem[]> {
   const client = await getSupabaseUserClient(options);
   if (client) {
     const { data, error } = await client
       .from("viral_library_items")
-      .select("id,title,source_url,summary,tags,created_at")
+      .select("id,title,source_url,summary,tags,created_at,embedding_key")
       .order("created_at", { ascending: false })
       .limit(200);
 
@@ -471,14 +526,7 @@ export async function listLibraryItems(options?: QueryOptions): Promise<ViralLib
       throw new Error(`SUPABASE_LIST_LIBRARY_FAILED:${error.message}`);
     }
 
-    const mapped = (data ?? []).map((item) => ({
-      id: String(item.id),
-      title: String(item.title),
-      sourceUrl: String(item.source_url ?? ""),
-      summary: String(item.summary ?? ""),
-      tags: normalizeTags(item.tags),
-      createdAt: String(item.created_at ?? new Date().toISOString())
-    }));
+    const mapped = (data ?? []).map((item) => toLibraryItem(item as LibraryRow));
 
     if (mapped.length > 0) {
       return mapped;
@@ -491,4 +539,91 @@ export async function listLibraryItems(options?: QueryOptions): Promise<ViralLib
   }
 
   return fallbackLibrary;
+}
+
+export async function importLibraryItems(
+  items: LibraryImportInput[],
+  options?: QueryOptions
+): Promise<ViralLibraryItem[]> {
+  const normalizedItems = items
+    .map(normalizeLibraryImportItem)
+    .filter((item) => item.title && item.summary);
+
+  if (normalizedItems.length === 0) {
+    return listLibraryItems(options);
+  }
+
+  const deduped = Array.from(
+    new Map(normalizedItems.map((item) => [createLibraryEmbeddingKey(item), item])).entries()
+  );
+
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const payload = deduped.map(([embeddingKey, item]) => ({
+      title: item.title,
+      source_url: item.sourceUrl || null,
+      summary: item.summary,
+      tags: {
+        hook_type: item.tags?.hookType ?? "unknown",
+        topic: item.tags?.topic ?? "general",
+        duration_bucket: item.tags?.durationBucket ?? "5-10m"
+      },
+      embedding_key: embeddingKey
+    }));
+
+    const { error } = await client
+      .from("viral_library_items")
+      .upsert(payload, { onConflict: "embedding_key" });
+
+    if (error) {
+      throw new Error(`SUPABASE_IMPORT_LIBRARY_FAILED:${error.message}`);
+    }
+
+    return listLibraryItems({ ...options, supabaseClient: client });
+  }
+
+  const db = await readDb();
+  const existingByKey = new Map(
+    db.library.map((item) => [
+      createLibraryEmbeddingKey({
+        title: item.title,
+        sourceUrl: item.sourceUrl,
+        summary: item.summary,
+        tags: item.tags
+      }),
+      item
+    ])
+  );
+
+  for (const [embeddingKey, item] of deduped) {
+    const existing = existingByKey.get(embeddingKey);
+    if (existing) {
+      existing.title = item.title;
+      existing.sourceUrl = item.sourceUrl ?? "";
+      existing.summary = item.summary;
+      existing.tags = {
+        hookType: item.tags?.hookType ?? "unknown",
+        topic: item.tags?.topic ?? "general",
+        durationBucket: item.tags?.durationBucket ?? "5-10m"
+      };
+      continue;
+    }
+
+    db.library.unshift({
+      id: crypto.randomUUID(),
+      title: item.title,
+      sourceUrl: item.sourceUrl ?? "",
+      summary: item.summary,
+      tags: {
+        hookType: item.tags?.hookType ?? "unknown",
+        topic: item.tags?.topic ?? "general",
+        durationBucket: item.tags?.durationBucket ?? "5-10m"
+      },
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  db.library.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+  await writeDb(db);
+  return db.library;
 }

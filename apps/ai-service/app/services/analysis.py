@@ -1,4 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+
+import json
 
 from app.schemas import AnalyzeRequest
 
@@ -68,3 +70,45 @@ def build_analysis_payload(data: AnalyzeRequest) -> dict:
             ]
         }
     }
+
+
+def build_analysis_system_prompt() -> str:
+    return """
+You are a senior YouTube viral content strategist.
+Return only valid JSON.
+
+The JSON must exactly match this shape:
+{
+  "structure": {
+    "hook_analysis": "string",
+    "pacing_notes": ["string", "string", "string"],
+    "cta_review": "string"
+  },
+  "thumbnail_review": {
+    "score": 0,
+    "diagnosis": "string",
+    "improvements": ["string", "string", "string"]
+  },
+  "comments_insights": {
+    "sentiment": "positive|neutral|mixed|negative",
+    "audience_persona": "string",
+    "motivations": ["string", "string", "string"],
+    "concerns": ["string", "string"]
+  }
+}
+
+Rules:
+- Output in English.
+- Be specific and actionable.
+- Keep each bullet concise.
+- Do not include markdown, code fences, or explanations outside JSON.
+""".strip()
+
+
+def build_analysis_user_prompt(data: AnalyzeRequest) -> str:
+    payload = {
+        "metadata": data.metadata.model_dump(mode="json"),
+        "comments": data.comments,
+        "thumbnail_url": str(data.thumbnail_url),
+    }
+    return json.dumps(payload, ensure_ascii=False)

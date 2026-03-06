@@ -7,7 +7,10 @@ This build uses Supabase Auth users (Google + Email Magic Link) and stores data 
 - YouTube-only analysis workflow
 - Next.js App Router + FastAPI AI service
 - Streaming analyze flow and report detail pages
+- Report detail page upgraded to 5 tabs (Snapshot / Structure / Thumbnail / Audience / Playbook)
 - Real YouTube Data API with mock fallback
+- AI service with real-model priority and local fallback
+- Pinecone-backed benchmark retrieval with local fallback
 - Optional mock/supabase data backend switch
 - Supabase Auth login:
   - Google OAuth
@@ -15,6 +18,7 @@ This build uses Supabase Auth users (Google + Email Magic Link) and stores data 
 - `demo-user` replaced with authenticated Supabase user ID
 - Server writes now use user session + RLS (no service role dependency)
 - Bilingual UI switch (English/Chinese) via navbar toggle
+- Viral Library search + JSON/CSV import workflow
 
 ## Project Structure
 
@@ -48,7 +52,22 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # Optional server aliases (fallback)
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
+```
 
+Create `apps/ai-service/.env` or export these vars before running FastAPI:
+
+```bash
+AI_PROVIDER=auto
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+OPENAI_TIMEOUT_SEC=20
+OPENAI_ANALYSIS_MODEL=gpt-4o-mini
+OPENAI_SCORE_MODEL=gpt-4o-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+PINECONE_API_KEY=
+PINECONE_INDEX_HOST=
+PINECONE_INDEX_NAME=
+PINECONE_NAMESPACE=viral-library
 ```
 
 Notes:
@@ -57,6 +76,9 @@ Notes:
 - Set `NEXT_PUBLIC_APP_URL` only when you need to override localhost callback (for example, tunnel URL).
 - `SUPABASE_SERVICE_ROLE_KEY` is no longer required for current report/usage writes.
 - `DATA_BACKEND=supabase` is recommended.
+- `AI_PROVIDER=auto` means: try OpenAI first, then fall back to local deterministic logic.
+- `AI_PROVIDER=local` forces local fallback mode for analysis, benchmark retrieval, and score.
+- Benchmark retrieval tries OpenAI embeddings + Pinecone first. If either side is unavailable, it falls back to local similarity ranking.
 
 ## Auth Redirect Strategy (for real users)
 
@@ -86,57 +108,51 @@ Localhost/LAN (`localhost`, `192.168.x.x`) only works on same device/network and
 3. Ensure tables exist: `videos`, `reports`, `usage_logs`, `viral_library_items`.
 4. Confirm trigger `usage_logs_daily_limit_guard` exists on `usage_logs` (hard quota intercept).
 5. Confirm RLS is enabled on these tables and policies are created.
+6. Re-run `supabase/schema.sql` after pulling latest changes so `viral_library_items` gets:
+   - `embedding_key` unique index
+   - authenticated insert/update policies for library import
 
 ## Run
 
-### 1) AI service
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r apps/ai-service/requirements.txt
-npm run dev:ai
-```
-
-### 2) Web app
+### Web
 
 ```bash
 cd apps/web
-cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-## Deployment (Vercel Monorepo)
-
-Use Vercel project settings:
-
-1. Framework Preset: `Next.js`
-2. Root Directory: `apps/web`
-3. Build Command: `npm run build` (default)
-4. Output Directory: keep empty
-
-Do not keep a root-level `vercel.json` with legacy `builds` entries. It triggers Vercel warning and bypasses Project Settings.
-
-Troubleshooting:
-- `401` on `*.vercel.app` means Deployment Protection is blocking public access. Disable protection for Production or use a custom production domain.
-- `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND` means that domain alias is detached/stale. Re-assign the domain in Vercel `Project -> Domains`.
-
-Preflight check command (inside `apps/web`):
+### AI service
 
 ```bash
-npm run deploy:check
+cd apps/ai-service
+python -m venv .venv
+. .venv/Scripts/Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Auth Flow
+### Index viral library into Pinecone
 
-- Open `/login`
-- Sign in via Google or Email Magic Link
-- After callback, redirected to `/dashboard`
-- New reports are created with real `auth.user.id`
+Create a Pinecone cosine index whose dimension matches your embedding model. If you keep the default `text-embedding-3-small`, use dimension `1536`.
 
-## Routes
+Then run:
 
+```bash
+cd apps/ai-service
+python scripts/index_viral_library.py
+```
+
+Optional flags:
+
+```bash
+python scripts/index_viral_library.py --index-host=... --namespace=viral-library --batch-size=50
+```
+
+## Pages
+
+- `/`
 - `/login`
 - `/auth/callback` (legacy + server exchange)
 - `/auth/confirm` (mobile/email callback compatibility)
@@ -147,10 +163,12 @@ npm run deploy:check
 
 ## API
 
-- Unified JSON envelope for non-stream routes: `ok/data/error/request_id`
+- Unified JSON envelope for all `/api/*` JSON routes: `ok/data/error/request_id` + `x-request-id` header
+- `/api/analyze` SSE events also use the same envelope shape inside `data:` payloads
 - `POST /api/analyze` enforces daily quota and returns `429 USAGE_LIMIT_EXCEEDED` when exceeded
 - Quota is hard-enforced in DB trigger (`usage_logs_daily_limit_guard`) to prevent concurrent bypass
 - `POST /api/analyze` (requires auth)
+- `POST /api/library/import` (requires auth, JSON/CSV import)
 - `GET /api/reports` (requires auth)
 - `GET /api/reports/{id}` (requires auth, owner only)
 - `GET /api/me` (requires auth)
@@ -160,6 +178,4 @@ npm run deploy:check
 
 ## Next Upgrades
 
-- Pinecone-based benchmark retrieval
-- Real model provider usage/token tracing
 - Stripe billing

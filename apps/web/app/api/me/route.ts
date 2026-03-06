@@ -1,4 +1,4 @@
-import { createRequestId, okJsonResponse } from "@/lib/api-response";
+﻿import { okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { getDailyLimitByPlan } from "@/lib/quota";
 import { countUsageForDay } from "@/lib/report-store";
@@ -6,8 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const requestId = createRequestId();
+export const GET = withApiRoute(async (_request, { requestId }) => {
   const authUser = await getApiAuthUser();
   if (!authUser) {
     return unauthorizedJsonResponse(requestId);
@@ -32,4 +31,4 @@ export async function GET() {
     },
     requestId
   );
-}
+});

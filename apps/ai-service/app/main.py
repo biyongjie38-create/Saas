@@ -1,46 +1,39 @@
 from __future__ import annotations
 
-import time
-from typing import Callable
+from fastapi import FastAPI
 
-from fastapi import FastAPI, HTTPException
-from pydantic import ValidationError
-
+from app.runtime_env import load_runtime_env
 from app.schemas import (
+    AnalysisPayload,
     AnalyzeRequest,
     AnalyzeResponse,
+    BenchmarksPayload,
     RagCompareRequest,
     RagCompareResponse,
+    ScorePayload,
     ScoreRequest,
     ScoreResponse,
 )
-from app.services.analysis import build_analysis_payload
+from app.services.analysis import (
+    build_analysis_payload,
+    build_analysis_system_prompt,
+    build_analysis_user_prompt,
+)
 from app.services.model_router import (
     route_analysis_model,
-    route_rag_model,
     route_score_model,
 )
-from app.services.rag import build_benchmark_payload
-from app.services.scoring import build_score_payload
+from app.services.provider import run_json_task
+from app.services.rag import run_benchmark_retrieval
+from app.services.scoring import (
+    build_score_payload,
+    build_score_system_prompt,
+    build_score_user_prompt,
+)
 
-app = FastAPI(title="ViralBrain AI Service", version="0.1.0")
+load_runtime_env()
 
-
-def validate_with_retry(factory: Callable[[], dict], retries: int = 2) -> tuple[dict, int]:
-    attempts = 0
-    last_error: ValidationError | None = None
-
-    while attempts <= retries:
-        try:
-            payload = factory()
-            return payload, attempts
-        except ValidationError as exc:
-            last_error = exc
-            attempts += 1
-
-    if last_error is None:
-        raise HTTPException(status_code=500, detail="SCHEMA_UNKNOWN")
-    raise HTTPException(status_code=422, detail="SCHEMA_INVALID")
+app = FastAPI(title="ViralBrain AI Service", version="0.3.1")
 
 
 @app.get("/health")
@@ -51,70 +44,72 @@ def health() -> dict:
 @app.post("/ai/analyze", response_model=AnalyzeResponse)
 def analyze(data: AnalyzeRequest) -> AnalyzeResponse:
     model = route_analysis_model(data.metadata)
-    started = time.perf_counter()
+    result = run_json_task(
+        task_name="analysis",
+        model=model,
+        system_prompt=build_analysis_system_prompt(),
+        user_prompt=build_analysis_user_prompt(data),
+        fallback_factory=lambda: build_analysis_payload(data),
+        validator=lambda payload: AnalysisPayload.model_validate(payload),
+        temperature=0.4,
+        max_retries=1,
+    )
 
-    def _factory() -> dict:
-        payload = build_analysis_payload(data)
-        validated = AnalyzeResponse(
-            analysis=payload,
-            model=model,
-            retries=0,
-            latency_ms=0,
-        )
-        return validated.model_dump()
-
-    result, retries = validate_with_retry(_factory)
-    latency_ms = int((time.perf_counter() - started) * 1000)
-
-    result["retries"] = retries
-    result["latency_ms"] = latency_ms
-
-    return AnalyzeResponse.model_validate(result)
+    return AnalyzeResponse(
+        analysis=AnalysisPayload.model_validate(result.payload),
+        model=result.model,
+        provider=result.provider,
+        fallback_used=result.fallback_used,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        total_tokens=result.total_tokens,
+        provider_request_id=result.provider_request_id,
+        retries=result.retries,
+        latency_ms=result.latency_ms,
+    )
 
 
 @app.post("/ai/rag/compare", response_model=RagCompareResponse)
 def rag_compare(data: RagCompareRequest) -> RagCompareResponse:
-    model = route_rag_model()
-    started = time.perf_counter()
+    result = run_benchmark_retrieval(data, data.top_k)
 
-    def _factory() -> dict:
-        payload = build_benchmark_payload(data)
-        validated = RagCompareResponse(
-            benchmarks=payload,
-            model=model,
-            retries=0,
-            latency_ms=0,
-        )
-        return validated.model_dump()
-
-    result, retries = validate_with_retry(_factory)
-    latency_ms = int((time.perf_counter() - started) * 1000)
-
-    result["retries"] = retries
-    result["latency_ms"] = latency_ms
-
-    return RagCompareResponse.model_validate(result)
+    return RagCompareResponse(
+        benchmarks=BenchmarksPayload.model_validate(result.payload),
+        model=result.model,
+        provider=result.provider,
+        fallback_used=result.fallback_used,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        total_tokens=result.total_tokens,
+        provider_request_id=result.provider_request_id,
+        retries=result.retries,
+        latency_ms=result.latency_ms,
+    )
 
 
 @app.post("/ai/score", response_model=ScoreResponse)
 def score(data: ScoreRequest) -> ScoreResponse:
     model = route_score_model(data.metadata)
-    started = time.perf_counter()
+    result = run_json_task(
+        task_name="score",
+        model=model,
+        system_prompt=build_score_system_prompt(),
+        user_prompt=build_score_user_prompt(data),
+        fallback_factory=lambda: build_score_payload(data),
+        validator=lambda payload: ScorePayload.model_validate(payload),
+        temperature=0.2,
+        max_retries=1,
+    )
 
-    def _factory() -> dict:
-        payload = build_score_payload(data)
-        validated = ScoreResponse(
-            score=payload,
-            model=model,
-            retries=0,
-            latency_ms=0,
-        )
-        return validated.model_dump()
-
-    result, retries = validate_with_retry(_factory)
-    latency_ms = int((time.perf_counter() - started) * 1000)
-
-    result["retries"] = retries
-    result["latency_ms"] = latency_ms
-
-    return ScoreResponse.model_validate(result)
+    return ScoreResponse(
+        score=ScorePayload.model_validate(result.payload),
+        model=result.model,
+        provider=result.provider,
+        fallback_used=result.fallback_used,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        total_tokens=result.total_tokens,
+        provider_request_id=result.provider_request_id,
+        retries=result.retries,
+        latency_ms=result.latency_ms,
+    )

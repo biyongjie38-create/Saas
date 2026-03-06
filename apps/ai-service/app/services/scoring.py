@@ -1,4 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
+
+import json
 
 from app.schemas import ScoreRequest
 
@@ -49,3 +51,35 @@ def build_score_payload(data: ScoreRequest) -> dict:
         },
         "top_actions": actions[:5]
     }
+
+
+def build_score_system_prompt() -> str:
+    return """
+You are a YouTube growth analyst scoring viral potential.
+Return only valid JSON.
+
+The JSON must exactly match this shape:
+{
+  "total": 0,
+  "breakdown": {
+    "title": 0,
+    "thumbnail": 0,
+    "hook": 0,
+    "pacing": 0,
+    "value_density": 0,
+    "emotion_resonance": 0
+  },
+  "top_actions": ["string", "string", "string"]
+}
+
+Rules:
+- Scores must be integers between 0 and 100.
+- `total` must reflect the breakdown, not random numbers.
+- `top_actions` must be specific and actionable.
+- Output in English.
+- Do not include markdown, code fences, or explanations outside JSON.
+""".strip()
+
+
+def build_score_user_prompt(data: ScoreRequest) -> str:
+    return json.dumps(data.model_dump(mode="json"), ensure_ascii=False)

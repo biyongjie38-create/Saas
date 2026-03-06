@@ -1,9 +1,15 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { createRequestId, errorJsonResponse, okJsonResponse } from "@/lib/api-response";
+import {
+  errorJsonResponse,
+  logApiError,
+  okJsonResponse,
+  toSseErrorEvent,
+  toSseSuccessEvent,
+  withApiRoute
+} from "@/lib/api-response";
 import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { runAnalysis, runBenchmarks, runScoring } from "@/lib/ai-client";
-import { routeModels } from "@/lib/model-router";
 import {
   consumeUsage,
   countUsageForDay,
@@ -11,8 +17,9 @@ import {
   listLibraryItems,
   updateReport
 } from "@/lib/report-store";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import type { ModelTrace } from "@/lib/types";
 import { fetchYoutubeData } from "@/lib/youtube";
 
 export const runtime = "nodejs";
@@ -26,6 +33,32 @@ const requestSchema = z.object({
   url: z.string().url(),
   stream: z.boolean().optional().default(true)
 });
+
+function buildModelTrace(input: {
+  analysis: Awaited<ReturnType<typeof runAnalysis>>["trace"];
+  benchmark: Awaited<ReturnType<typeof runBenchmarks>>["trace"];
+  score: Awaited<ReturnType<typeof runScoring>>["trace"];
+  totalLatencyMs: number;
+}): ModelTrace {
+  const inputTokens = input.analysis.inputTokens + input.benchmark.inputTokens + input.score.inputTokens;
+  const outputTokens = input.analysis.outputTokens + input.benchmark.outputTokens + input.score.outputTokens;
+  const totalTokens = input.analysis.totalTokens + input.benchmark.totalTokens + input.score.totalTokens;
+
+  return {
+    analysisModel: input.analysis.model,
+    benchmarkModel: input.benchmark.model,
+    scoreModel: input.score.model,
+    totalLatencyMs: input.totalLatencyMs,
+    retries: input.analysis.retries + input.benchmark.retries + input.score.retries,
+    fallbackUsed: input.analysis.fallbackUsed || input.benchmark.fallbackUsed || input.score.fallbackUsed,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    analysis: input.analysis,
+    benchmark: input.benchmark,
+    score: input.score
+  };
+}
 
 async function executeAnalyzeTask(input: {
   url: string;
@@ -68,46 +101,51 @@ async function executeAnalyzeTask(input: {
       source: video.dataSource
     });
 
-    const models = routeModels(video);
+    input.onStage?.("analysis", {});
+    const analysisResult = await runAnalysis(video);
 
-    input.onStage?.("analysis", { model: models.analysisModel });
-    const analysis = await runAnalysis(video);
-
-    input.onStage?.("benchmark", { model: models.benchmarkModel });
+    input.onStage?.("benchmark", {});
     const libraryItems = await listLibraryItems({ supabaseClient: input.supabaseClient });
-    const benchmarks = await runBenchmarks(video, analysis.structure.hookAnalysis, libraryItems);
+    const benchmarkResult = await runBenchmarks(video, analysisResult.analysis.structure.hookAnalysis, libraryItems);
 
-    input.onStage?.("score", { model: models.scoreModel });
-    const score = await runScoring(video, analysis, benchmarks);
+    input.onStage?.("score", {});
+    const scoreResult = await runScoring(video, analysisResult.analysis, benchmarkResult.benchmarks);
+
+    const modelTrace = buildModelTrace({
+      analysis: analysisResult.trace,
+      benchmark: benchmarkResult.trace,
+      score: scoreResult.trace,
+      totalLatencyMs: Date.now() - startedAt
+    });
 
     await updateReport(
       report.id,
       {
         status: "done",
-        analysisJson: analysis,
-        benchmarksJson: benchmarks,
-        scoreJson: score,
-        scoreTotal: score.total,
-        modelTrace: {
-          analysisModel: models.analysisModel,
-          benchmarkModel: models.benchmarkModel,
-          scoreModel: models.scoreModel,
-          totalLatencyMs: Date.now() - startedAt,
-          retries: 0
-        }
+        analysisJson: analysisResult.analysis,
+        benchmarksJson: benchmarkResult.benchmarks,
+        scoreJson: scoreResult.score,
+        scoreTotal: scoreResult.score.total,
+        modelTrace
       },
       { supabaseClient: input.supabaseClient }
     );
 
     input.onStage?.("done", {
       reportId: report.id,
-      scoreTotal: score.total,
-      source: video.dataSource
+      scoreTotal: scoreResult.score.total,
+      source: video.dataSource,
+      modelTrace: {
+        analysis_model: modelTrace.analysisModel,
+        score_model: modelTrace.scoreModel,
+        total_tokens: modelTrace.totalTokens ?? 0,
+        fallback_used: modelTrace.fallbackUsed ?? false
+      }
     });
 
     return {
       reportId: report.id,
-      scoreTotal: score.total
+      scoreTotal: scoreResult.score.total
     };
   } catch (error) {
     if (reportId) {
@@ -125,8 +163,7 @@ async function executeAnalyzeTask(input: {
   }
 }
 
-export async function POST(request: Request) {
-  const requestId = createRequestId();
+export const POST = withApiRoute(async (request, { requestId }) => {
   const authUser = await getApiAuthUser();
   if (!authUser) {
     return unauthorizedJsonResponse(requestId);
@@ -202,6 +239,7 @@ export async function POST(request: Request) {
         );
       }
 
+      logApiError(request, requestId, error);
       return errorJsonResponse(
         {
           code: "ANALYZE_FAILED",
@@ -217,10 +255,12 @@ export async function POST(request: Request) {
 
   const streamResponse = new ReadableStream({
     start(controller) {
-      const send = (event: string, payload: Record<string, unknown>) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify({ request_id: requestId, ...payload })}\n\n`)
-        );
+      const sendSuccess = (event: string, payload: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(toSseSuccessEvent(event, payload, requestId)));
+      };
+
+      const sendError = (error: { code: string; message: string; details?: Record<string, unknown> }) => {
+        controller.enqueue(encoder.encode(toSseErrorEvent("error", error, requestId)));
       };
 
       executeAnalyzeTask({
@@ -229,12 +269,12 @@ export async function POST(request: Request) {
         plan: appUser.plan,
         supabaseClient,
         onStage(stage, payload) {
-          send(stage, payload ?? {});
+          sendSuccess(stage, payload ?? {});
         }
       })
         .catch((error) => {
           if (error instanceof UsageLimitExceededError) {
-            send("error", {
+            sendError({
               code: error.code,
               message: error.message,
               details: error.details
@@ -242,7 +282,8 @@ export async function POST(request: Request) {
             return;
           }
 
-          send("error", {
+          logApiError(request, requestId, error);
+          sendError({
             code: "ANALYZE_FAILED",
             message: error instanceof Error ? error.message : "Analyze task failed"
           });
@@ -261,4 +302,4 @@ export async function POST(request: Request) {
       "x-request-id": requestId
     }
   });
-}
+});

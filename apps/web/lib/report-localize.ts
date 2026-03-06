@@ -1,5 +1,5 @@
 import type { Lang } from "@/lib/i18n-shared";
-import type { AnalysisJson, ScoreJson, VideoDataSource } from "@/lib/types";
+import type { AnalysisJson, BenchmarksJson, ScoreJson, VideoDataSource } from "@/lib/types";
 
 const zhTextMap: Record<string, string> = {
   "Title has high information density. Move the outcome promise earlier and reduce extra wording.": "标题信息密度偏高，建议把结果承诺前置并减少冗余表述。",
@@ -24,7 +24,11 @@ const zhTextMap: Record<string, string> = {
   "Rewrite CTA with clear promise for the next video.": "重写 CTA，明确下一条视频的具体收益承诺。",
   "Live API": "实时 API",
   "Mock Demo": "演示数据",
-  "Mock Synthetic": "合成数据"
+  "Mock Synthetic": "合成数据",
+  "Avoid generic intro context before the main payoff.": "避免在主要结果出现前铺垫过多泛化背景。",
+  "Avoid long intro setup": "避免冗长的开场铺垫",
+  "Avoid late CTA placement": "避免把 CTA 放得过晚",
+  "Pull one concrete benchmark beat into the first third of the script.": "把一个具体对标节奏点放进脚本前三分之一。"
 };
 
 const sentimentMap: Record<string, string> = {
@@ -68,6 +72,50 @@ export function localizeSentiment(lang: Lang, sentiment: string): string {
   return sentimentMap[sentiment] ?? sentiment;
 }
 
+function localizeBenchmarkLine(lang: Lang, value: string): string {
+  if (lang !== "zh") {
+    return value;
+  }
+
+  if (value.startsWith("Relevant to topic cluster: ")) {
+    return `相关主题簇：${value.slice("Relevant to topic cluster: ".length)}`;
+  }
+  if (value.startsWith("Retrieved with hook pattern: ")) {
+    return `命中的钩子模式：${value.slice("Retrieved with hook pattern: ".length)}`;
+  }
+  if (value.startsWith("Benchmark duration bucket is ")) {
+    const rest = value.slice("Benchmark duration bucket is ".length).replace(", so pacing may differ from the current video.", "");
+    return `对标案例时长分段为 ${rest}，节奏可能与当前视频不同。`;
+  }
+  if (value.startsWith("Adapt the ") && value.endsWith(" opening pattern into the first 10-15 seconds.")) {
+    const hook = value.slice("Adapt the ".length, -" opening pattern into the first 10-15 seconds.".length);
+    return `把 ${hook} 的开场模式压进前 10-15 秒。`;
+  }
+  if (value.startsWith("Reuse the ") && value.endsWith(" framing from this benchmark while keeping your original promise specific.")) {
+    const topic = value.slice("Reuse the ".length, -" framing from this benchmark while keeping your original promise specific.".length);
+    return `复用这个 ${topic} 主题的表达框架，同时保留你原本明确的结果承诺。`;
+  }
+  if (value.startsWith("Avoid drifting away from the query focus: ")) {
+    return `避免偏离当前 query 重点：${value.slice("Avoid drifting away from the query focus: ".length)}`;
+  }
+  if (value.startsWith("Topic alignment: ")) {
+    return `主题对齐：${value.slice("Topic alignment: ".length)}`;
+  }
+  if (value.startsWith("Hook pattern overlap: ")) {
+    return `钩子模式重合：${value.slice("Hook pattern overlap: ".length)}`;
+  }
+  if (value.startsWith("This benchmark sits in the ") && value.endsWith(" runtime bucket.")) {
+    const bucket = value.slice("This benchmark sits in the ".length, -" runtime bucket.".length);
+    return `这个对标案例位于 ${bucket} 时长分段。`;
+  }
+  if (value.startsWith("Borrow the ") && value.endsWith(" opening pattern.")) {
+    const hook = value.slice("Borrow the ".length, -" opening pattern.".length);
+    return `借用 ${hook} 的开场模式。`;
+  }
+
+  return localizeText(lang, value);
+}
+
 export function localizeAnalysisJson(lang: Lang, value: AnalysisJson | null): AnalysisJson | null {
   if (!value || lang !== "zh") {
     return value;
@@ -88,10 +136,27 @@ export function localizeAnalysisJson(lang: Lang, value: AnalysisJson | null): An
     },
     commentsInsights: {
       ...value.commentsInsights,
+      sentiment: localizeSentiment(lang, value.commentsInsights.sentiment) as AnalysisJson["commentsInsights"]["sentiment"],
       audiencePersona: localizeText(lang, value.commentsInsights.audiencePersona),
       motivations: value.commentsInsights.motivations.map((item) => localizeText(lang, item)),
       concerns: value.commentsInsights.concerns.map((item) => localizeText(lang, item))
     }
+  };
+}
+
+export function localizeBenchmarksJson(lang: Lang, value: BenchmarksJson | null): BenchmarksJson | null {
+  if (!value || lang !== "zh") {
+    return value;
+  }
+
+  return {
+    topMatches: value.topMatches.map((item) => ({
+      ...item,
+      sharedPoints: item.sharedPoints.map((entry) => localizeBenchmarkLine(lang, entry)),
+      differences: item.differences.map((entry) => localizeBenchmarkLine(lang, entry)),
+      copy: item.copy.map((entry) => localizeBenchmarkLine(lang, entry)),
+      avoid: item.avoid.map((entry) => localizeBenchmarkLine(lang, entry))
+    }))
   };
 }
 

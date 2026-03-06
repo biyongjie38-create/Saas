@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class Stats(BaseModel):
@@ -55,6 +55,12 @@ class AnalysisPayload(BaseModel):
 class AnalyzeResponse(BaseModel):
     analysis: AnalysisPayload
     model: str
+    provider: str
+    fallback_used: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    provider_request_id: str | None = None
     retries: int
     latency_ms: int
 
@@ -67,13 +73,15 @@ class RagCompareRequest(BaseModel):
 
 
 class BenchmarkItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str
     title: str
     source_url: HttpUrl
     similarity: int = Field(ge=0, le=100)
     shared_points: list[str]
     differences: list[str]
-    copy: list[str]
+    copy_actions: list[str] = Field(validation_alias="copy", serialization_alias="copy")
     avoid: list[str]
 
 
@@ -84,6 +92,12 @@ class BenchmarksPayload(BaseModel):
 class RagCompareResponse(BaseModel):
     benchmarks: BenchmarksPayload
     model: str
+    provider: str
+    fallback_used: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    provider_request_id: str | None = None
     retries: int
     latency_ms: int
 
@@ -112,5 +126,11 @@ class ScoreRequest(BaseModel):
 class ScoreResponse(BaseModel):
     score: ScorePayload
     model: str
+    provider: str
+    fallback_used: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    provider_request_id: str | None = None
     retries: int
     latency_ms: int
