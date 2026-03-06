@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState, type FormEvent } from "react";
 import {
+  createImplicitBrowserSupabaseClient,
   getBrowserSupabaseClient,
   type BrowserSupabaseAuthConfig
 } from "@/lib/supabase-browser";
@@ -334,7 +335,7 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
     setMessage(null);
 
     try {
-      const supabase = getBrowserSupabaseClient(authConfig);
+      const supabase = createImplicitBrowserSupabaseClient(authConfig);
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email.trim(),
         options: {
@@ -410,6 +411,3 @@ export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
     </div>
   );
 }
-
-
-

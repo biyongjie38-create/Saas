@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { EmailOtpType } from "@supabase/supabase-js";
@@ -148,6 +148,8 @@ export default function AuthConfirmPage() {
         const nextPath = normalizeNextPath(search?.get("next") ?? null);
         const code = search?.get("code");
         const tokenHash = search?.get("token_hash");
+        const token = search?.get("token");
+        const email = search?.get("email");
         const rawType = search?.get("type");
         const otpType = rawType && otpTypes.has(rawType as EmailOtpType) ? (rawType as EmailOtpType) : null;
         const authError = search?.get("error_description") ?? search?.get("error");
@@ -157,45 +159,73 @@ export default function AuthConfirmPage() {
         }
 
         const supabase = getBrowserSupabaseClient();
+        const errors: unknown[] = [];
+        let signedIn = false;
 
         if (code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            throw exchangeError;
+          if (!exchangeError) {
+            signedIn = true;
+          } else {
+            errors.push(exchangeError);
           }
-        } else if (tokenHash && otpType) {
-          const { error: otpError } = await supabase.auth.verifyOtp({
+        }
+
+        if (!signedIn && tokenHash && otpType) {
+          const { error: otpHashError } = await supabase.auth.verifyOtp({
             token_hash: tokenHash,
             type: otpType
           });
-          if (otpError) {
-            throw otpError;
+          if (!otpHashError) {
+            signedIn = true;
+          } else {
+            errors.push(otpHashError);
           }
-        } else {
+        }
+
+        if (!signedIn && token && otpType && email) {
+          const { error: otpTokenError } = await supabase.auth.verifyOtp({
+            token,
+            type: otpType,
+            email
+          });
+          if (!otpTokenError) {
+            signedIn = true;
+          } else {
+            errors.push(otpTokenError);
+          }
+        }
+
+        if (!signedIn) {
           const querySession = extractQuerySession(search);
           const hashSession = extractHashSession(window.location.hash);
+          const sessionPayload = querySession ?? hashSession;
 
-          if (querySession || hashSession) {
-            const sessionPayload = querySession ?? hashSession;
-            if (!sessionPayload) {
-              throw new Error(copy.missingPayload);
-            }
+          if (sessionPayload) {
             const { error: setSessionError } = await supabase.auth.setSession({
               access_token: sessionPayload.accessToken,
               refresh_token: sessionPayload.refreshToken
             });
-            if (setSessionError) {
-              throw setSessionError;
-            }
-          } else {
-            const {
-              data: { session }
-            } = await supabase.auth.getSession();
-
-            if (!session) {
-              throw new Error(copy.missingPayload);
+            if (!setSessionError) {
+              signedIn = true;
+            } else {
+              errors.push(setSessionError);
             }
           }
+        }
+
+        if (!signedIn) {
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+
+          if (session) {
+            signedIn = true;
+          }
+        }
+
+        if (!signedIn) {
+          throw (errors.length > 0 ? errors[errors.length - 1] : new Error(copy.missingPayload));
         }
 
         window.location.replace(nextPath);
@@ -236,4 +266,3 @@ export default function AuthConfirmPage() {
     </main>
   );
 }
-
