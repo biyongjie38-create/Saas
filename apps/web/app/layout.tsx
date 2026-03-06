@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import { getServerLang } from "@/lib/i18n";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -18,12 +19,15 @@ export const metadata: Metadata = {
   description: "YouTube viral intelligence SaaS"
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{ children: React.ReactNode }>) {
+  const lang = await getServerLang();
+
   return (
-    <html lang="en">
+    <html lang={lang === "zh" ? "zh-CN" : "en"}>
       <body className={`${spaceGrotesk.variable} ${plexMono.variable}`}>{children}</body>
     </html>
   );
 }
+

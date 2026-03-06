@@ -1,4 +1,4 @@
-# ViralBrain.ai MVP
+﻿# ViralBrain.ai MVP
 
 This build uses Supabase Auth users (Google + Email Magic Link) and stores data with RLS-scoped user sessions.
 
@@ -14,6 +14,7 @@ This build uses Supabase Auth users (Google + Email Magic Link) and stores data 
   - Email Magic Link
 - `demo-user` replaced with authenticated Supabase user ID
 - Server writes now use user session + RLS (no service role dependency)
+- Bilingual UI switch (English/Chinese) via navbar toggle
 
 ## Project Structure
 
@@ -135,7 +136,8 @@ npm run deploy:check
 ## Routes
 
 - `/login`
-- `/auth/callback`
+- `/auth/callback` (legacy + server exchange)
+- `/auth/confirm` (mobile/email callback compatibility)
 - `/dashboard`
 - `/report/[id]`
 - `/library`
@@ -158,5 +160,6 @@ npm run deploy:check
 - Pinecone-based benchmark retrieval
 - Real model provider usage/token tracing
 - Stripe billing
+
 
 

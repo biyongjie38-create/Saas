@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { SiteNav } from "@/components/site-nav";
 import { LoginForm } from "@/components/login-form";
 import { getOptionalAuthUser } from "@/lib/auth";
+import { getServerLang, text } from "@/lib/i18n";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase-config";
 
 type Props = {
@@ -52,6 +53,7 @@ function resolvePublicAppUrl(): string | null {
 export default async function LoginPage({ searchParams }: Props) {
   const query = await searchParams;
   const nextPath = normalizeNextPath(query.next);
+  const lang = await getServerLang();
 
   const user = await getOptionalAuthUser();
   if (user) {
@@ -67,14 +69,16 @@ export default async function LoginPage({ searchParams }: Props) {
     <main>
       <SiteNav />
       <section className="shell section">
-        <h1 style={{ marginTop: 0 }}>Welcome Back</h1>
-        <p>Sign in to access your reports and usage.</p>
+        <h1 style={{ marginTop: 0 }}>{text(lang, "Welcome Back", "欢迎回来")}</h1>
+        <p>{text(lang, "Sign in to access your reports and usage.", "登录后可访问你的分析报告和额度数据。")}</p>
         <LoginForm
           nextPath={nextPath}
           appUrl={resolvePublicAppUrl()}
+          lang={lang}
           authConfig={authConfig}
         />
       </section>
     </main>
   );
 }
+

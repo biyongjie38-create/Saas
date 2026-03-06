@@ -1,4 +1,4 @@
-# API Contracts (MVP)
+﻿# API Contracts (MVP)
 
 ## Auth
 
@@ -8,6 +8,7 @@ Browser login paths:
 
 - `GET /login`
 - `GET /auth/callback`
+- `GET /auth/confirm`
 - `POST /auth/signout`
 
 Server-side DB writes run through authenticated user session + RLS policies.
@@ -137,3 +138,4 @@ Response:
   }
 }
 ```
+

@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #070a12;
   --panel: #101827;
   --text: #f6f7fb;
@@ -238,6 +238,19 @@ a {
 }
 
 @media (max-width: 900px) {
+  .nav-inner {
+    height: auto;
+    min-height: 68px;
+    padding: 10px 0;
+    align-items: flex-start;
+  }
+
+  .nav-links {
+    gap: 12px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
   .grid-3 {
     grid-template-columns: 1fr;
   }
@@ -245,9 +258,6 @@ a {
   .report-grid {
     grid-template-columns: 1fr;
   }
-
-  .nav-links {
-    gap: 12px;
-    font-size: 13px;
-  }
 }
+
+

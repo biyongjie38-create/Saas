@@ -1,4 +1,4 @@
-# Production Deployment (Public Login)
+﻿# Production Deployment (Public Login)
 
 ## Goal
 
@@ -29,7 +29,9 @@ In your deployment platform, set:
 In Supabase Dashboard -> Auth -> URL Configuration:
 
 - Site URL: `https://your-domain.com`
-- Redirect URL: `https://your-domain.com/auth/callback`
+- Redirect URLs:
+  - `https://your-domain.com/auth/callback`
+  - `https://your-domain.com/auth/confirm`
 
 If you have preview domains, add each callback URL explicitly.
 
@@ -69,3 +71,4 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 
 - `401` on `*.vercel.app`: Deployment Protection is active. Disable protection for Production or use a custom production domain.
 - `404` + `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`: the domain alias points to a missing/deleted deployment. Re-assign that domain in `Project -> Domains`.
+

@@ -1,10 +1,12 @@
 ﻿import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser, toAppUser } from "@/lib/auth";
+import { getServerLang, text } from "@/lib/i18n";
 import { countUsageForDay } from "@/lib/report-store";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 export default async function SettingsPage() {
   const authUser = await requirePageAuthUser("/settings");
+  const lang = await getServerLang();
   const supabaseClient = await createServerSupabaseClient();
   const user = toAppUser(authUser);
   const usedToday = await countUsageForDay(user.id, { supabaseClient });
@@ -14,27 +16,27 @@ export default async function SettingsPage() {
     <main>
       <SiteNav />
       <section className="shell section">
-        <h1 style={{ marginTop: 0 }}>Settings</h1>
+        <h1 style={{ marginTop: 0 }}>{text(lang, "Settings", "设置")}</h1>
         <div className="grid-3">
           <article className="card panel">
-            <h3>Account</h3>
+            <h3>{text(lang, "Account", "账号")}</h3>
             <p className="mono">{user.email}</p>
-            <p className="small">Plan: {user.plan}</p>
+            <p className="small">{text(lang, "Plan", "套餐")}: {user.plan}</p>
           </article>
 
           <article className="card panel">
-            <h3>Usage</h3>
+            <h3>{text(lang, "Usage", "用量")}</h3>
             <p>
-              Today {usedToday} / {dailyLimit}
+              {text(lang, "Today", "今日")} {usedToday} / {dailyLimit}
             </p>
-            <p className="small">Data backend follows DATA_BACKEND setting (mock or supabase).</p>
+            <p className="small">{text(lang, "Data backend follows DATA_BACKEND setting (mock or supabase).", "数据后端遵循 DATA_BACKEND 配置（mock 或 supabase）。")}</p>
           </article>
 
           <article className="card panel">
-            <h3>Pro Plan</h3>
-            <p>Pro waitlist is open (MVP placeholder).</p>
+            <h3>{text(lang, "Pro Plan", "专业版")}</h3>
+            <p>{text(lang, "Pro waitlist is open (MVP placeholder).", "专业版候补列表已开放（MVP 占位）。")}</p>
             <button className="btn btn-ghost" type="button">
-              Join Waitlist
+              {text(lang, "Join Waitlist", "加入候补")}
             </button>
           </article>
         </div>
@@ -42,3 +44,4 @@ export default async function SettingsPage() {
     </main>
   );
 }
+

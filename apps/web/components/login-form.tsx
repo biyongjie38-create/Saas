@@ -1,18 +1,81 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState, type FormEvent } from "react";
 import {
   getBrowserSupabaseClient,
   type BrowserSupabaseAuthConfig
 } from "@/lib/supabase-browser";
+import type { Lang } from "@/lib/i18n-shared";
 
 type Props = {
   nextPath: string;
   appUrl: string | null;
+  lang: Lang;
   authConfig: {
     url: string | null;
     anonKey: string | null;
   };
+};
+
+type LoginCopy = {
+  title: string;
+  subtitle: string;
+  callback: string;
+  continueGoogle: string;
+  sendMagicLink: string;
+  emailPlaceholder: string;
+  inputEmailRequired: string;
+  magicSent: string;
+  signInFailed: string;
+  missingConfigPrefix: string;
+  missingConfigFallback: string;
+  missingRedirectOrigin: string;
+  hintVercelCurrent: string;
+  hintLoopback: string;
+  hintPrivate: string;
+  hintVercelTarget: string;
+  hintNonHttps: string;
+};
+
+const copyByLang: Record<Lang, LoginCopy> = {
+  en: {
+    title: "Sign In",
+    subtitle: "Use Google OAuth or Email Magic Link.",
+    callback: "callback",
+    continueGoogle: "Continue with Google",
+    sendMagicLink: "Send Email Magic Link",
+    emailPlaceholder: "you@example.com",
+    inputEmailRequired: "Please enter your email.",
+    magicSent: "Magic link sent. Check your inbox and click the link to continue.",
+    signInFailed: "Sign-in failed.",
+    missingConfigPrefix: "Missing Supabase Auth config",
+    missingConfigFallback: "Missing Supabase Auth config.",
+    missingRedirectOrigin: "No redirect origin available. Set NEXT_PUBLIC_APP_URL or open this page from your real domain.",
+    hintVercelCurrent: "Current domain is *.vercel.app. Set NEXT_PUBLIC_APP_URL to your public domain to avoid protected login callbacks.",
+    hintLoopback: "Redirect target is localhost. Magic Link only works on the same device/browser that can access localhost.",
+    hintPrivate: "Redirect target is a private LAN address. It only works for users on the same local network.",
+    hintVercelTarget: "Redirect target is a vercel.app domain. If users see 401, disable Deployment Protection or use a custom domain.",
+    hintNonHttps: "Redirect target is not HTTPS. Public users should sign in through an HTTPS domain."
+  },
+  zh: {
+    title: "登录",
+    subtitle: "使用 Google OAuth 或邮箱魔法链接登录。",
+    callback: "回调地址",
+    continueGoogle: "使用 Google 登录",
+    sendMagicLink: "发送邮箱魔法链接",
+    emailPlaceholder: "you@example.com",
+    inputEmailRequired: "请输入邮箱地址。",
+    magicSent: "魔法链接已发送，请到邮箱点击登录。",
+    signInFailed: "登录失败。",
+    missingConfigPrefix: "缺少 Supabase 登录配置",
+    missingConfigFallback: "缺少 Supabase 登录配置。",
+    missingRedirectOrigin: "未找到回调来源域名。请设置 NEXT_PUBLIC_APP_URL，或从真实域名打开本页。",
+    hintVercelCurrent: "当前域名是 *.vercel.app。请设置 NEXT_PUBLIC_APP_URL 为正式域名，避免回调被保护策略拦截。",
+    hintLoopback: "回调目标是 localhost，仅在同一设备/浏览器可用。",
+    hintPrivate: "回调目标是局域网地址，仅同一网络可用。",
+    hintVercelTarget: "回调目标是 vercel.app 域名。如出现 401，请关闭 Deployment Protection 或使用自定义域名。",
+    hintNonHttps: "回调目标不是 HTTPS。对外用户请使用 HTTPS 域名登录。"
+  }
 };
 
 function normalizeNextPath(input: string): string {
@@ -140,7 +203,7 @@ function chooseRedirectOrigin(runtimeOrigin: string | null, configuredOrigin: st
   return configuredOrigin ?? runtimeOrigin;
 }
 
-function buildMissingAuthConfigMessage(config: BrowserSupabaseAuthConfig): string | null {
+function buildMissingAuthConfigMessage(config: BrowserSupabaseAuthConfig, copy: LoginCopy): string | null {
   const missing: string[] = [];
 
   if (!config.url) {
@@ -155,25 +218,26 @@ function buildMissingAuthConfigMessage(config: BrowserSupabaseAuthConfig): strin
     return null;
   }
 
-  return `Missing Supabase Auth config: ${missing.join(", ")}.`;
+  return `${copy.missingConfigPrefix}: ${missing.join(", ")}.`;
 }
 
-function mapAuthError(error: unknown, configMessage: string | null): string {
+function mapAuthError(error: unknown, configMessage: string | null, copy: LoginCopy): string {
   if (error instanceof Error && error.message.startsWith("SUPABASE_AUTH_CONFIG_MISSING")) {
-    return configMessage ?? "Missing Supabase Auth config.";
+    return configMessage ?? copy.missingConfigFallback;
   }
 
-  return error instanceof Error ? error.message : "Sign-in failed.";
+  return error instanceof Error ? error.message : copy.signInFailed;
 }
 
-export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
+export function LoginForm({ nextPath, appUrl, lang, authConfig }: Props) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const copy = useMemo(() => copyByLang[lang], [lang]);
   const safeNextPath = useMemo(() => normalizeNextPath(nextPath), [nextPath]);
-  const configMessage = useMemo(() => buildMissingAuthConfigMessage(authConfig), [authConfig]);
+  const configMessage = useMemo(() => buildMissingAuthConfigMessage(authConfig, copy), [authConfig, copy]);
   const runtimeOrigin = useMemo(() => getRuntimeOrigin(), []);
   const configuredOrigin = useMemo(() => normalizeAppOrigin(appUrl), [appUrl]);
   const callbackPath = useMemo(
@@ -190,35 +254,35 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
 
   const originHint = useMemo(() => {
     if (!redirectOrigin) {
-      return "No redirect origin available. Set NEXT_PUBLIC_APP_URL or open this page from your real domain.";
+      return copy.missingRedirectOrigin;
     }
 
     if (runtimeOrigin && isVercelAppHost(runtimeOrigin) && !configuredOrigin) {
-      return "Current domain is *.vercel.app. Set NEXT_PUBLIC_APP_URL to your public domain to avoid protected login callbacks.";
+      return copy.hintVercelCurrent;
     }
 
     if (isLoopbackHost(redirectOrigin)) {
-      return "Redirect target is localhost. Magic Link only works on the same device/browser that can access localhost.";
+      return copy.hintLoopback;
     }
 
     if (isPrivateHost(redirectOrigin)) {
-      return "Redirect target is a private LAN address. It only works for users on the same local network.";
+      return copy.hintPrivate;
     }
 
     if (isVercelAppHost(redirectOrigin)) {
-      return "Redirect target is a vercel.app domain. If users see 401, disable Deployment Protection or use a custom domain.";
+      return copy.hintVercelTarget;
     }
 
     if (!isHttpsOrigin(redirectOrigin)) {
-      return "Redirect target is not HTTPS. Public users should sign in through an HTTPS domain.";
+      return copy.hintNonHttps;
     }
 
     return null;
-  }, [redirectOrigin, runtimeOrigin, configuredOrigin]);
+  }, [redirectOrigin, runtimeOrigin, configuredOrigin, copy]);
 
   function buildRedirectUrl() {
     if (!redirectOrigin) {
-      throw new Error("Missing redirect origin.");
+      throw new Error(copy.missingRedirectOrigin);
     }
 
     return `${redirectOrigin}${callbackPath}`;
@@ -247,7 +311,7 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
         throw authError;
       }
     } catch (e) {
-      setError(mapAuthError(e, configMessage));
+      setError(mapAuthError(e, configMessage, copy));
       setLoading(false);
     }
   }
@@ -261,7 +325,7 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
     }
 
     if (!email.trim()) {
-      setError("Please enter your email.");
+      setError(copy.inputEmailRequired);
       return;
     }
 
@@ -282,9 +346,9 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
         throw authError;
       }
 
-      setMessage("Magic link sent. Check your inbox and click the link to continue.");
+      setMessage(copy.magicSent);
     } catch (e) {
-      setError(mapAuthError(e, configMessage));
+      setError(mapAuthError(e, configMessage, copy));
     } finally {
       setLoading(false);
     }
@@ -294,14 +358,14 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
 
   return (
     <div className="card panel" style={{ maxWidth: 560 }}>
-      <h2 style={{ marginTop: 0 }}>Sign In</h2>
-      <p className="small">Use Google OAuth or Email Magic Link.</p>
+      <h2 style={{ marginTop: 0 }}>{copy.title}</h2>
+      <p className="small">{copy.subtitle}</p>
       <p className="small mono" style={{ marginTop: 8 }}>
-        callback: {callbackPreview}
+        {copy.callback}: {callbackPreview}
       </p>
 
       <button className="btn btn-primary" onClick={signInWithGoogle} disabled={disableActions} type="button">
-        Continue with Google
+        {copy.continueGoogle}
       </button>
 
       <div style={{ height: 16 }} />
@@ -312,11 +376,11 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@example.com"
+          placeholder={copy.emailPlaceholder}
           disabled={disableActions}
         />
         <button className="btn btn-ghost" type="submit" disabled={disableActions}>
-          Send Email Magic Link
+          {copy.sendMagicLink}
         </button>
       </form>
 
@@ -346,3 +410,6 @@ export function LoginForm({ nextPath, appUrl, authConfig }: Props) {
     </div>
   );
 }
+
+
+
