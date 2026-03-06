@@ -9,37 +9,26 @@ export async function SiteNav() {
   const lang = await getServerLang();
 
   const links = [
-    { href: "/dashboard", label: text(lang, "Dashboard", "控制台") },
-    { href: "/library", label: text(lang, "Viral Library", "爆款库") },
-    { href: "/settings", label: text(lang, "Settings", "设置") }
+    { href: "/dashboard", label: text(lang, "Dashboard", "\u63a7\u5236\u53f0") },
+    { href: "/library", label: text(lang, "Viral Library", "\u7206\u6b3e\u5e93") },
+    { href: "/membership", label: text(lang, "Membership", "\u8ba2\u9605\u4f1a\u5458") },
+    { href: "/settings", label: text(lang, "Personal Center", "\u4e2a\u4eba\u4e2d\u5fc3") }
   ];
 
   return (
     <header className="nav">
       <div className="shell nav-inner">
-        <Link href="/" className="brand">
-          <span className="brand-dot" /> ViralBrain.ai
+        <Link href="/" className="brand" aria-label="ViralBrain homepage">
+          <span className="brand-dot" />
+          <span>ViralBrain.ai</span>
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="nav-utilities">
           <NavLinks links={links} />
-
           <LanguageSwitcher currentLang={lang} />
-
-          {authUser ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span className="small" style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>
-                {authUser.email}
-              </span>
-              <form action="/auth/signout" method="post">
-                <button className="btn btn-ghost" type="submit" style={{ height: 34, padding: "0 12px" }}>
-                  {text(lang, "Sign Out", "退出登录")}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <Link href="/login" className="btn btn-ghost" style={{ height: 34, padding: "0 12px" }}>
-              {text(lang, "Sign In", "登录")}
+          {authUser ? null : (
+            <Link href="/login" className="nav-link nav-auth-link">
+              {text(lang, "Sign In", "\u767b\u5f55")}
             </Link>
           )}
         </div>
