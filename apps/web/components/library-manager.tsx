@@ -446,31 +446,37 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
         </section>
 
         <aside className="library-side-stack">
-          <section className="card panel import-panel">
-            <h2 style={{ marginTop: 0 }}>{copy.collectTitle}</h2>
-            <div className="integration-form-grid">
-              <label className="integration-field">
+          <section className="card panel import-panel collect-panel">
+            <div className="collect-panel-head">
+              <h2 style={{ marginTop: 0, marginBottom: 0 }}>{copy.collectTitle}</h2>
+              <span className="badge">YouTube</span>
+            </div>
+            <div className="collect-form-grid">
+              <label className="collect-field">
                 <span className="small">{copy.hoursWithin}</span>
                 <input className="input" type="number" min={1} max={168} value={collectForm.hoursWithin} onChange={(event) => setCollectForm((current) => ({ ...current, hoursWithin: Number(event.target.value) || 24 }))} />
               </label>
-              <label className="integration-field">
+              <label className="collect-field">
                 <span className="small">{copy.minViews}</span>
                 <input className="input" type="number" min={1000} step={1000} value={collectForm.minViews} onChange={(event) => setCollectForm((current) => ({ ...current, minViews: Number(event.target.value) || 100000 }))} />
               </label>
-              <label className="integration-field">
+              <label className="collect-field">
                 <span className="small">{copy.maxResults}</span>
                 <input className="input" type="number" min={1} max={plan === "pro" ? 30 : 10} value={collectForm.maxResults} onChange={(event) => setCollectForm((current) => ({ ...current, maxResults: Number(event.target.value) || 10 }))} />
               </label>
-              <label className="integration-field">
+              <label className="collect-field">
                 <span className="small">{copy.regionCode}</span>
                 <input className="input" value={collectForm.regionCode} onChange={(event) => setCollectForm((current) => ({ ...current, regionCode: event.target.value.toUpperCase() }))} placeholder="US" />
               </label>
             </div>
-            <button type="button" className="btn btn-primary" onClick={handleCollect} disabled={collecting}>
-              {collecting ? copy.collecting : copy.collectButton}
-            </button>
+            <div className="collect-panel-actions">
+              <button type="button" className="btn btn-primary collect-panel-button" onClick={handleCollect} disabled={collecting}>
+                {collecting ? copy.collecting : copy.collectButton}
+              </button>
+              <p className="small collect-panel-note">{lang === "zh" ? "24-48 小时 + 10 万播放量通常是比较稳妥的起始筛选条件。" : "24-48h + 100k+ views works well as a starting filter."}</p>
+            </div>
             {collectPreview.length > 0 ? (
-              <div className="collect-preview-list">
+              <div className="collect-preview-list compact-preview-list">
                 <p className="small" style={{ fontWeight: 700 }}>{copy.collectSummary}</p>
                 {collectPreview.map((item) => (
                   <div key={item.id} className="collect-preview-card">
@@ -531,4 +537,5 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
     </div>
   );
 }
+
 

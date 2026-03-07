@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
 import {
   applyProviderPreset,
@@ -58,6 +58,9 @@ type Copy = {
   advancedLocked: string;
   providerNote: string;
   testSummary: string;
+  providerHint: string;
+  providerSelected: string;
+  providerDefaultNote: string;
 };
 
 type TestResponse = {
@@ -108,7 +111,10 @@ const copyByLang: Record<Lang, Copy> = {
     activeNotice: "Analysis requests automatically prefer your own connected APIs when available.",
     advancedLocked: "Domestic/custom LLM providers are available in Pro.",
     providerNote: "Provider note",
-    testSummary: "Connection summary"
+    testSummary: "Connection summary",
+    providerHint: "Click to open a clear provider picker and auto-fill the recommended defaults.",
+    providerSelected: "Selected",
+    providerDefaultNote: "Use the default compatible settings, then fill in the key and test the connection."
   },
   zh: {
     title: "对接用户自己的 API",
@@ -146,7 +152,10 @@ const copyByLang: Record<Lang, Copy> = {
     activeNotice: "当你填写了自己的 API 后，分析请求会优先走你自己的平台额度。",
     advancedLocked: "国产 / 自定义模型供应商属于专业版能力。",
     providerNote: "供应商说明",
-    testSummary: "连接结果"
+    testSummary: "连接结果",
+    providerHint: "点击后会展开清晰的供应商选择面板，并自动带入推荐配置。",
+    providerSelected: "当前选择",
+    providerDefaultNote: "先使用默认兼容配置，再填写对应 Key 并执行测试连接。"
   }
 };
 
@@ -157,10 +166,27 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
   const [message, setMessage] = useState("");
   const [testing, setTesting] = useState(false);
   const [results, setResults] = useState<Record<string, { ok: boolean; message: string; detail?: string }>>({});
+  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+  const providerPickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setConfig(readApiIntegrationConfigFromStorage());
   }, []);
+
+  useEffect(() => {
+    if (!providerMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!providerPickerRef.current?.contains(event.target as Node)) {
+        setProviderMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, [providerMenuOpen]);
 
   const currentPreset = getProviderPreset(config.llmProvider);
   const providerCards = useMemo(
@@ -198,6 +224,7 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
   function changeProvider(nextProvider: ApiIntegrationConfig["llmProvider"]) {
     setConfig((current) => applyProviderPreset(current, nextProvider, { preserveSecrets: true }));
     setMessage("");
+    setProviderMenuOpen(false);
   }
 
   function saveConfig() {
@@ -210,6 +237,7 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
     setConfig(createEmptyApiIntegrationConfig());
     setResults({});
     setMessage(copy.cleared);
+    setProviderMenuOpen(false);
   }
 
   async function testConfig() {
@@ -268,14 +296,43 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
           <span className="small">{copy.youtubeKey}</span>
           <input className="input" value={config.youtubeApiKey} onChange={(event) => updateField("youtubeApiKey", event.target.value)} placeholder="AIza..." />
         </label>
-        <label className="integration-field">
+        <div className="integration-field provider-picker" ref={providerPickerRef}>
           <span className="small">{copy.provider}</span>
-          <select className="input" value={config.llmProvider} onChange={(event) => changeProvider(event.target.value as ApiIntegrationConfig["llmProvider"])}>
-            {presets.map((preset) => (
-              <option key={preset.id} value={preset.id}>{preset.label}</option>
-            ))}
-          </select>
-        </label>
+          <button
+            type="button"
+            className={`provider-picker-trigger ${providerMenuOpen ? "provider-picker-trigger-active" : ""}`}
+            onClick={() => setProviderMenuOpen((current) => !current)}
+            aria-haspopup="dialog"
+            aria-expanded={providerMenuOpen}
+          >
+            <div className="provider-picker-text">
+              <strong>{currentPreset.label}</strong>
+              <span className="small">{copy.providerHint}</span>
+            </div>
+            <span className="provider-picker-chevron">{providerMenuOpen ? (lang === "zh" ? "收起" : "Close") : (lang === "zh" ? "选择" : "Choose")}</span>
+          </button>
+          {providerMenuOpen ? (
+            <div className="provider-picker-popover" role="dialog" aria-label={copy.provider}>
+              {presets.map((preset) => {
+                const active = config.llmProvider === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={`provider-option ${active ? "provider-option-active" : ""}`}
+                    onClick={() => changeProvider(preset.id)}
+                  >
+                    <div className="provider-option-head">
+                      <strong>{preset.label}</strong>
+                      {active ? <span className="badge badge-live">{copy.providerSelected}</span> : null}
+                    </div>
+                    <p className="small provider-option-note">{preset.note ?? copy.providerDefaultNote}</p>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
         <label className="integration-field">
           <span className="small">{copy.llmKey}</span>
           <input className="input" value={config.openaiApiKey} onChange={(event) => updateField("openaiApiKey", event.target.value)} placeholder="sk-..." />
@@ -357,4 +414,3 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
     </section>
   );
 }
-
