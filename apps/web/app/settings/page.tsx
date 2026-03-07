@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+﻿import { MembershipModalTrigger } from "@/components/membership-modal-trigger";
 import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
@@ -27,9 +27,7 @@ export default async function SettingsPage() {
       <section className="shell section">
         <div className="section-intro">
           <span className="badge">{text(lang, "Personal Center", "个人中心")}</span>
-          <h1 style={{ marginTop: 18 }}>
-            {text(lang, "Manage profile, plan, and session settings", "统一管理账号资料、套餐和会话设置")}
-          </h1>
+          <h1 style={{ marginTop: 18 }}>{text(lang, "Manage profile, plan, and session settings", "统一管理账号资料、套餐和会话设置")}</h1>
           <p>
             {text(
               lang,
@@ -44,16 +42,28 @@ export default async function SettingsPage() {
             <p className="card-kicker">{text(lang, "Profile", "资料")}</p>
             <h3>{text(lang, "Account Overview", "账号概览")}</h3>
             <p className="mono profile-email">{user.email}</p>
-            <p className="small">{text(lang, "Current plan", "当前套餐")}: {user.plan}</p>
-            <p className="small">{text(lang, "Subscription status", "订阅状态")}: {user.subscriptionStatus ?? "none"}</p>
-            {user.planExpiresAt ? <p className="small">{text(lang, "Expires", "到期时间")}: {new Date(user.planExpiresAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}</p> : null}
+            <p className="small">
+              {text(lang, "Current plan", "当前套餐")}: {user.plan}
+            </p>
+            <p className="small">
+              {text(lang, "Subscription status", "订阅状态")}: {user.subscriptionStatus ?? "none"}
+            </p>
+            {user.planExpiresAt ? (
+              <p className="small">
+                {text(lang, "Expires", "到期时间")}: {new Date(user.planExpiresAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
+              </p>
+            ) : null}
           </article>
 
           <article className="card panel profile-card">
             <p className="card-kicker">{text(lang, "Usage", "用量")}</p>
             <h3>{text(lang, "Daily Analysis Limit", "每日分析额度")}</h3>
-            <div className="usage-metric">{usedToday} / {dailyLimit}</div>
-            <p className="small">{text(lang, "Remaining today", "今日剩余")}: {remaining}</p>
+            <div className="usage-metric">
+              {usedToday} / {dailyLimit}
+            </div>
+            <p className="small">
+              {text(lang, "Remaining today", "今日剩余")}: {remaining}
+            </p>
             <p className="small">
               {text(
                 lang,
@@ -66,19 +76,34 @@ export default async function SettingsPage() {
           <article className="card panel profile-card">
             <p className="card-kicker">{text(lang, "Subscription", "订阅")}</p>
             <h3>{text(lang, "Membership Status", "会员状态")}</h3>
-            <p className="small">{text(lang, "Current plan", "当前套餐")}: {user.plan}</p>
-            <p className="small">{text(lang, "Billing cycle", "计费周期")}: {user.billingCycle ?? (lang === "zh" ? "未开通" : "none")}</p>
+            <p className="small">
+              {text(lang, "Current plan", "当前套餐")}: {user.plan}
+            </p>
+            <p className="small">
+              {text(lang, "Billing cycle", "计费周期")}: {user.billingCycle ?? (lang === "zh" ? "未开通" : "none")}
+            </p>
             {latestOrder ? (
               <>
                 <p className="small mono">order_id: {latestOrder.id.slice(0, 8)}</p>
-                <p className="small">{text(lang, "Latest amount", "最近金额")}: CNY {latestOrder.amountCny}</p>
+                <p className="small">
+                  {text(lang, "Latest amount", "最近金额")}: CNY {latestOrder.amountCny}
+                </p>
               </>
             ) : (
               <p className="small">{text(lang, "No membership orders yet.", "还没有会员订单。")}</p>
             )}
-            <Link href="/membership" className="btn btn-primary compact-button" style={{ marginTop: 12 }}>
-              {text(lang, "Open Membership", "打开订阅会员")}
-            </Link>
+            <MembershipModalTrigger
+              lang={lang}
+              plan={user.plan}
+              label={text(lang, "Open Membership", "查看会员方案")}
+              className="btn btn-primary compact-button"
+              title={text(lang, "Membership Information", "会员信息")}
+              subtitle={text(
+                lang,
+                "Upgrade here without leaving the current page. ViralBrain.ai charges for the workflow; provider API costs stay with the user.",
+                "不离开当前页面即可查看并升级套餐。ViralBrain.ai 收费的是工作流，第三方 API 费用仍由用户自行承担。"
+              )}
+            />
           </article>
         </div>
 
@@ -111,4 +136,3 @@ export default async function SettingsPage() {
     </main>
   );
 }
-

@@ -12,10 +12,7 @@ export default async function DashboardPage() {
   const lang = await getServerLang();
   const supabaseClient = await maybeCreateServerSupabaseClient();
   const user = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
-  const result = await listReports(
-    { userId: authUser.id, limit: 8 },
-    { supabaseClient }
-  );
+  const result = await listReports({ userId: authUser.id, limit: 8 }, { supabaseClient });
   const recentReports = result.data;
 
   return (
@@ -26,18 +23,19 @@ export default async function DashboardPage() {
         <p>
           {text(
             lang,
-            "Analyze a YouTube URL, connect your own APIs, and manage historical reports in one console.",
-            "在同一个控制台里输入 YouTube 链接、对接你自己的 API，并管理历史报告。"
+            "Analyze a YouTube URL, connect your own APIs, manage hot trends, and review historical reports from one console.",
+            "在同一个控制台里输入 YouTube 链接、对接你自己的 API、查看热门趋势，并管理历史报告。"
           )}
         </p>
 
         <DashboardClient lang={lang} />
-        <section style={{ marginTop: 24 }}>
+        <section id="api-connections" style={{ marginTop: 24 }}>
           <ApiConnectionPanel lang={lang} plan={user.plan} />
         </section>
-        <RecentReportsPanel lang={lang} plan={user.plan} initialReports={recentReports} />
+        <section id="recent-reports">
+          <RecentReportsPanel lang={lang} plan={user.plan} initialReports={recentReports} />
+        </section>
       </section>
     </main>
   );
 }
-

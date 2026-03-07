@@ -1,4 +1,4 @@
-﻿import type { UserPlan } from "@/lib/types";
+import type { UserPlan } from "@/lib/types";
 
 export type PlanFeatures = {
   canUseAdvancedProviders: boolean;
@@ -7,6 +7,7 @@ export type PlanFeatures = {
   canManageRecycleBin: boolean;
   canCollectVirals: boolean;
   canExportReports: boolean;
+  canViewTrendDetails: boolean;
   maxCollectionResults: number;
 };
 
@@ -18,6 +19,7 @@ const FEATURES: Record<UserPlan, PlanFeatures> = {
     canManageRecycleBin: false,
     canCollectVirals: true,
     canExportReports: false,
+    canViewTrendDetails: false,
     maxCollectionResults: 10,
   },
   pro: {
@@ -27,6 +29,7 @@ const FEATURES: Record<UserPlan, PlanFeatures> = {
     canManageRecycleBin: true,
     canCollectVirals: true,
     canExportReports: true,
+    canViewTrendDetails: true,
     maxCollectionResults: 30,
   },
 };
@@ -34,4 +37,3 @@ const FEATURES: Record<UserPlan, PlanFeatures> = {
 export function getPlanFeatures(plan: UserPlan): PlanFeatures {
   return FEATURES[plan] ?? FEATURES.free;
 }
-

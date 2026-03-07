@@ -1,37 +1,47 @@
 import Link from "next/link";
-import { getOptionalAuthUser } from "@/lib/auth";
-import { getServerLang, text } from "@/lib/i18n";
-import { LanguageSwitcher } from "@/components/language-switcher";
-import { NavLinks } from "@/components/nav-links";
+import { getOptionalAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
+import { getServerLang } from "@/lib/i18n";
+import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
+import { SiteNavClient } from "@/components/site-nav-client";
+
+function resolveDisplayName(email: string | null | undefined, rawName: unknown): string {
+  if (typeof rawName === "string" && rawName.trim()) {
+    return rawName.trim();
+  }
+
+  if (!email) {
+    return "ViralBrain User";
+  }
+
+  const local = email.split("@")[0] ?? email;
+  return local.replace(/[._-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export async function SiteNav() {
   const authUser = await getOptionalAuthUser();
   const lang = await getServerLang();
+  const supabaseClient = await maybeCreateServerSupabaseClient();
+  const user = authUser
+    ? await resolveAuthenticatedAppUser(authUser, { supabaseClient })
+    : null;
 
-  const links = [
-    { href: "/dashboard", label: text(lang, "Dashboard", "\u63a7\u5236\u53f0") },
-    { href: "/library", label: text(lang, "Viral Library", "\u7206\u6b3e\u5e93") },
-    { href: "/membership", label: text(lang, "Membership", "\u8ba2\u9605\u4f1a\u5458") },
-    { href: "/settings", label: text(lang, "Personal Center", "\u4e2a\u4eba\u4e2d\u5fc3") }
-  ];
+  const navUser = user
+    ? {
+        email: user.email,
+        plan: user.plan,
+        displayName: resolveDisplayName(user.email, authUser?.user_metadata?.full_name ?? authUser?.user_metadata?.name)
+      }
+    : null;
 
   return (
     <header className="nav">
-      <div className="shell nav-inner">
+      <div className="shell nav-inner nav-inner-rich">
         <Link href="/" className="brand" aria-label="ViralBrain homepage">
           <span className="brand-dot" />
           <span>ViralBrain.ai</span>
         </Link>
 
-        <div className="nav-utilities">
-          <NavLinks links={links} />
-          <LanguageSwitcher currentLang={lang} />
-          {authUser ? null : (
-            <Link href="/login" className="nav-link nav-auth-link">
-              {text(lang, "Sign In", "\u767b\u5f55")}
-            </Link>
-          )}
-        </div>
+        <SiteNavClient lang={lang} user={navUser} />
       </div>
     </header>
   );

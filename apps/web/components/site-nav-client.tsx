@@ -1,0 +1,348 @@
+﻿"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { MembershipUpgradeModal } from "@/components/membership-upgrade-modal";
+import type { Lang } from "@/lib/i18n-shared";
+import type { UserPlan } from "@/lib/types";
+
+type NavUser = {
+  email: string;
+  displayName: string;
+  plan: UserPlan;
+};
+
+type MenuLink = {
+  href?: string;
+  label: string;
+  desc?: string;
+  onClick?: () => void;
+};
+
+type Props = {
+  lang: Lang;
+  user: NavUser | null;
+};
+
+type ThemeMode = "dark" | "light";
+
+type Copy = {
+  trends: string;
+  dashboard: string;
+  help: string;
+  hotVideos: string;
+  hotChannels: string;
+  hotTopics: string;
+  trendVideoDesc: string;
+  trendChannelDesc: string;
+  trendTopicDesc: string;
+  consoleEntry: string;
+  consoleDesc: string;
+  libraryEntry: string;
+  libraryDesc: string;
+  apiEntry: string;
+  apiDesc: string;
+  reportsEntry: string;
+  reportsDesc: string;
+  manual: string;
+  faq: string;
+  contact: string;
+  manualDesc: string;
+  faqDesc: string;
+  contactDesc: string;
+  personalCenter: string;
+  membership: string;
+  upgrade: string;
+  signOut: string;
+  signIn: string;
+  light: string;
+  dark: string;
+  more: string;
+  free: string;
+  pro: string;
+};
+
+const copyByLang: Record<Lang, Copy> = {
+  en: {
+    trends: "Hot Trends",
+    dashboard: "Console",
+    help: "Help & Support",
+    hotVideos: "Hot Videos",
+    hotChannels: "Hot Channels",
+    hotTopics: "Hot Topics",
+    trendVideoDesc: "Track breakout videos in your category.",
+    trendChannelDesc: "Spot channels gaining attention quickly.",
+    trendTopicDesc: "Find recurring topics worth following.",
+    consoleEntry: "YouTube Analysis",
+    consoleDesc: "Run URL analysis and see streaming progress.",
+    libraryEntry: "Viral Library",
+    libraryDesc: "Collect, import, and manage reusable references.",
+    apiEntry: "API Integrations",
+    apiDesc: "Bring your own provider and data keys.",
+    reportsEntry: "Recent Reports",
+    reportsDesc: "Review history, rerun, and export.",
+    manual: "User Manual",
+    faq: "FAQ",
+    contact: "Contact Support",
+    manualDesc: "Start quickly with the core workflow.",
+    faqDesc: "Common answers about plans, APIs, and quotas.",
+    contactDesc: "Talk to us when setup or billing is blocked.",
+    personalCenter: "Personal Center",
+    membership: "Membership",
+    upgrade: "Upgrade",
+    signOut: "Sign Out",
+    signIn: "Sign In",
+    light: "Light",
+    dark: "Dark",
+    more: "More",
+    free: "Free",
+    pro: "Pro"
+  },
+  zh: {
+    trends: "热门趋势",
+    dashboard: "控制台",
+    help: "帮助与支持",
+    hotVideos: "热门视频",
+    hotChannels: "热门频道",
+    hotTopics: "热门主题",
+    trendVideoDesc: "追踪正在起量的爆款视频。",
+    trendChannelDesc: "查看增长更快的频道。",
+    trendTopicDesc: "发现值得持续跟踪的话题。",
+    consoleEntry: "链接分析",
+    consoleDesc: "输入视频链接并查看实时分析进度。",
+    libraryEntry: "爆款库",
+    libraryDesc: "采集、导入并维护运营素材。",
+    apiEntry: "API 对接",
+    apiDesc: "接入你自己的模型和数据 Key。",
+    reportsEntry: "历史报告",
+    reportsDesc: "查看历史、重跑和导出报告。",
+    manual: "用户手册",
+    faq: "常见问题",
+    contact: "联系支持",
+    manualDesc: "快速上手核心工作流。",
+    faqDesc: "查看套餐、API、额度等常见问题。",
+    contactDesc: "配置或计费卡住时直接联系。",
+    personalCenter: "个人中心",
+    membership: "会员信息",
+    upgrade: "立即升级",
+    signOut: "退出登录",
+    signIn: "登录",
+    light: "浅色",
+    dark: "深色",
+    more: "更多",
+    free: "免费版",
+    pro: "专业版"
+  }
+};
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function SiteNavClient({ lang, user }: Props) {
+  const copy = copyByLang[lang];
+  const pathname = usePathname() ?? "/";
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [membershipOpen, setMembershipOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const shellRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("vb_theme");
+    const nextTheme = stored === "light" ? "light" : "dark";
+    setTheme(nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+  }, []);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!shellRef.current?.contains(event.target as Node)) {
+        setOpenMenu(null);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  const trendsLinks: MenuLink[] = [
+    { href: "/dashboard/trends?tab=videos", label: copy.hotVideos, desc: copy.trendVideoDesc },
+    { href: "/dashboard/trends?tab=channels", label: copy.hotChannels, desc: copy.trendChannelDesc },
+    { href: "/dashboard/trends?tab=topics", label: copy.hotTopics, desc: copy.trendTopicDesc }
+  ];
+
+  const consoleLinks: MenuLink[] = [
+    { href: "/dashboard", label: copy.consoleEntry, desc: copy.consoleDesc },
+    { href: "/library", label: copy.libraryEntry, desc: copy.libraryDesc },
+    { href: "/dashboard#api-connections", label: copy.apiEntry, desc: copy.apiDesc },
+    { href: "/dashboard#recent-reports", label: copy.reportsEntry, desc: copy.reportsDesc }
+  ];
+
+  const helpLinks: MenuLink[] = [
+    { href: "/support#manual", label: copy.manual, desc: copy.manualDesc },
+    { href: "/support#faq", label: copy.faq, desc: copy.faqDesc },
+    { href: "/support#contact", label: copy.contact, desc: copy.contactDesc }
+  ];
+
+  const avatarLabel = useMemo(() => {
+    const source = user?.displayName?.trim() || user?.email || "V";
+    return source.slice(0, 1).toUpperCase();
+  }, [user]);
+
+  function toggleMenu(key: string) {
+    setOpenMenu((current) => (current === key ? null : key));
+  }
+
+  function closeMenus() {
+    setOpenMenu(null);
+  }
+
+  function applyTheme(nextTheme: ThemeMode) {
+    setTheme(nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+    window.localStorage.setItem("vb_theme", nextTheme);
+  }
+
+  function renderMenu(key: string, label: string, links: MenuLink[]) {
+    const active =
+      key === "trends"
+        ? pathname.startsWith("/dashboard/trends")
+        : key === "console"
+          ? isActive(pathname, "/dashboard") || isActive(pathname, "/library")
+          : isActive(pathname, "/support");
+
+    return (
+      <div className="nav-menu-group">
+        <button type="button" className={`nav-menu-trigger ${active ? "nav-link-active" : ""}`} onClick={() => toggleMenu(key)}>
+          <span>{label}</span>
+          <span className={`nav-menu-caret ${openMenu === key ? "nav-menu-caret-open" : ""}`}>v</span>
+        </button>
+        {openMenu === key ? (
+          <div className="nav-menu-panel">
+            {links.map((item) => {
+              const content = (
+                <>
+                  <strong>{item.label}</strong>
+                  {item.desc ? <span>{item.desc}</span> : null}
+                </>
+              );
+
+              if (item.href) {
+                return (
+                  <Link key={item.label} href={item.href} className="nav-menu-item" onClick={closeMenus}>
+                    {content}
+                  </Link>
+                );
+              }
+
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  className="nav-menu-item nav-menu-item-button"
+                  onClick={() => {
+                    item.onClick?.();
+                    closeMenus();
+                  }}
+                >
+                  {content}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="nav-client-shell" ref={shellRef}>
+        <div className="nav-main-links">
+          {renderMenu("trends", copy.trends, trendsLinks)}
+          {renderMenu("console", copy.dashboard, consoleLinks)}
+          {renderMenu("help", copy.help, helpLinks)}
+        </div>
+
+        <div className="nav-utilities nav-utilities-rich">
+          <LanguageSwitcher currentLang={lang} />
+          <button
+            type="button"
+            className="utility-icon-button"
+            onClick={() => applyTheme(theme === "dark" ? "light" : "dark")}
+            aria-label={theme === "dark" ? copy.light : copy.dark}
+          >
+            {theme === "dark" ? "L" : "D"}
+          </button>
+
+          {user ? (
+            <div className="nav-menu-group nav-avatar-group">
+              <button type="button" className="avatar-button" onClick={() => toggleMenu("avatar")} aria-label={copy.more}>
+                {avatarLabel}
+              </button>
+              {openMenu === "avatar" ? (
+                <div className="nav-menu-panel avatar-panel">
+                  <div className="avatar-summary">
+                    <strong>{user.displayName}</strong>
+                    <span>{user.email}</span>
+                    <span className="avatar-plan">{user.plan === "pro" ? copy.pro : copy.free}</span>
+                  </div>
+                  <Link href="/settings" className="nav-menu-item" onClick={closeMenus}>
+                    <strong>{copy.personalCenter}</strong>
+                    <span>{lang === "zh" ? "管理资料、额度和会话。" : "Manage profile, quota, and sessions."}</span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="nav-menu-item nav-menu-item-button"
+                    onClick={() => {
+                      setMembershipOpen(true);
+                      closeMenus();
+                    }}
+                  >
+                    <strong>{copy.membership}</strong>
+                    <span>
+                      {user.plan === "pro"
+                        ? lang === "zh"
+                          ? "查看当前套餐与升级信息。"
+                          : "View current plan information."
+                        : lang === "zh"
+                          ? "升级后解锁完整趋势和更高额度。"
+                          : "Upgrade for full trends and higher limits."}
+                    </span>
+                  </button>
+                  {user.plan === "free" ? (
+                    <button
+                      type="button"
+                      className="nav-menu-item nav-menu-item-button"
+                      onClick={() => {
+                        setMembershipOpen(true);
+                        closeMenus();
+                      }}
+                    >
+                      <strong>{copy.upgrade}</strong>
+                      <span>{lang === "zh" ? "打开套餐介绍并立即升级。" : "Open the plan modal and upgrade now."}</span>
+                    </button>
+                  ) : null}
+                  <form action="/auth/signout" method="post" className="avatar-signout-form">
+                    <button type="submit" className="nav-menu-item nav-menu-item-button nav-menu-danger">
+                      <strong>{copy.signOut}</strong>
+                      <span>{lang === "zh" ? "结束当前会话。" : "End the current session."}</span>
+                    </button>
+                  </form>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link href="/login" className="nav-link nav-auth-link">
+              {copy.signIn}
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <MembershipUpgradeModal open={membershipOpen} onClose={() => setMembershipOpen(false)} lang={lang} plan={user?.plan ?? "free"} signedIn={Boolean(user)} />
+    </>
+  );
+}

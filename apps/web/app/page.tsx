@@ -1,33 +1,82 @@
 ﻿import Link from "next/link";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { getServerLang, text } from "@/lib/i18n";
 
 export default async function HomePage() {
   const lang = await getServerLang();
 
-  const highlights = [
+  const workflowCards = [
     {
-      title: text(lang, "Structure Breakdown", "结构拆解"),
+      title: text(lang, "Hot Video Discovery", "热门视频发现"),
       desc: text(
         lang,
-        "Dissect hook, pacing, and CTA to explain why a video keeps attention.",
-        "拆解开场钩子、节奏与 CTA，解释视频为何能持续吸引注意力。"
+        "Track breakout YouTube videos before they become obvious, then route the best ones into your report workflow.",
+        "在爆款完全扩散之前追踪起量视频，再把高价值样本送进报告工作流。"
       )
     },
     {
-      title: text(lang, "Benchmark Comparison", "对标比较"),
+      title: text(lang, "Hot Channel Analysis", "热门频道分析"),
       desc: text(
         lang,
-        "Retrieve Top3 similar hits from viral library and output copy/avoid actions.",
-        "从爆款库检索 Top3 相似案例，并给出可复用/应避免动作。"
+        "Spot channels that are accelerating fast and understand which content systems they are repeating.",
+        "找到增长加速更快的频道，并看清它们在重复什么内容系统。"
       )
     },
     {
-      title: text(lang, "Viral Score", "爆款评分"),
+      title: text(lang, "Hot Topic Tracking", "热门主题追踪"),
       desc: text(
         lang,
-        "Explainable 0-100 scoring with prioritized action list.",
-        "可解释的 0-100 评分，并附优先级行动清单。"
+        "Build a topic pipeline from recurring themes instead of chasing random inspiration.",
+        "从持续重复出现的话题中建立选题池，而不是随机找灵感。"
+      )
+    }
+  ];
+
+  const consoleCards = [
+    {
+      title: text(lang, "YouTube Link Analysis", "YouTube 链接分析"),
+      desc: text(
+        lang,
+        "Drop one URL and get structure, thumbnail, audience, benchmark, and action output in one place.",
+        "输入一个链接，即可在一个界面里拿到结构、封面、受众、对标和行动建议。"
+      )
+    },
+    {
+      title: text(lang, "Bring Your Own APIs", "自带 API 接入"),
+      desc: text(
+        lang,
+        "Connect YouTube, OpenAI, Bailian, Yunwu, and Pinecone with your own keys so the platform does not eat your provider cost.",
+        "接入你自己的 YouTube、OpenAI、百炼、云雾和 Pinecone Key，平台不代付供应商成本。"
+      )
+    },
+    {
+      title: text(lang, "Report Review & Export", "报告查看与导出"),
+      desc: text(
+        lang,
+        "Preview recent reports, rerun with live data, share links, and export action-ready output.",
+        "预览最近报告、用实时数据重跑、分享链接，并导出可执行结果。"
+      )
+    }
+  ];
+
+  const featureBlocks = [
+    {
+      kicker: text(lang, "Control Center", "控制台"),
+      title: text(lang, "Operate everything from a single YouTube growth console.", "把所有动作都收进一个 YouTube 增长控制台。"),
+      desc: text(
+        lang,
+        "Instead of scattering tools across multiple products, ViralBrain.ai keeps trend discovery, API setup, analysis, report review, and library management inside one workflow.",
+        "不把能力拆散到多个产品里，ViralBrain.ai 把趋势发现、API 配置、分析、报告查看和爆款库管理统一放在一个工作流里。"
+      )
+    },
+    {
+      kicker: text(lang, "Trend Radar", "趋势雷达"),
+      title: text(lang, "Find what is heating up before you decide what to make next.", "在决定下一条内容之前，先判断什么正在起量。"),
+      desc: text(
+        lang,
+        "Hot trends helps you watch videos, channels, and topics, then pull the strongest candidates back into analysis and benchmarking.",
+        "热门趋势会帮你监控视频、频道和主题，再把最强样本拉回分析和对标流程。"
       )
     }
   ];
@@ -36,53 +85,101 @@ export default async function HomePage() {
     <main>
       <SiteNav />
 
-      <section className="shell hero">
-        <span className="badge">{text(lang, "YouTube Viral Intelligence SaaS", "YouTube 爆款智能 SaaS")}</span>
-        <h1>{text(lang, "Drop one YouTube URL and get an action-ready viral playbook.", "输入一个 YouTube 链接，立即生成可执行的爆款方案。")}</h1>
+      <section className="shell hero hero-landing">
+        <span className="badge landing-kicker">{text(lang, "Trend discovery + AI growth console", "趋势发现 + AI 增长控制台")}</span>
+        <h1>{text(lang, "Find breakout ideas, dissect winners, and turn them into your next YouTube playbook.", "找爆款、拆逻辑、做增长，把热门内容变成你的下一套 YouTube 方案。")}</h1>
         <p>
           {text(
             lang,
-            "ViralBrain.ai focuses on YouTube depth. MVP includes stable mock-first delivery for structure analysis, thumbnail review, comment sentiment, benchmark comparison, and Viral Score.",
-            "ViralBrain.ai 专注 YouTube 深度分析。MVP 已支持结构分析、封面评估、评论情绪、对标比较和爆款评分。"
+            "ViralBrain.ai is built for operators who need one place to track hot trends, run deep video teardowns, manage a viral library, and work with their own APIs.",
+            "ViralBrain.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和自带 API 工作流统一到一个界面中。"
           )}
         </p>
         <div className="hero-actions">
-          <Link href="/dashboard" className="btn btn-primary">
-            {text(lang, "Start Analysis", "开始分析")}
+          <Link href="/dashboard/trends" className="btn btn-primary">
+            {text(lang, "Discover Hot Trends", "发现热门趋势")}
           </Link>
-          <Link href="/library" className="btn btn-ghost">
-            {text(lang, "Open Viral Library", "打开爆款库")}
+          <Link href="/dashboard" className="btn btn-ghost">
+            {text(lang, "Open Console", "进入控制台")}
           </Link>
         </div>
+      </section>
 
-        <div className="grid-3">
-          <div className="kpi card">
-            <div className="label">{text(lang, "Experience", "体验")}</div>
-            <div className="value">{text(lang, "Streaming", "流式反馈")}</div>
+      <section className="shell section landing-feature-grid">
+        {workflowCards.map((item) => (
+          <article className="card panel landing-mini-card" key={item.title}>
+            <p className="card-kicker">{text(lang, "Trend Layer", "趋势层")}</p>
+            <h3>{item.title}</h3>
+            <p>{item.desc}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="shell section landing-showcase">
+        <div className="landing-showcase-copy">
+          <span className="badge">{featureBlocks[0].kicker}</span>
+          <h2>{featureBlocks[0].title}</h2>
+          <p>{featureBlocks[0].desc}</p>
+        </div>
+        <div className="landing-showcase-visual card panel">
+          <div className="landing-console-window">
+            {consoleCards.map((item, index) => (
+              <div className="landing-console-row" key={item.title}>
+                <span className="landing-console-index">0{index + 1}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="kpi card">
-            <div className="label">{text(lang, "Model Routing", "模型路由")}</div>
-            <div className="value">mini + gpt-4o</div>
+        </div>
+      </section>
+
+      <section className="shell section landing-showcase landing-showcase-reverse">
+        <div className="landing-showcase-visual card panel landing-stacked-cards">
+          <div className="landing-floating-card">
+            <span className="badge">{text(lang, "Videos", "视频")}</span>
+            <strong>{text(lang, "Breakout this week", "本周起量")}</strong>
+            <p>{text(lang, "Views, pace, title angle, and reusable hook patterns.", "播放、节奏、标题角度和可复用钩子模式。")}</p>
           </div>
-          <div className="kpi card">
-            <div className="label">{text(lang, "Goal", "目标")}</div>
-            <div className="value">{text(lang, "10-20s visible progress", "10-20 秒可见进度")}</div>
+          <div className="landing-floating-card landing-floating-card-alt">
+            <span className="badge">{text(lang, "Channels", "频道")}</span>
+            <strong>{text(lang, "Fastest-growing operators", "增长更快的操盘手")}</strong>
+            <p>{text(lang, "Who is compounding attention, and what cadence are they using?", "谁在持续放大注意力，他们在用什么更新节奏？")}</p>
+          </div>
+        </div>
+        <div className="landing-showcase-copy">
+          <span className="badge">{featureBlocks[1].kicker}</span>
+          <h2>{featureBlocks[1].title}</h2>
+          <p>{featureBlocks[1].desc}</p>
+          <div className="hero-actions" style={{ marginTop: 20 }}>
+            <Link href="/dashboard/trends?tab=videos" className="btn btn-primary">
+              {text(lang, "Hot Videos", "热门视频")}
+            </Link>
+            <Link href="/dashboard/trends?tab=channels" className="btn btn-ghost">
+              {text(lang, "Hot Channels", "热门频道")}
+            </Link>
           </div>
         </div>
       </section>
 
       <section className="shell section">
-        <h2>{text(lang, "MVP Core Modules", "MVP 核心模块")}</h2>
-        <div className="grid-3">
-          {highlights.map((item) => (
-            <article className="card panel" key={item.title}>
+        <div className="section-intro">
+          <span className="badge">{text(lang, "Capabilities", "功能矩阵")}</span>
+          <h2>{text(lang, "Everything you need to go from trend to action", "从趋势到执行，所需能力都在这里")}</h2>
+        </div>
+        <div className="landing-capability-grid">
+          {consoleCards.concat(workflowCards).map((item) => (
+            <article className="card panel landing-capability-card" key={item.title}>
               <h3>{item.title}</h3>
               <p>{item.desc}</p>
             </article>
           ))}
         </div>
       </section>
+
+      <SiteFooter lang={lang} />
     </main>
   );
 }
-
