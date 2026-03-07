@@ -2,8 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import type { Lang } from "@/lib/i18n-shared";
-import type { CollectedViralItem, UserPlan, ViralLibraryItem } from "@/lib/types";
-import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
+import type { UserPlan, ViralLibraryItem } from "@/lib/types";
 
 type Props = {
   lang: Lang;
@@ -39,25 +38,13 @@ type DeleteResponse = {
   error?: ApiError | null;
 };
 
-type CollectResponse = {
-  ok: boolean;
-  data: {
-    collected: CollectedViralItem[];
-    imported_count: number;
-    items: ViralLibraryItem[] | null;
-    max_results_applied: number;
-  } | null;
-  error?: ApiError | null;
-};
-
 const copyByLang = {
   en: {
     title: "Viral Library",
-    subtitle: "Search benchmark references, import JSON/CSV, collect recent winners, and maintain your working library.",
+    subtitle: "Search benchmark references, import JSON/CSV, and maintain your working library.",
     searchLabel: "Search",
     searchPlaceholder: "Search title, summary, topic, hook type...",
     importTitle: "Import Items",
-    collectTitle: "Collect Viral Works",
     importHelpJson:
       "JSON must be an array of items. Supported fields: title, sourceUrl, summary, tags.hookType/topic/durationBucket.",
     importHelpCsv: "CSV header must be: title,sourceUrl,summary,hookType,topic,durationBucket",
@@ -86,13 +73,6 @@ const copyByLang = {
     deleting: "Deleting...",
     deleteFailed: "Delete failed.",
     deleted: "Item moved to recycle bin.",
-    hoursWithin: "Published within hours",
-    minViews: "Minimum views",
-    maxResults: "Max results",
-    regionCode: "Region code",
-    collectButton: "Collect and Import",
-    collecting: "Collecting...",
-    collected: "Collected",
     recycleBin: "Recycle Bin",
     recycleHint: "Pro users can restore or purge deleted items.",
     restore: "Restore",
@@ -101,16 +81,14 @@ const copyByLang = {
     purging: "Purging...",
     noDeleted: "Recycle bin is empty.",
     planHint: "Current plan",
-    proOnly: "Pro only",
-    collectSummary: "Recent viral candidates"
+    proOnly: "Pro only"
   },
   zh: {
     title: "爆款库",
-    subtitle: "搜索对标素材、导入 JSON/CSV、采集近期爆款作品，并统一维护自己的运营素材库。",
+    subtitle: "搜索对标素材、导入 JSON/CSV，并统一维护自己的运营素材库。",
     searchLabel: "搜索",
     searchPlaceholder: "搜索标题、摘要、主题、钩子类型...",
     importTitle: "导入条目",
-    collectTitle: "爆款作品采集",
     importHelpJson:
       "JSON 必须是数组格式，支持字段：title、sourceUrl、summary、tags.hookType/topic/durationBucket。",
     importHelpCsv: "CSV 表头必须是：title,sourceUrl,summary,hookType,topic,durationBucket",
@@ -139,13 +117,6 @@ const copyByLang = {
     deleting: "删除中...",
     deleteFailed: "删除失败。",
     deleted: "已移入回收站。",
-    hoursWithin: "采集最近多少小时",
-    minViews: "最低播放量",
-    maxResults: "最多采集条数",
-    regionCode: "地区代码",
-    collectButton: "采集并导入",
-    collecting: "采集中...",
-    collected: "已采集",
     recycleBin: "回收站",
     recycleHint: "专业版用户可以恢复或彻底删除回收站条目。",
     restore: "恢复",
@@ -154,8 +125,7 @@ const copyByLang = {
     purging: "删除中...",
     noDeleted: "回收站为空。",
     planHint: "当前套餐",
-    proOnly: "专业版专享",
-    collectSummary: "最近命中的爆款候选"
+    proOnly: "专业版专享"
   }
 } as const;
 
@@ -187,14 +157,6 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
   const [error, setError] = useState("");
   const [loadedFileName, setLoadedFileName] = useState("");
   const [deletingId, setDeletingId] = useState("");
-  const [collecting, setCollecting] = useState(false);
-  const [collectPreview, setCollectPreview] = useState<CollectedViralItem[]>([]);
-  const [collectForm, setCollectForm] = useState({
-    hoursWithin: 48,
-    minViews: 100000,
-    maxResults: plan === "pro" ? 20 : 10,
-    regionCode: "US"
-  });
   const [isPending, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
@@ -315,42 +277,6 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
     }
   }
 
-  async function handleCollect() {
-    setCollecting(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/library/collect", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
-        },
-        body: JSON.stringify({
-          ...collectForm,
-          autoImport: true
-        })
-      });
-
-      const payload = (await response.json().catch(() => null)) as CollectResponse | null;
-      if (!response.ok || !payload?.ok || !payload.data) {
-        setError(payload?.error?.message ?? copy.importFailed);
-        return;
-      }
-
-      setCollectPreview(payload.data.collected);
-      if (payload.data.items) {
-        setItems(payload.data.items);
-      }
-      setMessage(`${copy.collected} ${payload.data.collected.length} ${copy.items}`);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.importFailed);
-    } finally {
-      setCollecting(false);
-    }
-  }
-
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -405,7 +331,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
         </div>
       </div>
 
-      <div className="library-layout">
+      <div className="library-layout library-layout-compact">
         <section className="card panel">
           <div className="library-search-row">
             <label className="small" htmlFor="library-search">{copy.searchLabel}</label>
@@ -446,48 +372,6 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
         </section>
 
         <aside className="library-side-stack">
-          <section className="card panel import-panel collect-panel">
-            <div className="collect-panel-head">
-              <h2 style={{ marginTop: 0, marginBottom: 0 }}>{copy.collectTitle}</h2>
-              <span className="badge">YouTube</span>
-            </div>
-            <div className="collect-form-grid">
-              <label className="collect-field">
-                <span className="small">{copy.hoursWithin}</span>
-                <input className="input" type="number" min={1} max={168} value={collectForm.hoursWithin} onChange={(event) => setCollectForm((current) => ({ ...current, hoursWithin: Number(event.target.value) || 24 }))} />
-              </label>
-              <label className="collect-field">
-                <span className="small">{copy.minViews}</span>
-                <input className="input" type="number" min={1000} step={1000} value={collectForm.minViews} onChange={(event) => setCollectForm((current) => ({ ...current, minViews: Number(event.target.value) || 100000 }))} />
-              </label>
-              <label className="collect-field">
-                <span className="small">{copy.maxResults}</span>
-                <input className="input" type="number" min={1} max={plan === "pro" ? 30 : 10} value={collectForm.maxResults} onChange={(event) => setCollectForm((current) => ({ ...current, maxResults: Number(event.target.value) || 10 }))} />
-              </label>
-              <label className="collect-field">
-                <span className="small">{copy.regionCode}</span>
-                <input className="input" value={collectForm.regionCode} onChange={(event) => setCollectForm((current) => ({ ...current, regionCode: event.target.value.toUpperCase() }))} placeholder="US" />
-              </label>
-            </div>
-            <div className="collect-panel-actions">
-              <button type="button" className="btn btn-primary collect-panel-button" onClick={handleCollect} disabled={collecting}>
-                {collecting ? copy.collecting : copy.collectButton}
-              </button>
-              <p className="small collect-panel-note">{lang === "zh" ? "24-48 小时 + 10 万播放量通常是比较稳妥的起始筛选条件。" : "24-48h + 100k+ views works well as a starting filter."}</p>
-            </div>
-            {collectPreview.length > 0 ? (
-              <div className="collect-preview-list compact-preview-list">
-                <p className="small" style={{ fontWeight: 700 }}>{copy.collectSummary}</p>
-                {collectPreview.map((item) => (
-                  <div key={item.id} className="collect-preview-card">
-                    <strong>{item.title}</strong>
-                    <p className="small">{item.channelName} · {item.stats.viewCount.toLocaleString()}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
           <section className="card panel import-panel">
             <h2 style={{ marginTop: 0 }}>{copy.importTitle}</h2>
             <div className="tab-bar import-toolbar">
@@ -537,5 +421,3 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
     </div>
   );
 }
-
-

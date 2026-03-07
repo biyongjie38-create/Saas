@@ -154,6 +154,11 @@ const copyByLang: Record<Lang, Copy> = {
   }
 };
 
+const kickerByLang: Record<Lang, string> = {
+  en: "Membership Plans",
+  zh: "会员方案"
+};
+
 function PlanCard({
   name,
   desc,
@@ -205,6 +210,7 @@ function PlanCard({
 
 export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subtitle, signedIn = true, nextPath = "/dashboard/trends" }: Props) {
   const copy = copyByLang[lang];
+  const kicker = kickerByLang[lang];
   const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [submitting, setSubmitting] = useState(false);
@@ -295,7 +301,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
       <div className="modal-shell upgrade-modal-shell" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <p className="card-kicker">{title ?? copy.title}</p>
+            <p className="card-kicker">{kicker}</p>
             <h2 style={{ margin: "6px 0 0" }}>{title ?? copy.title}</h2>
           </div>
           <button type="button" className="btn btn-ghost compact-button" onClick={onClose}>

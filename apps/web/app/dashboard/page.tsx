@@ -1,40 +1,25 @@
 ﻿import { SiteNav } from "@/components/site-nav";
-import { ApiConnectionPanel } from "@/components/api-connection-panel";
 import { DashboardClient } from "@/components/dashboard-client";
-import { RecentReportsPanel } from "@/components/recent-reports-panel";
-import { requirePageAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
+import { requirePageAuthUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
-import { listReports } from "@/lib/report-store";
-import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
 export default async function DashboardPage() {
-  const authUser = await requirePageAuthUser("/dashboard");
+  await requirePageAuthUser("/dashboard");
   const lang = await getServerLang();
-  const supabaseClient = await maybeCreateServerSupabaseClient();
-  const user = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
-  const result = await listReports({ userId: authUser.id, limit: 8 }, { supabaseClient });
-  const recentReports = result.data;
 
   return (
     <main>
       <SiteNav />
       <section className="shell section">
-        <h1 style={{ marginTop: 0 }}>{text(lang, "Dashboard", "控制台")}</h1>
+        <h1 style={{ marginTop: 0 }}>{text(lang, "Console", "控制台")}</h1>
         <p>
           {text(
             lang,
-            "Analyze a YouTube URL, connect your own APIs, manage hot trends, and review historical reports from one console.",
-            "在同一个控制台里输入 YouTube 链接、对接你自己的 API、查看热门趋势，并管理历史报告。"
+            "Paste a YouTube URL to generate a report. API integrations, library, collector, and report history now live on their own pages.",
+            "在这里输入 YouTube 链接生成报告。API 对接、爆款库、作品采集和历史报告都已经拆成独立页面。"
           )}
         </p>
-
         <DashboardClient lang={lang} />
-        <section id="api-connections" style={{ marginTop: 24 }}>
-          <ApiConnectionPanel lang={lang} plan={user.plan} />
-        </section>
-        <section id="recent-reports">
-          <RecentReportsPanel lang={lang} plan={user.plan} initialReports={recentReports} />
-        </section>
       </section>
     </main>
   );

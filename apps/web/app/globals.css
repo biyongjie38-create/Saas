@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #070a12;
   --panel: #101827;
   --text: #f6f7fb;
@@ -418,6 +418,10 @@ a {
   grid-template-columns: minmax(0, 1.68fr) minmax(320px, 0.82fr);
   gap: 18px;
   align-items: start;
+}
+
+.library-layout-compact {
+  grid-template-columns: minmax(0, 1fr) 390px;
 }
 
 .library-search-row {
@@ -1202,6 +1206,25 @@ a {
   text-align: right;
 }
 
+.collect-page-panel {
+  max-width: 980px;
+}
+
+.collect-form-grid-wide {
+  margin-top: 6px;
+}
+
+.collect-page-actions {
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.collect-page-actions .collect-panel-note {
+  max-width: 360px;
+  text-align: left;
+}
+
 .compact-preview-list {
   margin-top: 12px;
   max-height: 220px;
@@ -1342,7 +1365,7 @@ a {
   position: absolute;
   top: calc(100% + 10px);
   left: 0;
-  min-width: 280px;
+  min-width: 320px;
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -1426,7 +1449,7 @@ a {
 }
 
 .avatar-summary strong {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .avatar-summary > span {
@@ -1887,13 +1910,15 @@ a {
 }
 
 .upgrade-modal-shell {
-  width: min(1180px, 94vw);
+  width: min(960px, 90vw);
+  max-height: min(84vh, 860px);
+  overflow-y: auto;
 }
 
 .upgrade-modal-body {
   display: grid;
-  gap: 18px;
-  padding: 12px 22px 22px;
+  gap: 16px;
+  padding: 8px 18px 18px;
 }
 
 .upgrade-modal-copy {
@@ -1913,14 +1938,15 @@ a {
 
 .upgrade-modal-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .upgrade-plan-card {
-  min-height: 480px;
+  min-height: 360px;
 }
 
 .upgrade-plan-card-primary {
-  transform: translateY(-6px);
+  transform: none;
 }
 
 .upgrade-plan-head {
@@ -2138,3 +2164,4 @@ a {
     grid-template-columns: 1fr;
   }
 }
+

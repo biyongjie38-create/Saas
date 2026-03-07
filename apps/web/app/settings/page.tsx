@@ -73,7 +73,7 @@ export default async function SettingsPage() {
             </p>
           </article>
 
-          <article className="card panel profile-card">
+          <article id="membership" className="card panel profile-card" style={{ scrollMarginTop: 96 }}>
             <p className="card-kicker">{text(lang, "Subscription", "订阅")}</p>
             <h3>{text(lang, "Membership Status", "会员状态")}</h3>
             <p className="small">
@@ -97,7 +97,7 @@ export default async function SettingsPage() {
               plan={user.plan}
               label={text(lang, "Open Membership", "查看会员方案")}
               className="btn btn-primary compact-button"
-              title={text(lang, "Membership Information", "会员信息")}
+              title={text(lang, "Membership Plans", "会员方案")}
               subtitle={text(
                 lang,
                 "Upgrade here without leaving the current page. ViralBrain.ai charges for the workflow; provider API costs stay with the user.",

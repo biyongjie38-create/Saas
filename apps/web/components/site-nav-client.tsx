@@ -42,6 +42,8 @@ type Copy = {
   consoleDesc: string;
   libraryEntry: string;
   libraryDesc: string;
+  collectorEntry: string;
+  collectorDesc: string;
   apiEntry: string;
   apiDesc: string;
   reportsEntry: string;
@@ -78,7 +80,9 @@ const copyByLang: Record<Lang, Copy> = {
     consoleEntry: "YouTube Analysis",
     consoleDesc: "Run URL analysis and see streaming progress.",
     libraryEntry: "Viral Library",
-    libraryDesc: "Collect, import, and manage reusable references.",
+    libraryDesc: "Search, import, and maintain reusable references.",
+    collectorEntry: "Viral Collector",
+    collectorDesc: "Pull fresh breakout candidates into your library.",
     apiEntry: "API Integrations",
     apiDesc: "Bring your own provider and data keys.",
     reportsEntry: "Recent Reports",
@@ -113,7 +117,9 @@ const copyByLang: Record<Lang, Copy> = {
     consoleEntry: "链接分析",
     consoleDesc: "输入视频链接并查看实时分析进度。",
     libraryEntry: "爆款库",
-    libraryDesc: "采集、导入并维护运营素材。",
+    libraryDesc: "搜索、导入并维护运营素材。",
+    collectorEntry: "爆款作品采集",
+    collectorDesc: "单独采集近期爆款候选并导入素材库。",
     apiEntry: "API 对接",
     apiDesc: "接入你自己的模型和数据 Key。",
     reportsEntry: "历史报告",
@@ -157,6 +163,10 @@ export function SiteNavClient({ lang, user }: Props) {
   }, []);
 
   useEffect(() => {
+    setOpenMenu(null);
+  }, [pathname]);
+
+  useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (!shellRef.current?.contains(event.target as Node)) {
         setOpenMenu(null);
@@ -176,8 +186,9 @@ export function SiteNavClient({ lang, user }: Props) {
   const consoleLinks: MenuLink[] = [
     { href: "/dashboard", label: copy.consoleEntry, desc: copy.consoleDesc },
     { href: "/library", label: copy.libraryEntry, desc: copy.libraryDesc },
-    { href: "/dashboard#api-connections", label: copy.apiEntry, desc: copy.apiDesc },
-    { href: "/dashboard#recent-reports", label: copy.reportsEntry, desc: copy.reportsDesc }
+    { href: "/dashboard/collector", label: copy.collectorEntry, desc: copy.collectorDesc },
+    { href: "/dashboard/integrations", label: copy.apiEntry, desc: copy.apiDesc },
+    { href: "/dashboard/reports", label: copy.reportsEntry, desc: copy.reportsDesc }
   ];
 
   const helpLinks: MenuLink[] = [
@@ -297,8 +308,8 @@ export function SiteNavClient({ lang, user }: Props) {
                     type="button"
                     className="nav-menu-item nav-menu-item-button"
                     onClick={() => {
-                      setMembershipOpen(true);
                       closeMenus();
+                      setMembershipOpen(true);
                     }}
                   >
                     <strong>{copy.membership}</strong>
@@ -312,19 +323,6 @@ export function SiteNavClient({ lang, user }: Props) {
                           : "Upgrade for full trends and higher limits."}
                     </span>
                   </button>
-                  {user.plan === "free" ? (
-                    <button
-                      type="button"
-                      className="nav-menu-item nav-menu-item-button"
-                      onClick={() => {
-                        setMembershipOpen(true);
-                        closeMenus();
-                      }}
-                    >
-                      <strong>{copy.upgrade}</strong>
-                      <span>{lang === "zh" ? "打开套餐介绍并立即升级。" : "Open the plan modal and upgrade now."}</span>
-                    </button>
-                  ) : null}
                   <form action="/auth/signout" method="post" className="avatar-signout-form">
                     <button type="submit" className="nav-menu-item nav-menu-item-button nav-menu-danger">
                       <strong>{copy.signOut}</strong>
@@ -342,7 +340,21 @@ export function SiteNavClient({ lang, user }: Props) {
         </div>
       </div>
 
-      <MembershipUpgradeModal open={membershipOpen} onClose={() => setMembershipOpen(false)} lang={lang} plan={user?.plan ?? "free"} signedIn={Boolean(user)} />
+      <MembershipUpgradeModal
+        open={membershipOpen}
+        onClose={() => setMembershipOpen(false)}
+        lang={lang}
+        plan={user?.plan ?? "free"}
+        signedIn={Boolean(user)}
+        title={lang === "zh" ? "会员方案" : "Membership plans"}
+        subtitle={
+          lang === "zh"
+            ? "直接在当前页面查看套餐差异和升级方式，不再跳转到设置页。"
+            : "Review plan differences and upgrade paths directly from the current page."
+        }
+        nextPath={pathname}
+      />
+
     </>
   );
 }
