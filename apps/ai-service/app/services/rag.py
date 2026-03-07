@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -42,16 +42,20 @@ HOOK_KEYWORDS: dict[str, tuple[str, ...]] = {
 
 def build_rag_provider_overrides(
     *,
+    llm_provider: str | None = None,
     openai_api_key: str | None = None,
     openai_base_url: str | None = None,
+    embedding_model: str | None = None,
     pinecone_api_key: str | None = None,
     pinecone_index_host: str | None = None,
     pinecone_index_name: str | None = None,
     pinecone_namespace: str | None = None,
 ) -> dict[str, str] | None:
     payload = {
+        "llm_provider": (llm_provider or "").strip(),
         "openai_api_key": (openai_api_key or "").strip(),
         "openai_base_url": (openai_base_url or "").strip(),
+        "embedding_model": (embedding_model or "").strip(),
         "pinecone_api_key": (pinecone_api_key or "").strip(),
         "pinecone_index_host": (pinecone_index_host or "").strip(),
         "pinecone_index_name": (pinecone_index_name or "").strip(),
@@ -332,7 +336,7 @@ def _create_pinecone_index(provider_overrides: dict[str, str] | None = None) -> 
 
 def _embed_query(text: str, provider_overrides: dict[str, str] | None = None) -> tuple[list[float], str, int, int, int, str | None]:
     client = _create_openai_client(provider_overrides)
-    model = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
+    model = (provider_overrides.get("embedding_model") if provider_overrides else "") or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
     response = client.embeddings.create(
         model=model,
         input=[text],
@@ -407,7 +411,7 @@ def run_benchmark_retrieval(
         return ModelExecution(
             payload=payload,
             model=f"{embedding_model} -> pinecone",
-            provider="openai+pinecone",
+            provider=f"{(provider_overrides.get('llm_provider') if provider_overrides and provider_overrides.get('llm_provider') else 'openai')}+pinecone",
             fallback_used=False,
             retries=0,
             latency_ms=int((time.perf_counter() - started) * 1000),
@@ -438,3 +442,5 @@ def build_embedding_records(items: list[dict[str, Any]]) -> list[dict[str, Any]]
             }
         )
     return records
+
+

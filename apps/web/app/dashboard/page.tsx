@@ -2,7 +2,7 @@
 import { ApiConnectionPanel } from "@/components/api-connection-panel";
 import { DashboardClient } from "@/components/dashboard-client";
 import { RecentReportsPanel } from "@/components/recent-reports-panel";
-import { requirePageAuthUser } from "@/lib/auth";
+import { requirePageAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { listReports } from "@/lib/report-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
@@ -11,6 +11,7 @@ export default async function DashboardPage() {
   const authUser = await requirePageAuthUser("/dashboard");
   const lang = await getServerLang();
   const supabaseClient = await maybeCreateServerSupabaseClient();
+  const user = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
   const result = await listReports(
     { userId: authUser.id, limit: 8 },
     { supabaseClient }
@@ -32,10 +33,11 @@ export default async function DashboardPage() {
 
         <DashboardClient lang={lang} />
         <section style={{ marginTop: 24 }}>
-          <ApiConnectionPanel lang={lang} />
+          <ApiConnectionPanel lang={lang} plan={user.plan} />
         </section>
-        <RecentReportsPanel lang={lang} initialReports={recentReports} />
+        <RecentReportsPanel lang={lang} plan={user.plan} initialReports={recentReports} />
       </section>
     </main>
   );
 }
+

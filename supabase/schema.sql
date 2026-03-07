@@ -23,8 +23,6 @@ create table if not exists videos (
 alter table videos add column if not exists description text;
 alter table videos add column if not exists data_source text;
 
-create index if not exists idx_videos_fetched_at on videos(fetched_at desc);
-
 create table if not exists reports (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
@@ -36,15 +34,20 @@ create table if not exists reports (
   score_total int,
   model_trace jsonb,
   error_message text,
+  share_token text,
+  share_enabled_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table reports add column if not exists error_message text;
+alter table reports add column if not exists share_token text;
+alter table reports add column if not exists share_enabled_at timestamptz;
 
 create index if not exists idx_reports_user_created on reports(user_id, created_at desc);
 create index if not exists idx_reports_video_id on reports(video_id);
 create index if not exists idx_reports_score_total on reports(score_total desc);
+create unique index if not exists idx_reports_share_token on reports(share_token) where share_token is not null;
 
 create table if not exists viral_library_items (
   id uuid primary key default gen_random_uuid(),
@@ -53,10 +56,15 @@ create table if not exists viral_library_items (
   summary text not null,
   tags jsonb not null default '{}'::jsonb,
   embedding_key text unique,
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
+alter table viral_library_items add column if not exists embedding_key text;
+alter table viral_library_items add column if not exists deleted_at timestamptz;
+
 create index if not exists idx_viral_library_created on viral_library_items(created_at desc);
+create index if not exists idx_viral_library_deleted_at on viral_library_items(deleted_at);
 create unique index if not exists idx_viral_library_embedding_key on viral_library_items(embedding_key);
 
 create table if not exists usage_logs (
@@ -70,20 +78,51 @@ create table if not exists usage_logs (
 
 create index if not exists idx_usage_logs_user_created on usage_logs(user_id, created_at desc);
 
+create table if not exists user_profiles (
+  user_id uuid primary key,
+  email text,
+  plan text not null default 'free' check (plan in ('free', 'pro')),
+  subscription_status text not null default 'none' check (subscription_status in ('none', 'active', 'canceled')),
+  billing_cycle text check (billing_cycle in ('monthly', 'yearly')),
+  plan_started_at timestamptz,
+  plan_expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_user_profiles_plan on user_profiles(plan);
+
+create table if not exists membership_orders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  plan text not null check (plan in ('free', 'pro')),
+  billing_cycle text not null check (billing_cycle in ('monthly', 'yearly')),
+  status text not null check (status in ('pending', 'paid', 'failed', 'canceled')),
+  amount_cny int not null default 0,
+  payment_provider text not null default 'demo_checkout',
+  created_at timestamptz not null default now(),
+  paid_at timestamptz
+);
+
+create index if not exists idx_membership_orders_user_created on membership_orders(user_id, created_at desc);
+
 -- RLS
 alter table videos enable row level security;
 alter table reports enable row level security;
 alter table viral_library_items enable row level security;
 alter table usage_logs enable row level security;
+alter table user_profiles enable row level security;
+alter table membership_orders enable row level security;
 
--- Videos policies (shared cache, authenticated users can read/write)
+-- Videos policies (shared public cache; authenticated users can write)
 drop policy if exists videos_select_authenticated on videos;
+drop policy if exists videos_select_public on videos;
 drop policy if exists videos_insert_authenticated on videos;
 drop policy if exists videos_update_authenticated on videos;
 
-create policy videos_select_authenticated on videos
+create policy videos_select_public on videos
 for select
-using (auth.role() = 'authenticated');
+using (true);
 
 create policy videos_insert_authenticated on videos
 for insert
@@ -94,14 +133,19 @@ for update
 using (auth.role() = 'authenticated')
 with check (auth.role() = 'authenticated');
 
--- Reports policies (strictly user-owned)
+-- Reports policies (strictly owner-managed, with optional public share)
 drop policy if exists reports_select_own on reports;
+drop policy if exists reports_select_shared on reports;
 drop policy if exists reports_insert_own on reports;
 drop policy if exists reports_update_own on reports;
 
 create policy reports_select_own on reports
 for select
 using (auth.uid() = user_id);
+
+create policy reports_select_shared on reports
+for select
+using (share_token is not null);
 
 create policy reports_insert_own on reports
 for insert
@@ -112,7 +156,7 @@ for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
--- Viral library policies (authenticated users can read/import/update)
+-- Viral library policies (authenticated users can read/import/update/delete)
 drop policy if exists viral_library_select_authenticated on viral_library_items;
 drop policy if exists viral_library_insert_authenticated on viral_library_items;
 drop policy if exists viral_library_update_authenticated on viral_library_items;
@@ -147,6 +191,36 @@ create policy usage_insert_own on usage_logs
 for insert
 with check (auth.uid() = user_id);
 
+-- User profile policies
+drop policy if exists user_profiles_select_own on user_profiles;
+drop policy if exists user_profiles_insert_own on user_profiles;
+drop policy if exists user_profiles_update_own on user_profiles;
+
+create policy user_profiles_select_own on user_profiles
+for select
+using (auth.uid() = user_id);
+
+create policy user_profiles_insert_own on user_profiles
+for insert
+with check (auth.uid() = user_id);
+
+create policy user_profiles_update_own on user_profiles
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- Membership order policies
+drop policy if exists membership_orders_select_own on membership_orders;
+drop policy if exists membership_orders_insert_own on membership_orders;
+
+create policy membership_orders_select_own on membership_orders
+for select
+using (auth.uid() = user_id);
+
+create policy membership_orders_insert_own on membership_orders
+for insert
+with check (auth.uid() = user_id);
+
 -- Hard quota intercept for analyze usage (DB-level, concurrency-safe)
 create or replace function resolve_auth_plan()
 returns text
@@ -154,6 +228,12 @@ language sql
 stable
 as $$
   select coalesce(
+    (
+      select up.plan
+      from user_profiles up
+      where up.user_id = auth.uid()
+      limit 1
+    ),
     nullif(auth.jwt() -> 'app_metadata' ->> 'plan', ''),
     nullif(auth.jwt() -> 'user_metadata' ->> 'plan', ''),
     'free'
@@ -181,7 +261,6 @@ begin
   day_start := date_trunc('day', timezone('utc', now())) at time zone 'utc';
   day_end := day_start + interval '1 day';
 
-  -- Serialize inserts per user/day to prevent concurrent bypass.
   perform pg_advisory_xact_lock(hashtext(new.user_id::text || ':' || day_start::text));
 
   select count(*)
@@ -211,6 +290,4 @@ drop trigger if exists usage_logs_daily_limit_guard on usage_logs;
 create trigger usage_logs_daily_limit_guard
 before insert on usage_logs
 for each row execute function enforce_usage_logs_daily_limit();
-
-
 

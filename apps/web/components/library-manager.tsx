@@ -2,11 +2,14 @@
 
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import type { Lang } from "@/lib/i18n-shared";
-import type { ViralLibraryItem } from "@/lib/types";
+import type { CollectedViralItem, UserPlan, ViralLibraryItem } from "@/lib/types";
+import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 
 type Props = {
   lang: Lang;
+  plan: UserPlan;
   initialItems: ViralLibraryItem[];
+  initialDeletedItems: ViralLibraryItem[];
 };
 
 type ImportFormat = "json" | "csv";
@@ -28,8 +31,21 @@ type ImportResponse = {
 type DeleteResponse = {
   ok: boolean;
   data: {
-    deleted: boolean;
+    deleted?: boolean;
     id: string;
+    action?: "restore" | "purge";
+    success?: boolean;
+  } | null;
+  error?: ApiError | null;
+};
+
+type CollectResponse = {
+  ok: boolean;
+  data: {
+    collected: CollectedViralItem[];
+    imported_count: number;
+    items: ViralLibraryItem[] | null;
+    max_results_applied: number;
   } | null;
   error?: ApiError | null;
 };
@@ -37,16 +53,15 @@ type DeleteResponse = {
 const copyByLang = {
   en: {
     title: "Viral Library",
-    subtitle:
-      "Search benchmark references, paste JSON/CSV snippets, or upload a local file for future retrieval and manual curation.",
+    subtitle: "Search benchmark references, import JSON/CSV, collect recent winners, and maintain your working library.",
     searchLabel: "Search",
     searchPlaceholder: "Search title, summary, topic, hook type...",
     importTitle: "Import Items",
+    collectTitle: "Collect Viral Works",
     importHelpJson:
       "JSON must be an array of items. Supported fields: title, sourceUrl, summary, tags.hookType/topic/durationBucket.",
     importHelpCsv: "CSV header must be: title,sourceUrl,summary,hookType,topic,durationBucket",
-    fileRule:
-      "Only .json or .csv files can be imported. Unsupported files will be rejected and cannot enter the library.",
+    fileRule: "Only .json or .csv files can be imported. Unsupported files will be rejected.",
     json: "JSON",
     csv: "CSV",
     uploadFile: "Upload File",
@@ -70,18 +85,36 @@ const copyByLang = {
     deleteItem: "Delete",
     deleting: "Deleting...",
     deleteFailed: "Delete failed.",
-    deleted: "Item deleted."
+    deleted: "Item moved to recycle bin.",
+    hoursWithin: "Published within hours",
+    minViews: "Minimum views",
+    maxResults: "Max results",
+    regionCode: "Region code",
+    collectButton: "Collect and Import",
+    collecting: "Collecting...",
+    collected: "Collected",
+    recycleBin: "Recycle Bin",
+    recycleHint: "Pro users can restore or purge deleted items.",
+    restore: "Restore",
+    purge: "Delete Permanently",
+    restoring: "Restoring...",
+    purging: "Purging...",
+    noDeleted: "Recycle bin is empty.",
+    planHint: "Current plan",
+    proOnly: "Pro only",
+    collectSummary: "Recent viral candidates"
   },
   zh: {
     title: "爆款库",
-    subtitle: "搜索对标素材库，可粘贴 JSON/CSV，也可上传本地文件，供后续检索与运营维护使用。",
+    subtitle: "搜索对标素材、导入 JSON/CSV、采集近期爆款作品，并统一维护自己的运营素材库。",
     searchLabel: "搜索",
     searchPlaceholder: "搜索标题、摘要、主题、钩子类型...",
     importTitle: "导入条目",
+    collectTitle: "爆款作品采集",
     importHelpJson:
       "JSON 必须是数组格式，支持字段：title、sourceUrl、summary、tags.hookType/topic/durationBucket。",
     importHelpCsv: "CSV 表头必须是：title,sourceUrl,summary,hookType,topic,durationBucket",
-    fileRule: "只允许导入 .json 或 .csv 文件。格式不正确的文件会被拒绝，无法进入爆款库。",
+    fileRule: "只允许导入 .json 或 .csv 文件。格式不正确的文件会被拒绝。",
     json: "JSON",
     csv: "CSV",
     uploadFile: "上传文件",
@@ -105,7 +138,24 @@ const copyByLang = {
     deleteItem: "删除",
     deleting: "删除中...",
     deleteFailed: "删除失败。",
-    deleted: "已删除该条爆款。"
+    deleted: "已移入回收站。",
+    hoursWithin: "采集最近多少小时",
+    minViews: "最低播放量",
+    maxResults: "最多采集条数",
+    regionCode: "地区代码",
+    collectButton: "采集并导入",
+    collecting: "采集中...",
+    collected: "已采集",
+    recycleBin: "回收站",
+    recycleHint: "专业版用户可以恢复或彻底删除回收站条目。",
+    restore: "恢复",
+    purge: "彻底删除",
+    restoring: "恢复中...",
+    purging: "删除中...",
+    noDeleted: "回收站为空。",
+    planHint: "当前套餐",
+    proOnly: "专业版专享",
+    collectSummary: "最近命中的爆款候选"
   }
 } as const;
 
@@ -125,17 +175,26 @@ const jsonPlaceholder = `[
 const csvPlaceholder = `title,sourceUrl,summary,hookType,topic,durationBucket
 Hook teardown,https://youtube.com/watch?v=demo,"Outcome first, then conflict.",result-first,education,5-10m`;
 
-export function LibraryManager({ lang, initialItems }: Props) {
+export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }: Props) {
   const copy = copyByLang[lang];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
   const [format, setFormat] = useState<ImportFormat>("json");
   const [content, setContent] = useState("");
   const [items, setItems] = useState(initialItems);
+  const [deletedItems, setDeletedItems] = useState(initialDeletedItems);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loadedFileName, setLoadedFileName] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [collecting, setCollecting] = useState(false);
+  const [collectPreview, setCollectPreview] = useState<CollectedViralItem[]>([]);
+  const [collectForm, setCollectForm] = useState({
+    hoursWithin: 48,
+    minViews: 100000,
+    maxResults: plan === "pro" ? 20 : 10,
+    regionCode: "US"
+  });
   const [isPending, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
@@ -199,25 +258,96 @@ export function LibraryManager({ lang, initialItems }: Props) {
     });
   }
 
-  async function handleDelete(itemId: string) {
-    setDeletingId(itemId);
+  async function handleDelete(item: ViralLibraryItem) {
+    setDeletingId(item.id);
     setError("");
     setMessage("");
 
     try {
-      const response = await fetch(`/api/library/${itemId}`, { method: "DELETE" });
+      const response = await fetch(`/api/library/${item.id}`, { method: "DELETE" });
       const payload = (await response.json().catch(() => null)) as DeleteResponse | null;
       if (!response.ok || !payload?.ok || payload.data?.deleted !== true) {
         setError(payload?.error?.message ?? copy.deleteFailed);
         return;
       }
 
-      setItems((current) => current.filter((item) => item.id !== itemId));
+      const deletedAt = new Date().toISOString();
+      setItems((current) => current.filter((entry) => entry.id !== item.id));
+      setDeletedItems((current) => [{ ...item, deletedAt }, ...current]);
       setMessage(copy.deleted);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.deleteFailed);
     } finally {
       setDeletingId("");
+    }
+  }
+
+  async function handleRecycleAction(item: ViralLibraryItem, action: "restore" | "purge") {
+    setDeletingId(`${action}:${item.id}`);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/library/${item.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action })
+      });
+      const payload = (await response.json().catch(() => null)) as DeleteResponse | null;
+      if (!response.ok || !payload?.ok || payload.data?.success !== true) {
+        setError(payload?.error?.message ?? copy.deleteFailed);
+        return;
+      }
+
+      if (action === "restore") {
+        setDeletedItems((current) => current.filter((entry) => entry.id !== item.id));
+        setItems((current) => [{ ...item, deletedAt: null }, ...current]);
+      } else {
+        setDeletedItems((current) => current.filter((entry) => entry.id !== item.id));
+      }
+      setMessage(action === "restore" ? copy.restore : copy.purge);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.deleteFailed);
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  async function handleCollect() {
+    setCollecting(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/library/collect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
+        },
+        body: JSON.stringify({
+          ...collectForm,
+          autoImport: true
+        })
+      });
+
+      const payload = (await response.json().catch(() => null)) as CollectResponse | null;
+      if (!response.ok || !payload?.ok || !payload.data) {
+        setError(payload?.error?.message ?? copy.importFailed);
+        return;
+      }
+
+      setCollectPreview(payload.data.collected);
+      if (payload.data.items) {
+        setItems(payload.data.items);
+      }
+      setMessage(`${copy.collected} ${payload.data.collected.length} ${copy.items}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.importFailed);
+    } finally {
+      setCollecting(false);
     }
   }
 
@@ -269,28 +399,17 @@ export function LibraryManager({ lang, initialItems }: Props) {
           <p>{copy.subtitle}</p>
         </div>
         <div className="library-stats">
-          <span className="badge">
-            {copy.total}: {items.length}
-          </span>
-          <span className="badge">
-            {copy.filtered}: {filtered.length}
-          </span>
+          <span className="badge">{copy.planHint}: {plan}</span>
+          <span className="badge">{copy.total}: {items.length}</span>
+          <span className="badge">{copy.filtered}: {filtered.length}</span>
         </div>
       </div>
 
       <div className="library-layout">
         <section className="card panel">
           <div className="library-search-row">
-            <label className="small" htmlFor="library-search">
-              {copy.searchLabel}
-            </label>
-            <input
-              id="library-search"
-              className="input"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={copy.searchPlaceholder}
-            />
+            <label className="small" htmlFor="library-search">{copy.searchLabel}</label>
+            <input id="library-search" className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.searchPlaceholder} />
           </div>
 
           <div className="library-grid" style={{ marginTop: 18 }}>
@@ -314,12 +433,7 @@ export function LibraryManager({ lang, initialItems }: Props) {
                     ) : (
                       <span className="small" />
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-ghost library-delete-button"
-                      onClick={() => handleDelete(item.id)}
-                      disabled={deletingId === item.id}
-                    >
+                    <button type="button" className="btn btn-ghost library-delete-button" onClick={() => handleDelete(item)} disabled={deletingId === item.id}>
                       {deletingId === item.id ? copy.deleting : copy.deleteItem}
                     </button>
                   </div>
@@ -331,57 +445,90 @@ export function LibraryManager({ lang, initialItems }: Props) {
           </div>
         </section>
 
-        <aside className="card panel import-panel">
-          <h2 style={{ marginTop: 0 }}>{copy.importTitle}</h2>
-          <div className="tab-bar import-toolbar">
-            <button
-              type="button"
-              className={`tab-button ${format === "json" ? "tab-button-active" : ""}`}
-              onClick={() => setFormat("json")}
-            >
-              {copy.json}
-            </button>
-            <button
-              type="button"
-              className={`tab-button ${format === "csv" ? "tab-button-active" : ""}`}
-              onClick={() => setFormat("csv")}
-            >
-              {copy.csv}
-            </button>
-            <button type="button" className="tab-button import-upload-trigger" onClick={() => fileInputRef.current?.click()}>
-              {copy.uploadFile}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,.csv,application/json,text/csv"
-              className="visually-hidden"
-              onChange={handleFileChange}
-            />
-          </div>
-
-          <p className="small">{format === "json" ? copy.importHelpJson : copy.importHelpCsv}</p>
-          <p className="small import-rule">{copy.fileRule}</p>
-          {loadedFileName ? (
-            <div className="import-file-chip">
-              {copy.loadedFile}: {loadedFileName}
+        <aside className="library-side-stack">
+          <section className="card panel import-panel">
+            <h2 style={{ marginTop: 0 }}>{copy.collectTitle}</h2>
+            <div className="integration-form-grid">
+              <label className="integration-field">
+                <span className="small">{copy.hoursWithin}</span>
+                <input className="input" type="number" min={1} max={168} value={collectForm.hoursWithin} onChange={(event) => setCollectForm((current) => ({ ...current, hoursWithin: Number(event.target.value) || 24 }))} />
+              </label>
+              <label className="integration-field">
+                <span className="small">{copy.minViews}</span>
+                <input className="input" type="number" min={1000} step={1000} value={collectForm.minViews} onChange={(event) => setCollectForm((current) => ({ ...current, minViews: Number(event.target.value) || 100000 }))} />
+              </label>
+              <label className="integration-field">
+                <span className="small">{copy.maxResults}</span>
+                <input className="input" type="number" min={1} max={plan === "pro" ? 30 : 10} value={collectForm.maxResults} onChange={(event) => setCollectForm((current) => ({ ...current, maxResults: Number(event.target.value) || 10 }))} />
+              </label>
+              <label className="integration-field">
+                <span className="small">{copy.regionCode}</span>
+                <input className="input" value={collectForm.regionCode} onChange={(event) => setCollectForm((current) => ({ ...current, regionCode: event.target.value.toUpperCase() }))} placeholder="US" />
+              </label>
             </div>
-          ) : null}
+            <button type="button" className="btn btn-primary" onClick={handleCollect} disabled={collecting}>
+              {collecting ? copy.collecting : copy.collectButton}
+            </button>
+            {collectPreview.length > 0 ? (
+              <div className="collect-preview-list">
+                <p className="small" style={{ fontWeight: 700 }}>{copy.collectSummary}</p>
+                {collectPreview.map((item) => (
+                  <div key={item.id} className="collect-preview-card">
+                    <strong>{item.title}</strong>
+                    <p className="small">{item.channelName} · {item.stats.viewCount.toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
 
-          <textarea
-            className="textarea"
-            rows={16}
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder={format === "json" ? jsonPlaceholder : csvPlaceholder}
-          />
-          {message ? <p className="status-done small">{message}</p> : null}
-          {error ? <p className="status-failed small">{error}</p> : null}
-          <button type="button" className="btn btn-primary" onClick={handleImport} disabled={isPending}>
-            {isPending ? copy.importing : copy.importButton}
-          </button>
+          <section className="card panel import-panel">
+            <h2 style={{ marginTop: 0 }}>{copy.importTitle}</h2>
+            <div className="tab-bar import-toolbar">
+              <button type="button" className={`tab-button ${format === "json" ? "tab-button-active" : ""}`} onClick={() => setFormat("json")}>{copy.json}</button>
+              <button type="button" className={`tab-button ${format === "csv" ? "tab-button-active" : ""}`} onClick={() => setFormat("csv")}>{copy.csv}</button>
+              <button type="button" className="tab-button import-upload-trigger" onClick={() => fileInputRef.current?.click()}>{copy.uploadFile}</button>
+              <input ref={fileInputRef} type="file" accept=".json,.csv,application/json,text/csv" className="visually-hidden" onChange={handleFileChange} />
+            </div>
+
+            <p className="small">{format === "json" ? copy.importHelpJson : copy.importHelpCsv}</p>
+            <p className="small import-rule">{copy.fileRule}</p>
+            {loadedFileName ? <div className="import-file-chip">{copy.loadedFile}: {loadedFileName}</div> : null}
+
+            <textarea className="textarea" rows={14} value={content} onChange={(event) => setContent(event.target.value)} placeholder={format === "json" ? jsonPlaceholder : csvPlaceholder} />
+            {message ? <p className="status-done small">{message}</p> : null}
+            {error ? <p className="status-failed small">{error}</p> : null}
+            <button type="button" className="btn btn-primary" onClick={handleImport} disabled={isPending}>
+              {isPending ? copy.importing : copy.importButton}
+            </button>
+          </section>
+
+          <section className="card panel import-panel">
+            <div className="library-card-head">
+              <h2 style={{ marginTop: 0, marginBottom: 0 }}>{copy.recycleBin}</h2>
+              {plan === "pro" ? <span className="badge">PRO</span> : <span className="badge">{copy.proOnly}</span>}
+            </div>
+            <p className="small">{copy.recycleHint}</p>
+            {deletedItems.length === 0 ? (
+              <p className="small">{copy.noDeleted}</p>
+            ) : (
+              <div className="recycle-list">
+                {deletedItems.map((item) => (
+                  <article key={item.id} className="collect-preview-card">
+                    <strong>{item.title}</strong>
+                    <p className="small mono">deleted_at: {item.deletedAt ?? "--"}</p>
+                    <div className="recent-report-actions" style={{ marginTop: 10 }}>
+                      <button type="button" className="btn btn-ghost report-history-action" disabled={plan !== "pro" || deletingId === `restore:${item.id}`} onClick={() => handleRecycleAction(item, "restore")}>{deletingId === `restore:${item.id}` ? copy.restoring : copy.restore}</button>
+                      <button type="button" className="btn btn-ghost report-history-action" disabled={plan !== "pro" || deletingId === `purge:${item.id}`} onClick={() => handleRecycleAction(item, "purge")}>{deletingId === `purge:${item.id}` ? copy.purging : copy.purge}</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </aside>
       </div>
     </div>
   );
 }
+

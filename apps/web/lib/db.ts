@@ -10,13 +10,18 @@ const initialDb: MockDb = {
     {
       id: "local-user",
       email: "local@viralbrain.ai",
-      plan: "free"
-    }
+      plan: "free",
+      subscriptionStatus: "none",
+      billingCycle: null,
+      planStartedAt: null,
+      planExpiresAt: null,
+    },
   ],
   videos: [],
   reports: [],
   usageLogs: [],
-  library: fallbackLibrary
+  library: fallbackLibrary,
+  membershipOrders: [],
 };
 
 function cloneInitialDb(): MockDb {
@@ -26,7 +31,17 @@ function cloneInitialDb(): MockDb {
 export async function readDb(): Promise<MockDb> {
   try {
     const content = await fs.readFile(DB_PATH, "utf8");
-    return JSON.parse(content) as MockDb;
+    const parsed = JSON.parse(content) as Partial<MockDb>;
+    return {
+      ...cloneInitialDb(),
+      ...parsed,
+      users: Array.isArray(parsed.users) ? parsed.users : cloneInitialDb().users,
+      videos: Array.isArray(parsed.videos) ? parsed.videos : [],
+      reports: Array.isArray(parsed.reports) ? parsed.reports : [],
+      usageLogs: Array.isArray(parsed.usageLogs) ? parsed.usageLogs : [],
+      library: Array.isArray(parsed.library) ? parsed.library : cloneInitialDb().library,
+      membershipOrders: Array.isArray(parsed.membershipOrders) ? parsed.membershipOrders : [],
+    };
   } catch {
     const db = cloneInitialDb();
     await writeDb(db);
@@ -44,3 +59,4 @@ export async function resetDb(): Promise<MockDb> {
   await writeDb(db);
   return db;
 }
+

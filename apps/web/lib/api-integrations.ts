@@ -1,30 +1,104 @@
+﻿import type { ApiLlmProvider } from "@/lib/types";
+
 export type ApiIntegrationConfig = {
   youtubeApiKey: string;
+  llmProvider: ApiLlmProvider;
   openaiApiKey: string;
   openaiBaseUrl: string;
+  analysisModel: string;
+  scoreModel: string;
+  embeddingModel: string;
   pineconeApiKey: string;
   pineconeIndexHost: string;
   pineconeIndexName: string;
   pineconeNamespace: string;
 };
 
-export const API_INTEGRATION_STORAGE_KEY = "vb_api_integrations_v1";
+export type ProviderPreset = {
+  id: ApiLlmProvider;
+  label: string;
+  baseUrl: string;
+  analysisModel: string;
+  scoreModel: string;
+  embeddingModel: string;
+  requiresCustomBaseUrl?: boolean;
+  note?: string;
+};
+
+export const API_INTEGRATION_STORAGE_KEY = "vb_api_integrations_v2";
 
 export const API_INTEGRATION_HEADERS = {
   youtubeApiKey: "x-vb-youtube-api-key",
+  llmProvider: "x-vb-llm-provider",
   openaiApiKey: "x-vb-openai-api-key",
   openaiBaseUrl: "x-vb-openai-base-url",
+  analysisModel: "x-vb-analysis-model",
+  scoreModel: "x-vb-score-model",
+  embeddingModel: "x-vb-embedding-model",
   pineconeApiKey: "x-vb-pinecone-api-key",
   pineconeIndexHost: "x-vb-pinecone-index-host",
   pineconeIndexName: "x-vb-pinecone-index-name",
   pineconeNamespace: "x-vb-pinecone-namespace"
 } as const;
 
+const PROVIDER_PRESETS: Record<ApiLlmProvider, ProviderPreset> = {
+  openai: {
+    id: "openai",
+    label: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    analysisModel: "gpt-4o-mini",
+    scoreModel: "gpt-4o",
+    embeddingModel: "text-embedding-3-small"
+  },
+  bailian: {
+    id: "bailian",
+    label: "阿里云百炼",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    analysisModel: "qwen-plus",
+    scoreModel: "qwen-plus",
+    embeddingModel: "text-embedding-v4",
+    note: "使用阿里云百炼 OpenAI 兼容模式。"
+  },
+  yunwu: {
+    id: "yunwu",
+    label: "云雾 / 兼容 OpenAI",
+    baseUrl: "",
+    analysisModel: "",
+    scoreModel: "",
+    embeddingModel: "",
+    requiresCustomBaseUrl: true,
+    note: "请填写云雾实际兼容地址与模型名。"
+  },
+  custom: {
+    id: "custom",
+    label: "自定义兼容接口",
+    baseUrl: "",
+    analysisModel: "",
+    scoreModel: "",
+    embeddingModel: "",
+    requiresCustomBaseUrl: true,
+    note: "适用于任何 OpenAI 兼容接口。"
+  }
+};
+
+export function getProviderPreset(provider: ApiLlmProvider): ProviderPreset {
+  return PROVIDER_PRESETS[provider] ?? PROVIDER_PRESETS.openai;
+}
+
+export function listProviderPresets(): ProviderPreset[] {
+  return Object.values(PROVIDER_PRESETS);
+}
+
 export function createEmptyApiIntegrationConfig(): ApiIntegrationConfig {
+  const preset = getProviderPreset("openai");
   return {
     youtubeApiKey: "",
+    llmProvider: preset.id,
     openaiApiKey: "",
-    openaiBaseUrl: "",
+    openaiBaseUrl: preset.baseUrl,
+    analysisModel: preset.analysisModel,
+    scoreModel: preset.scoreModel,
+    embeddingModel: preset.embeddingModel,
     pineconeApiKey: "",
     pineconeIndexHost: "",
     pineconeIndexName: "",
@@ -36,18 +110,44 @@ function normalizeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeProvider(value: unknown): ApiLlmProvider {
+  return value === "bailian" || value === "yunwu" || value === "custom" ? value : "openai";
+}
+
+export function applyProviderPreset(
+  config: ApiIntegrationConfig,
+  provider: ApiLlmProvider,
+  options?: { preserveSecrets?: boolean }
+): ApiIntegrationConfig {
+  const preset = getProviderPreset(provider);
+  return {
+    ...config,
+    llmProvider: provider,
+    openaiBaseUrl: preset.baseUrl,
+    analysisModel: preset.analysisModel,
+    scoreModel: preset.scoreModel,
+    embeddingModel: preset.embeddingModel,
+    openaiApiKey: options?.preserveSecrets ? config.openaiApiKey : ""
+  };
+}
+
 export function normalizeApiIntegrationConfig(input: unknown): ApiIntegrationConfig {
   const source = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
-  const fallback = createEmptyApiIntegrationConfig();
+  const provider = normalizeProvider(source.llmProvider);
+  const preset = getProviderPreset(provider);
 
   return {
-    youtubeApiKey: normalizeString(source.youtubeApiKey) || fallback.youtubeApiKey,
-    openaiApiKey: normalizeString(source.openaiApiKey) || fallback.openaiApiKey,
-    openaiBaseUrl: normalizeString(source.openaiBaseUrl) || fallback.openaiBaseUrl,
-    pineconeApiKey: normalizeString(source.pineconeApiKey) || fallback.pineconeApiKey,
-    pineconeIndexHost: normalizeString(source.pineconeIndexHost) || fallback.pineconeIndexHost,
-    pineconeIndexName: normalizeString(source.pineconeIndexName) || fallback.pineconeIndexName,
-    pineconeNamespace: normalizeString(source.pineconeNamespace) || fallback.pineconeNamespace
+    youtubeApiKey: normalizeString(source.youtubeApiKey),
+    llmProvider: provider,
+    openaiApiKey: normalizeString(source.openaiApiKey),
+    openaiBaseUrl: normalizeString(source.openaiBaseUrl) || preset.baseUrl,
+    analysisModel: normalizeString(source.analysisModel) || preset.analysisModel,
+    scoreModel: normalizeString(source.scoreModel) || preset.scoreModel,
+    embeddingModel: normalizeString(source.embeddingModel) || preset.embeddingModel,
+    pineconeApiKey: normalizeString(source.pineconeApiKey),
+    pineconeIndexHost: normalizeString(source.pineconeIndexHost),
+    pineconeIndexName: normalizeString(source.pineconeIndexName),
+    pineconeNamespace: normalizeString(source.pineconeNamespace) || "viral-library"
   };
 }
 
@@ -91,11 +191,23 @@ export function buildApiIntegrationHeaders(config: ApiIntegrationConfig): Record
   if (normalized.youtubeApiKey) {
     headers[API_INTEGRATION_HEADERS.youtubeApiKey] = normalized.youtubeApiKey;
   }
+  if (normalized.llmProvider) {
+    headers[API_INTEGRATION_HEADERS.llmProvider] = normalized.llmProvider;
+  }
   if (normalized.openaiApiKey) {
     headers[API_INTEGRATION_HEADERS.openaiApiKey] = normalized.openaiApiKey;
   }
   if (normalized.openaiBaseUrl) {
     headers[API_INTEGRATION_HEADERS.openaiBaseUrl] = normalized.openaiBaseUrl;
+  }
+  if (normalized.analysisModel) {
+    headers[API_INTEGRATION_HEADERS.analysisModel] = normalized.analysisModel;
+  }
+  if (normalized.scoreModel) {
+    headers[API_INTEGRATION_HEADERS.scoreModel] = normalized.scoreModel;
+  }
+  if (normalized.embeddingModel) {
+    headers[API_INTEGRATION_HEADERS.embeddingModel] = normalized.embeddingModel;
   }
   if (normalized.pineconeApiKey) {
     headers[API_INTEGRATION_HEADERS.pineconeApiKey] = normalized.pineconeApiKey;
@@ -116,8 +228,12 @@ export function buildApiIntegrationHeaders(config: ApiIntegrationConfig): Record
 export function readApiIntegrationConfigFromHeaders(headers: Headers): ApiIntegrationConfig {
   return normalizeApiIntegrationConfig({
     youtubeApiKey: headers.get(API_INTEGRATION_HEADERS.youtubeApiKey),
+    llmProvider: headers.get(API_INTEGRATION_HEADERS.llmProvider),
     openaiApiKey: headers.get(API_INTEGRATION_HEADERS.openaiApiKey),
     openaiBaseUrl: headers.get(API_INTEGRATION_HEADERS.openaiBaseUrl),
+    analysisModel: headers.get(API_INTEGRATION_HEADERS.analysisModel),
+    scoreModel: headers.get(API_INTEGRATION_HEADERS.scoreModel),
+    embeddingModel: headers.get(API_INTEGRATION_HEADERS.embeddingModel),
     pineconeApiKey: headers.get(API_INTEGRATION_HEADERS.pineconeApiKey),
     pineconeIndexHost: headers.get(API_INTEGRATION_HEADERS.pineconeIndexHost),
     pineconeIndexName: headers.get(API_INTEGRATION_HEADERS.pineconeIndexName),
@@ -141,3 +257,4 @@ export function hasConnectedKeys(config: ApiIntegrationConfig): boolean {
   const normalized = normalizeApiIntegrationConfig(config);
   return Boolean(normalized.youtubeApiKey || normalized.openaiApiKey || normalized.pineconeApiKey);
 }
+

@@ -1,16 +1,14 @@
 ﻿import { notFound } from "next/navigation";
 import { SiteNav } from "@/components/site-nav";
-import { ReportActions } from "@/components/report-actions";
 import { ReportTabs } from "@/components/report-tabs";
-import { requirePageAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { localizeAnalysisJson, localizeBenchmarksJson, localizeScoreJson } from "@/lib/report-localize";
-import { getReportById } from "@/lib/report-store";
+import { getReportByShareToken } from "@/lib/report-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
 
 type Props = {
-  params: Promise<{ id: string }>;
+  params: Promise<{ token: string }>;
 };
 
 function classForStatus(status: string): string {
@@ -23,13 +21,11 @@ function classForStatus(status: string): string {
   return "status-running";
 }
 
-export default async function ReportPage({ params }: Props) {
-  const { id } = await params;
+export default async function SharedReportPage({ params }: Props) {
+  const { token } = await params;
   const lang = await getServerLang();
-  const authUser = await requirePageAuthUser(`/report/${id}`);
   const supabaseClient = await maybeCreateServerSupabaseClient();
-  const user = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
-  const report = await getReportById(id, authUser.id, { supabaseClient });
+  const report = await getReportByShareToken(token, { supabaseClient });
 
   if (!report) {
     notFound();
@@ -44,18 +40,16 @@ export default async function ReportPage({ params }: Props) {
     <main>
       <SiteNav />
       <section className="shell section">
-        <div className="report-shell-head">
-          <div>
-            <h1 style={{ marginTop: 0 }}>{text(lang, "Viral Report", "爆款报告")}</h1>
-            <p className="small">
-              {text(
-                lang,
-                "Review the full analysis, then share, rerun with live data, or export the current report.",
-                "查看完整分析后，可以继续分享链接、用真实数据重跑，或导出当前报告。"
-              )}
-            </p>
-          </div>
-          <ReportActions lang={lang} plan={user.plan} reportId={report.id} />
+        <div className="section-intro share-hero">
+          <span className="badge">{text(lang, "Shared Report", "分享报告")}</span>
+          <h1 style={{ marginTop: 18 }}>{text(lang, "A shared ViralBrain.ai report", "一份已分享的 ViralBrain.ai 报告")}</h1>
+          <p>
+            {text(
+              lang,
+              "This report was shared via a public link. Review the score, structure, and playbook without signing in.",
+              "这份报告通过公开链接分享，可在不登录的情况下查看评分、结构拆解和行动方案。"
+            )}
+          </p>
         </div>
 
         <div className="report-grid">
@@ -65,9 +59,7 @@ export default async function ReportPage({ params }: Props) {
             <h3 style={{ marginBottom: 4 }}>{text(lang, "Viral Score", "爆款评分")}</h3>
             <div style={{ fontSize: 42, fontWeight: 800 }}>{localizedScore?.total ?? "--"}</div>
             <p className="small mono">video_id: {report.videoId}</p>
-            <p className="small">
-              {text(lang, "Created", "创建时间")}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
-            </p>
+            <p className="small">{text(lang, "Created", "创建时间")}: {new Date(report.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}</p>
           </aside>
 
           <ReportTabs

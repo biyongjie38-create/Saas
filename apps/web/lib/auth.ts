@@ -1,7 +1,8 @@
-﻿import type { User as SupabaseAuthUser } from "@supabase/supabase-js";
+﻿import type { SupabaseClient, User as SupabaseAuthUser } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createRequestId, errorJsonResponse } from "@/lib/api-response";
 import { getE2EAuthUser } from "@/lib/e2e-auth";
+import { resolveAppUserProfile } from "@/lib/membership-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import type { User } from "@/lib/types";
 
@@ -14,8 +15,26 @@ export function toAppUser(user: SupabaseAuthUser): User {
   return {
     id: user.id,
     email: user.email ?? "unknown@viralbrain.ai",
-    plan: resolvePlan(user)
+    plan: resolvePlan(user),
+    subscriptionStatus: resolvePlan(user) === "pro" ? "active" : "none",
+    billingCycle: null,
+    planStartedAt: null,
+    planExpiresAt: null,
   };
+}
+
+export async function resolveAuthenticatedAppUser(
+  user: SupabaseAuthUser,
+  options?: { supabaseClient?: SupabaseClient | null },
+): Promise<User> {
+  return resolveAppUserProfile(
+    {
+      id: user.id,
+      email: user.email ?? "unknown@viralbrain.ai",
+      fallbackPlan: resolvePlan(user),
+    },
+    options,
+  );
 }
 
 export async function getOptionalAuthUser(): Promise<SupabaseAuthUser | null> {
@@ -31,7 +50,7 @@ export async function getOptionalAuthUser(): Promise<SupabaseAuthUser | null> {
 
   try {
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser();
     return user;
   } catch {
@@ -55,9 +74,10 @@ export function unauthorizedJsonResponse(requestId?: string) {
   return errorJsonResponse(
     {
       code: "UNAUTHORIZED",
-      message: "Please sign in first."
+      message: "Please sign in first.",
     },
     requestId ?? createRequestId(),
-    401
+    401,
   );
 }
+

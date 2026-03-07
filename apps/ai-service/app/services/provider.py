@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -16,6 +16,7 @@ except Exception:
 class ProviderOverrides:
     api_key: str | None = None
     base_url: str | None = None
+    provider_name: str | None = None
 
 
 @dataclass
@@ -32,12 +33,17 @@ class ModelExecution:
     provider_request_id: str | None = None
 
 
-def build_provider_overrides(api_key: str | None = None, base_url: str | None = None) -> ProviderOverrides | None:
+def build_provider_overrides(
+    api_key: str | None = None,
+    base_url: str | None = None,
+    provider_name: str | None = None,
+) -> ProviderOverrides | None:
     resolved_key = (api_key or "").strip() or None
     resolved_base_url = (base_url or "").strip() or None
-    if not resolved_key and not resolved_base_url:
+    resolved_provider = (provider_name or "").strip() or None
+    if not resolved_key and not resolved_base_url and not resolved_provider:
         return None
-    return ProviderOverrides(api_key=resolved_key, base_url=resolved_base_url)
+    return ProviderOverrides(api_key=resolved_key, base_url=resolved_base_url, provider_name=resolved_provider)
 
 
 def get_provider_mode() -> str:
@@ -68,6 +74,12 @@ def _should_try_openai(overrides: ProviderOverrides | None = None) -> bool:
     if mode == "local":
         return False
     return _has_openai_credentials(overrides)
+
+
+def _resolve_provider_name(overrides: ProviderOverrides | None = None) -> str:
+    if overrides and overrides.provider_name:
+        return overrides.provider_name
+    return "openai"
 
 
 def _create_openai_client(overrides: ProviderOverrides | None = None) -> Any:
@@ -172,6 +184,7 @@ def run_json_task(
     started = time.perf_counter()
     mode = get_provider_mode()
     last_error: Exception | None = None
+    provider_name = _resolve_provider_name(provider_overrides)
 
     if _should_try_openai(provider_overrides):
         for attempt in range(max_retries + 1):
@@ -187,7 +200,7 @@ def run_json_task(
                 return ModelExecution(
                     payload=payload,
                     model=resolved_model,
-                    provider="openai",
+                    provider=provider_name,
                     fallback_used=False,
                     retries=attempt,
                     latency_ms=int((time.perf_counter() - started) * 1000),
@@ -198,9 +211,9 @@ def run_json_task(
                 )
             except Exception as exc:
                 last_error = exc
-                print(f"[ai-service][{task_name}] OpenAI attempt {attempt + 1} failed: {exc}")
+                print(f"[ai-service][{task_name}] {provider_name} attempt {attempt + 1} failed: {exc}")
     elif mode == "openai":
-        print(f"[ai-service][{task_name}] OpenAI requested but SDK/key is unavailable. Falling back to local.")
+        print(f"[ai-service][{task_name}] {provider_name} requested but SDK/key is unavailable. Falling back to local.")
 
     payload = fallback_factory()
     validator(payload)
@@ -232,3 +245,4 @@ def build_local_execution(task_name: str, model: str, payload: dict[str, Any]) -
         total_tokens=0,
         provider_request_id=None,
     )
+

@@ -1,18 +1,16 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
-import {
-  localizeAnalysisJson,
-  localizeBenchmarksJson,
-  localizeScoreJson
-} from "@/lib/report-localize";
-import type { Report, YoutubeVideo } from "@/lib/types";
+import { localizeAnalysisJson, localizeBenchmarksJson, localizeScoreJson } from "@/lib/report-localize";
+import type { Report, UserPlan, YoutubeVideo } from "@/lib/types";
 import { ReportTabs } from "@/components/report-tabs";
+import { ReportActions } from "@/components/report-actions";
 
 type Props = {
   lang: Lang;
+  plan: UserPlan;
   initialReports: Report[];
 };
 
@@ -73,18 +71,18 @@ const copyByLang: Record<Lang, Copy> = {
     failed: "Could not load report preview."
   },
   zh: {
-    title: "\u6700\u8fd1\u62a5\u544a",
-    empty: "\u8fd8\u6ca1\u6709\u62a5\u544a\uff0c\u5148\u8fd0\u884c\u4e00\u6b21\u5206\u6790\u5427\u3002",
-    preview: "\u67e5\u770b\u62a5\u544a\u5206\u6790",
-    open: "\u6253\u5f00\u5b8c\u6574\u62a5\u544a",
-    loading: "\u6b63\u5728\u52a0\u8f7d\u62a5\u544a\u9884\u89c8...",
-    previewTitle: "\u62a5\u544a\u9884\u89c8",
-    close: "\u5173\u95ed",
-    openFull: "\u6253\u5f00\u5b8c\u6574\u62a5\u544a",
-    created: "\u521b\u5efa\u65f6\u95f4",
-    score: "\u8bc4\u5206",
-    status: "\u72b6\u6001",
-    failed: "\u52a0\u8f7d\u62a5\u544a\u9884\u89c8\u5931\u8d25\u3002"
+    title: "最近报告",
+    empty: "还没有报告，先运行一次分析吧。",
+    preview: "查看报告分析",
+    open: "打开完整报告",
+    loading: "正在加载报告预览...",
+    previewTitle: "报告预览",
+    close: "关闭",
+    openFull: "打开完整报告",
+    created: "创建时间",
+    score: "评分",
+    status: "状态",
+    failed: "加载报告预览失败。"
   }
 };
 
@@ -98,7 +96,7 @@ function classForStatus(status: string): string {
   return "status-running";
 }
 
-export function RecentReportsPanel({ lang, initialReports }: Props) {
+export function RecentReportsPanel({ lang, plan, initialReports }: Props) {
   const copy = copyByLang[lang];
   const [reports, setReports] = useState(initialReports);
   const [loading, setLoading] = useState(false);
@@ -199,6 +197,7 @@ export function RecentReportsPanel({ lang, initialReports }: Props) {
                   {copy.open}
                 </Link>
               </div>
+              <ReportActions lang={lang} plan={plan} reportId={report.id} compact onRerunCreated={() => void refreshReports()} />
             </article>
           ))}
         </div>
@@ -232,6 +231,7 @@ export function RecentReportsPanel({ lang, initialReports }: Props) {
                   <Link href={`/report/${localizedPreview.report.id}`} className="btn btn-primary report-history-action" style={{ marginTop: 16 }}>
                     {copy.openFull}
                   </Link>
+                  <ReportActions lang={lang} plan={plan} reportId={localizedPreview.report.id} includePrint={false} />
                 </aside>
 
                 <ReportTabs
@@ -250,3 +250,4 @@ export function RecentReportsPanel({ lang, initialReports }: Props) {
     </section>
   );
 }
+

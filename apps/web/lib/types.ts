@@ -5,6 +5,11 @@
 };
 
 export type VideoDataSource = "youtube_api" | "mock_demo" | "mock_synthetic";
+export type UserPlan = "free" | "pro";
+export type BillingCycle = "monthly" | "yearly";
+export type SubscriptionStatus = "none" | "active" | "canceled";
+export type MembershipOrderStatus = "pending" | "paid" | "failed" | "canceled";
+export type ApiLlmProvider = "openai" | "bailian" | "yunwu" | "custom";
 
 export type YoutubeVideo = {
   id: string;
@@ -118,6 +123,8 @@ export type Report = {
   scoreTotal: number | null;
   modelTrace: ModelTrace | null;
   errorMessage?: string;
+  shareToken?: string | null;
+  shareEnabledAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -134,7 +141,23 @@ export type UsageLog = {
 export type User = {
   id: string;
   email: string;
-  plan: "free" | "pro";
+  plan: UserPlan;
+  subscriptionStatus?: SubscriptionStatus;
+  billingCycle?: BillingCycle | null;
+  planStartedAt?: string | null;
+  planExpiresAt?: string | null;
+};
+
+export type MembershipOrder = {
+  id: string;
+  userId: string;
+  plan: UserPlan;
+  billingCycle: BillingCycle;
+  status: MembershipOrderStatus;
+  amountCny: number;
+  paymentProvider: "demo_checkout";
+  createdAt: string;
+  paidAt?: string | null;
 };
 
 export type ViralLibraryItem = {
@@ -148,6 +171,21 @@ export type ViralLibraryItem = {
     durationBucket: string;
   };
   createdAt: string;
+  deletedAt?: string | null;
+};
+
+export type CollectedViralItem = {
+  id: string;
+  videoId: string;
+  url: string;
+  title: string;
+  summary: string;
+  channelName: string;
+  publishedAt: string;
+  stats: VideoStats;
+  thumbnailUrl: string;
+  tags: ViralLibraryItem["tags"];
+  dataSource: VideoDataSource;
 };
 
 export type MockDb = {
@@ -156,6 +194,7 @@ export type MockDb = {
   reports: Report[];
   usageLogs: UsageLog[];
   library: ViralLibraryItem[];
+  membershipOrders: MembershipOrder[];
 };
 
 export type AnalyzePayload = {
@@ -163,3 +202,4 @@ export type AnalyzePayload = {
   userId?: string;
   stream?: boolean;
 };
+

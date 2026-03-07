@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readDb, writeDb } from "@/lib/db";
 import { fallbackLibrary } from "@/lib/mock-data";
@@ -9,11 +9,18 @@ import {
 } from "@/lib/quota";
 import { normalizeUserIdForBackend, useSupabaseBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import type { Report, ReportStatus, UsageLog, User, ViralLibraryItem } from "@/lib/types";
+import type {
+  Report,
+  ReportStatus,
+  UsageLog,
+  User,
+  ViralLibraryItem
+} from "@/lib/types";
 
 type QueryOptions = {
   supabaseClient?: SupabaseClient | null;
   action?: string;
+  includeDeleted?: boolean;
 };
 
 type ReportRow = {
@@ -27,6 +34,8 @@ type ReportRow = {
   score_total: number | null;
   model_trace: Report["modelTrace"];
   error_message?: string | null;
+  share_token?: string | null;
+  share_enabled_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -38,6 +47,7 @@ type LibraryRow = {
   summary: string | null;
   tags: unknown;
   created_at: string | null;
+  deleted_at?: string | null;
   embedding_key?: string | null;
 };
 
@@ -60,6 +70,8 @@ function toReport(row: ReportRow): Report {
     scoreTotal: row.score_total,
     modelTrace: row.model_trace,
     errorMessage: row.error_message ?? undefined,
+    shareToken: row.share_token ?? null,
+    shareEnabledAt: row.share_enabled_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -142,6 +154,8 @@ export async function createReport(
       score_json: null,
       score_total: null,
       model_trace: null,
+      share_token: null,
+      share_enabled_at: null,
       created_at: now,
       updated_at: now
     };
@@ -170,6 +184,8 @@ export async function createReport(
     scoreJson: null,
     scoreTotal: null,
     modelTrace: null,
+    shareToken: null,
+    shareEnabledAt: null,
     createdAt: now,
     updatedAt: now
   };
@@ -210,6 +226,12 @@ export async function updateReport(
     }
     if (patch.errorMessage !== undefined) {
       payload.error_message = patch.errorMessage;
+    }
+    if (patch.shareToken !== undefined) {
+      payload.share_token = patch.shareToken;
+    }
+    if (patch.shareEnabledAt !== undefined) {
+      payload.share_enabled_at = patch.shareEnabledAt;
     }
 
     const { data, error } = await client
@@ -274,6 +296,53 @@ export async function getReportById(
   return report;
 }
 
+export async function getReportByShareToken(
+  shareToken: string,
+  options?: QueryOptions
+): Promise<Report | null> {
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { data, error } = await client
+      .from("reports")
+      .select("*")
+      .eq("share_token", shareToken)
+      .maybeSingle<ReportRow>();
+
+    if (error) {
+      throw new Error(`SUPABASE_GET_SHARED_REPORT_FAILED:${error.message}`);
+    }
+
+    return data ? toReport(data) : null;
+  }
+
+  const db = await readDb();
+  return db.reports.find((item) => item.shareToken === shareToken) ?? null;
+}
+
+export async function enableReportShare(
+  reportId: string,
+  userId: string,
+  options?: QueryOptions
+): Promise<Report | null> {
+  const report = await getReportById(reportId, userId, options);
+  if (!report) {
+    return null;
+  }
+
+  if (report.shareToken && report.shareEnabledAt) {
+    return report;
+  }
+
+  return updateReport(
+    reportId,
+    {
+      shareToken: report.shareToken ?? crypto.randomUUID(),
+      shareEnabledAt: report.shareEnabledAt ?? new Date().toISOString()
+    },
+    options
+  );
+}
+
 export async function listReports(
   params: {
     userId: string;
@@ -299,10 +368,7 @@ export async function listReports(
 
     const reports = (data ?? []).map(toReport);
     const startIndex = params.cursor
-      ? Math.max(
-          0,
-          reports.findIndex((item) => item.id === params.cursor) + 1
-        )
+      ? Math.max(0, reports.findIndex((item) => item.id === params.cursor) + 1)
       : 0;
 
     const page = reports.slice(startIndex, startIndex + params.limit);
@@ -320,10 +386,7 @@ export async function listReports(
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
   const startIndex = params.cursor
-    ? Math.max(
-        0,
-        sorted.findIndex((item) => item.id === params.cursor) + 1
-      )
+    ? Math.max(0, sorted.findIndex((item) => item.id === params.cursor) + 1)
     : 0;
 
   const data = sorted.slice(startIndex, startIndex + params.limit);
@@ -482,7 +545,8 @@ function toLibraryItem(row: LibraryRow): ViralLibraryItem {
     sourceUrl: String(row.source_url ?? ""),
     summary: String(row.summary ?? ""),
     tags: normalizeTags(row.tags),
-    createdAt: String(row.created_at ?? new Date().toISOString())
+    createdAt: String(row.created_at ?? new Date().toISOString()),
+    deletedAt: row.deleted_at ? String(row.deleted_at) : null
   };
 }
 
@@ -514,31 +578,36 @@ function createLibraryEmbeddingKey(input: LibraryImportInput): string {
 }
 
 export async function listLibraryItems(options?: QueryOptions): Promise<ViralLibraryItem[]> {
+  const includeDeleted = Boolean(options?.includeDeleted);
   const client = await getSupabaseUserClient(options);
   if (client) {
-    const { data, error } = await client
+    let query = client
       .from("viral_library_items")
-      .select("id,title,source_url,summary,tags,created_at,embedding_key")
+      .select("id,title,source_url,summary,tags,created_at,deleted_at,embedding_key")
       .order("created_at", { ascending: false })
       .limit(200);
+
+    if (!includeDeleted) {
+      query = query.is("deleted_at", null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`SUPABASE_LIST_LIBRARY_FAILED:${error.message}`);
     }
 
     const mapped = (data ?? []).map((item) => toLibraryItem(item as LibraryRow));
-
     if (mapped.length > 0) {
       return mapped;
     }
   }
 
   const db = await readDb();
-  if (db.library.length > 0) {
-    return db.library;
-  }
-
-  return fallbackLibrary;
+  const list = db.library.length > 0 ? db.library : fallbackLibrary;
+  return list
+    .filter((item) => includeDeleted || !item.deletedAt)
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 }
 
 export async function importLibraryItems(
@@ -568,7 +637,8 @@ export async function importLibraryItems(
         topic: item.tags?.topic ?? "general",
         duration_bucket: item.tags?.durationBucket ?? "5-10m"
       },
-      embedding_key: embeddingKey
+      embedding_key: embeddingKey,
+      deleted_at: null
     }));
 
     const { error } = await client
@@ -606,6 +676,7 @@ export async function importLibraryItems(
         topic: item.tags?.topic ?? "general",
         durationBucket: item.tags?.durationBucket ?? "5-10m"
       };
+      existing.deletedAt = null;
       continue;
     }
 
@@ -619,16 +690,76 @@ export async function importLibraryItems(
         topic: item.tags?.topic ?? "general",
         durationBucket: item.tags?.durationBucket ?? "5-10m"
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      deletedAt: null
     });
   }
 
   db.library.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   await writeDb(db);
-  return db.library;
+  return db.library.filter((item) => !item.deletedAt);
 }
 
 export async function deleteLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {
+  const deletedAt = new Date().toISOString();
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { data, error } = await client
+      .from("viral_library_items")
+      .update({ deleted_at: deletedAt })
+      .eq("id", id)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`SUPABASE_DELETE_LIBRARY_FAILED:${error.message}`);
+    }
+
+    return Boolean(data?.id);
+  }
+
+  const db = await readDb();
+  const item = db.library.find((entry) => entry.id === id && !entry.deletedAt);
+  if (!item) {
+    return false;
+  }
+
+  item.deletedAt = deletedAt;
+  await writeDb(db);
+  return true;
+}
+
+export async function restoreLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { data, error } = await client
+      .from("viral_library_items")
+      .update({ deleted_at: null })
+      .eq("id", id)
+      .not("deleted_at", "is", null)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`SUPABASE_RESTORE_LIBRARY_FAILED:${error.message}`);
+    }
+
+    return Boolean(data?.id);
+  }
+
+  const db = await readDb();
+  const item = db.library.find((entry) => entry.id === id && entry.deletedAt);
+  if (!item) {
+    return false;
+  }
+
+  item.deletedAt = null;
+  await writeDb(db);
+  return true;
+}
+
+export async function purgeLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {
   const client = await getSupabaseUserClient(options);
   if (client) {
     const { error, count } = await client
@@ -637,7 +768,7 @@ export async function deleteLibraryItem(id: string, options?: QueryOptions): Pro
       .eq("id", id);
 
     if (error) {
-      throw new Error(`SUPABASE_DELETE_LIBRARY_FAILED:${error.message}`);
+      throw new Error(`SUPABASE_PURGE_LIBRARY_FAILED:${error.message}`);
     }
 
     return (count ?? 0) > 0;
@@ -653,3 +784,4 @@ export async function deleteLibraryItem(id: string, options?: QueryOptions): Pro
   await writeDb(db);
   return true;
 }
+

@@ -1,6 +1,10 @@
 ﻿import { z } from "zod";
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
-import { getApiAuthUser, toAppUser, unauthorizedJsonResponse } from "@/lib/auth";
+import {
+  getApiAuthUser,
+  resolveAuthenticatedAppUser,
+  unauthorizedJsonResponse
+} from "@/lib/auth";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { consumeUsage, countUsageForDay } from "@/lib/report-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
@@ -33,7 +37,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const supabaseClient = await maybeCreateServerSupabaseClient();
-  const appUser = toAppUser(authUser);
+  const appUser = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
 
   if (parsed.data.action === "analyze") {
     const usedToday = await countUsageForDay(appUser.id, {
@@ -89,3 +93,4 @@ export const POST = withApiRoute(async (request, { requestId }) => {
     throw error;
   }
 });
+

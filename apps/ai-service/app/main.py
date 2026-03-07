@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import FastAPI, Header
 
@@ -19,10 +19,7 @@ from app.services.analysis import (
     build_analysis_system_prompt,
     build_analysis_user_prompt,
 )
-from app.services.model_router import (
-    route_analysis_model,
-    route_score_model,
-)
+from app.services.model_router import route_analysis_model, route_score_model
 from app.services.provider import build_provider_overrides, run_json_task
 from app.services.rag import build_rag_provider_overrides, run_benchmark_retrieval
 from app.services.scoring import (
@@ -33,7 +30,7 @@ from app.services.scoring import (
 
 load_runtime_env()
 
-app = FastAPI(title="ViralBrain AI Service", version="0.3.1")
+app = FastAPI(title="ViralBrain AI Service", version="0.4.0")
 
 
 @app.get("/health")
@@ -44,13 +41,16 @@ def health() -> dict:
 @app.post("/ai/analyze", response_model=AnalyzeResponse)
 def analyze(
     data: AnalyzeRequest,
+    x_vb_llm_provider: str | None = Header(default=None),
     x_vb_openai_api_key: str | None = Header(default=None),
     x_vb_openai_base_url: str | None = Header(default=None),
+    x_vb_analysis_model: str | None = Header(default=None),
 ) -> AnalyzeResponse:
-    model = route_analysis_model(data.metadata)
+    model = (x_vb_analysis_model or "").strip() or route_analysis_model(data.metadata)
     provider_overrides = build_provider_overrides(
         api_key=x_vb_openai_api_key,
         base_url=x_vb_openai_base_url,
+        provider_name=x_vb_llm_provider,
     )
     result = run_json_task(
         task_name="analysis",
@@ -81,16 +81,20 @@ def analyze(
 @app.post("/ai/rag/compare", response_model=RagCompareResponse)
 def rag_compare(
     data: RagCompareRequest,
+    x_vb_llm_provider: str | None = Header(default=None),
     x_vb_openai_api_key: str | None = Header(default=None),
     x_vb_openai_base_url: str | None = Header(default=None),
+    x_vb_embedding_model: str | None = Header(default=None),
     x_vb_pinecone_api_key: str | None = Header(default=None),
     x_vb_pinecone_index_host: str | None = Header(default=None),
     x_vb_pinecone_index_name: str | None = Header(default=None),
     x_vb_pinecone_namespace: str | None = Header(default=None),
 ) -> RagCompareResponse:
     provider_overrides = build_rag_provider_overrides(
+        llm_provider=x_vb_llm_provider,
         openai_api_key=x_vb_openai_api_key,
         openai_base_url=x_vb_openai_base_url,
+        embedding_model=x_vb_embedding_model,
         pinecone_api_key=x_vb_pinecone_api_key,
         pinecone_index_host=x_vb_pinecone_index_host,
         pinecone_index_name=x_vb_pinecone_index_name,
@@ -115,13 +119,16 @@ def rag_compare(
 @app.post("/ai/score", response_model=ScoreResponse)
 def score(
     data: ScoreRequest,
+    x_vb_llm_provider: str | None = Header(default=None),
     x_vb_openai_api_key: str | None = Header(default=None),
     x_vb_openai_base_url: str | None = Header(default=None),
+    x_vb_score_model: str | None = Header(default=None),
 ) -> ScoreResponse:
-    model = route_score_model(data.metadata)
+    model = (x_vb_score_model or "").strip() or route_score_model(data.metadata)
     provider_overrides = build_provider_overrides(
         api_key=x_vb_openai_api_key,
         base_url=x_vb_openai_base_url,
+        provider_name=x_vb_llm_provider,
     )
     result = run_json_task(
         task_name="score",
@@ -147,3 +154,4 @@ def score(
         retries=result.retries,
         latency_ms=result.latency_ms,
     )
+

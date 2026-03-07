@@ -4,7 +4,7 @@ import { demoVideos } from "@/lib/mock-data";
 import { readDb, writeDb } from "@/lib/db";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { useSupabaseBackend } from "@/lib/supabase";
-import type { VideoDataSource, YoutubeVideo } from "@/lib/types";
+import type { CollectedViralItem, VideoDataSource, YoutubeVideo } from "@/lib/types";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -406,3 +406,123 @@ export async function fetchYoutubeData(url: string, options?: QueryOptions): Pro
 
   return saveVideo(current, options);
 }
+
+type CollectViralOptions = QueryOptions & {
+  hoursWithin: number;
+  minViews: number;
+  maxResults: number;
+  regionCode?: string | null;
+};
+
+function buildCollectedItem(video: YoutubeVideo): CollectedViralItem {
+  return {
+    id: `collect-${video.videoId}`,
+    videoId: video.videoId,
+    url: video.url,
+    title: video.title,
+    summary: video.description || `${video.channelName} · ${video.stats.viewCount.toLocaleString()} views`,
+    channelName: video.channelName,
+    publishedAt: video.publishedAt,
+    stats: video.stats,
+    thumbnailUrl: video.thumbnailUrl,
+    tags: {
+      hookType: video.stats.viewCount >= 1_000_000 ? "spike" : "emerging",
+      topic: "youtube-trending",
+      durationBucket: video.durationSec >= 600 ? "10m+" : video.durationSec >= 300 ? "5-10m" : "0-5m",
+    },
+    dataSource: video.dataSource,
+  };
+}
+
+async function fetchMostPopularVideos(apiKey: string, regionCode: string, maxResults: number): Promise<YoutubeApiVideoItem[]> {
+  const apiUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+  apiUrl.searchParams.set("part", "snippet,contentDetails,statistics");
+  apiUrl.searchParams.set("chart", "mostPopular");
+  apiUrl.searchParams.set("regionCode", regionCode || "US");
+  apiUrl.searchParams.set("maxResults", String(Math.min(50, Math.max(10, maxResults))));
+  apiUrl.searchParams.set("key", apiKey);
+
+  const payload = await fetchJson<YoutubeApiVideoResponse>(apiUrl.toString());
+  return payload.items ?? [];
+}
+
+function buildMockCollectedItems(input: { hoursWithin: number; minViews: number; maxResults: number }): CollectedViralItem[] {
+  const now = Date.now();
+  const candidates = Object.values(demoVideos).map((video, index) => ({
+    ...video,
+    publishedAt: new Date(now - Math.min(input.hoursWithin, 48) * 3600 * 1000 + index * 1800 * 1000).toISOString(),
+    stats: {
+      ...video.stats,
+      viewCount: Math.max(video.stats.viewCount, input.minViews + index * 25_000),
+    },
+  }));
+
+  return candidates
+    .filter((video) => video.stats.viewCount >= input.minViews)
+    .slice(0, input.maxResults)
+    .map((video) =>
+      buildCollectedItem({
+        id: crypto.randomUUID(),
+        ...video,
+        fetchedAt: new Date().toISOString(),
+      }),
+    );
+}
+
+export async function collectViralYoutubeItems(options: CollectViralOptions): Promise<CollectedViralItem[]> {
+  const hoursWithin = Math.min(168, Math.max(1, Math.floor(options.hoursWithin || 24)));
+  const minViews = Math.max(1000, Math.floor(options.minViews || 100_000));
+  const maxResults = Math.min(50, Math.max(1, Math.floor(options.maxResults || 10)));
+  const regionCode = (options.regionCode || "US").trim().toUpperCase() || "US";
+  const mode = resolveFetchMode();
+  const apiKey = (options.apiKeyOverride ?? process.env.YOUTUBE_API_KEY ?? "").trim();
+
+  if (!apiKey) {
+    return buildMockCollectedItems({ hoursWithin, minViews, maxResults });
+  }
+
+  try {
+    const publishedAfter = Date.now() - hoursWithin * 3600 * 1000;
+    const items = await fetchMostPopularVideos(apiKey, regionCode, Math.max(maxResults, 20));
+    const collected = items
+      .map((item) => {
+        const videoId = item.id;
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        const candidate: YoutubeVideo = {
+          id: crypto.randomUUID(),
+          videoId,
+          url,
+          title: item.snippet?.title ?? `Popular Video ${videoId}`,
+          description: item.snippet?.description ?? "",
+          channelId: item.snippet?.channelId ?? "",
+          channelName: item.snippet?.channelTitle ?? "Unknown channel",
+          publishedAt: item.snippet?.publishedAt ?? new Date().toISOString(),
+          durationSec: Math.max(1, parseIsoDurationToSeconds(item.contentDetails?.duration)),
+          stats: {
+            viewCount: toInt(item.statistics?.viewCount),
+            likeCount: toInt(item.statistics?.likeCount),
+            commentCount: toInt(item.statistics?.commentCount),
+          },
+          thumbnailUrl: pickThumbnail(item, videoId),
+          topComments: [],
+          dataSource: "youtube_api",
+          fetchedAt: new Date().toISOString(),
+        };
+        return candidate;
+      })
+      .filter((video) => new Date(video.publishedAt).getTime() >= publishedAfter && video.stats.viewCount >= minViews)
+      .slice(0, maxResults)
+      .map(buildCollectedItem);
+
+    if (collected.length > 0) {
+      return collected;
+    }
+  } catch (error) {
+    if (mode === "live") {
+      throw error;
+    }
+  }
+
+  return buildMockCollectedItems({ hoursWithin, minViews, maxResults });
+}
+
