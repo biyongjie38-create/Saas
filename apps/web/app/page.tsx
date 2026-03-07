@@ -95,12 +95,25 @@ export default async function HomePage() {
             "ViralBrain.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和自带 API 工作流统一到一个界面中。"
           )}
         </p>
+        <div className="qa-banner landing-demo-banner">
+          <strong>{text(lang, "Product preview mode", "产品预览模式")}</strong>
+          <p>
+            {text(
+              lang,
+              "The homepage is intentionally a marketing overview. It does not bind to live provider data. Real data paths currently exist in single-video analysis, viral collection, and BYOK connection tests.",
+              "首页本身是产品能力展示页，并不直接绑定实时数据源。当前真实接入主要覆盖单视频分析、爆款采集，以及用户自带 Key 的连接测试。"
+            )}
+          </p>
+        </div>
         <div className="hero-actions">
           <Link href="/dashboard/trends" className="btn btn-primary">
             {text(lang, "Discover Hot Trends", "发现热门趋势")}
           </Link>
           <Link href="/dashboard" className="btn btn-ghost">
             {text(lang, "Open Console", "进入控制台")}
+          </Link>
+          <Link href="/support#api-guide" className="btn btn-ghost">
+            {text(lang, "See API Setup Guide", "查看 API 配置教程")}
           </Link>
         </div>
       </section>

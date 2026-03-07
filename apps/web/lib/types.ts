@@ -155,8 +155,14 @@ export type MembershipOrder = {
   billingCycle: BillingCycle;
   status: MembershipOrderStatus;
   amountCny: number;
-  paymentProvider: "demo_checkout";
+  paymentProvider: "demo_checkout" | "stripe_checkout";
+  providerSessionId?: string | null;
+  providerCustomerId?: string | null;
+  providerSubscriptionId?: string | null;
+  providerPaymentIntentId?: string | null;
+  failureReason?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
   paidAt?: string | null;
 };
 

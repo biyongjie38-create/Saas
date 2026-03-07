@@ -100,11 +100,26 @@ create table if not exists membership_orders (
   status text not null check (status in ('pending', 'paid', 'failed', 'canceled')),
   amount_cny int not null default 0,
   payment_provider text not null default 'demo_checkout',
+  provider_session_id text,
+  provider_customer_id text,
+  provider_subscription_id text,
+  provider_payment_intent_id text,
+  failure_reason text,
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   paid_at timestamptz
 );
 
+alter table membership_orders add column if not exists provider_session_id text;
+alter table membership_orders add column if not exists provider_customer_id text;
+alter table membership_orders add column if not exists provider_subscription_id text;
+alter table membership_orders add column if not exists provider_payment_intent_id text;
+alter table membership_orders add column if not exists failure_reason text;
+alter table membership_orders add column if not exists updated_at timestamptz not null default now();
+
 create index if not exists idx_membership_orders_user_created on membership_orders(user_id, created_at desc);
+create unique index if not exists idx_membership_orders_provider_session_id on membership_orders(provider_session_id) where provider_session_id is not null;
+create index if not exists idx_membership_orders_provider_subscription_id on membership_orders(provider_subscription_id) where provider_subscription_id is not null;
 
 -- RLS
 alter table videos enable row level security;
@@ -212,6 +227,7 @@ with check (auth.uid() = user_id);
 -- Membership order policies
 drop policy if exists membership_orders_select_own on membership_orders;
 drop policy if exists membership_orders_insert_own on membership_orders;
+drop policy if exists membership_orders_update_own on membership_orders;
 
 create policy membership_orders_select_own on membership_orders
 for select
@@ -219,6 +235,11 @@ using (auth.uid() = user_id);
 
 create policy membership_orders_insert_own on membership_orders
 for insert
+with check (auth.uid() = user_id);
+
+create policy membership_orders_update_own on membership_orders
+for update
+using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
 -- Hard quota intercept for analyze usage (DB-level, concurrency-safe)

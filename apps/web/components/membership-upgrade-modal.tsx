@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -20,6 +20,7 @@ type Props = {
 type CheckoutResponse = {
   ok: boolean;
   data: {
+    checkoutUrl: string | null;
     message: string;
   } | null;
   error?: {
@@ -51,7 +52,7 @@ type Copy = {
   active: string;
   activating: string;
   close: string;
-  sandboxNote: string;
+  checkoutNote: string;
   success: string;
   failed: string;
   loginToUpgrade: string;
@@ -95,14 +96,14 @@ const copyByLang: Record<Lang, Copy> = {
       "Best annual price"
     ],
     current: "Current plan",
-    activate: "Upgrade to Pro",
+    activate: "Continue to secure checkout",
     active: "Already Pro",
-    activating: "Upgrading...",
+    activating: "Redirecting...",
     close: "Close",
-    sandboxNote:
-      "This is still a sandbox membership flow. It activates immediately and can later be replaced with a real payment provider.",
-    success: "Pro plan activated.",
-    failed: "Membership activation failed.",
+    checkoutNote:
+      "This upgrade now opens a real Stripe Checkout session. Access changes only after the payment session is verified.",
+    success: "Stripe checkout session created.",
+    failed: "Membership checkout failed.",
     loginToUpgrade: "Sign in to upgrade",
     loginHint: "Sign in first to activate a plan and save membership history."
   },
@@ -142,12 +143,12 @@ const copyByLang: Record<Lang, Copy> = {
       "更优年度价格"
     ],
     current: "当前套餐",
-    activate: "立即升级到 Pro",
+    activate: "前往安全支付",
     active: "当前已是 Pro",
-    activating: "升级中...",
+    activating: "跳转中...",
     close: "关闭",
-    sandboxNote: "当前仍是沙盒开通流程，确认后会立即生效，后续可直接替换成真实支付渠道。",
-    success: "专业版已开通。",
+    checkoutNote: "这里现在会创建真实 Stripe Checkout 支付会话。只有支付校验成功后，权限才会切换。",
+    success: "已创建 Stripe 支付会话。",
     failed: "会员开通失败。",
     loginToUpgrade: "登录后升级",
     loginHint: "先登录，再开通会员并保存你的套餐和订单记录。"
@@ -273,22 +274,27 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
         },
         body: JSON.stringify({
           plan: "pro",
-          billingCycle: nextCycle
+          billingCycle: nextCycle,
+          nextPath
         })
       });
 
       const payload = (await response.json().catch(() => null)) as CheckoutResponse | null;
-      if (!response.ok || !payload?.ok) {
+      if (!response.ok || !payload?.ok || !payload.data) {
         setError(payload?.error?.message ?? copy.failed);
         return;
       }
 
-      setMessage(copy.success);
+      if (payload.data.checkoutUrl) {
+        window.location.assign(payload.data.checkoutUrl);
+        return;
+      }
+
+      setMessage(payload.data.message || copy.success);
       router.refresh();
-      window.dispatchEvent(new Event("viralbrain:membership-refresh"));
       setTimeout(() => {
         onClose();
-      }, 800);
+      }, 500);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.failed);
     } finally {
@@ -356,7 +362,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
           ) : null}
           <div className="upgrade-footer-copy">
             <p className="small">{copy.billingHint}</p>
-            <p className="small">{copy.sandboxNote}</p>
+            <p className="small">{copy.checkoutNote}</p>
             {message ? <p className="small status-done">{message}</p> : null}
             {error ? <p className="small status-failed">{error}</p> : null}
           </div>

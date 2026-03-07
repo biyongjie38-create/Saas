@@ -1,4 +1,5 @@
-﻿import { createServerClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase-config";
 
@@ -36,4 +37,20 @@ export async function createServerSupabaseClient() {
     throw new Error("SUPABASE_AUTH_CONFIG_MISSING");
   }
   return client;
+}
+
+export function maybeCreateAdminSupabaseClient() {
+  const url = getSupabaseUrl();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
 }

@@ -147,6 +147,22 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function isTrendsRoute(pathname: string) {
+  return pathname === "/dashboard/trends" || pathname.startsWith("/dashboard/trends/");
+}
+
+function isConsoleRoute(pathname: string) {
+  return (
+    pathname === "/dashboard" ||
+    pathname === "/library" ||
+    pathname.startsWith("/library/") ||
+    pathname.startsWith("/dashboard/collector") ||
+    pathname.startsWith("/dashboard/integrations") ||
+    pathname.startsWith("/dashboard/reports") ||
+    pathname.startsWith("/report/")
+  );
+}
+
 export function SiteNavClient({ lang, user }: Props) {
   const copy = copyByLang[lang];
   const pathname = usePathname() ?? "/";
@@ -219,9 +235,9 @@ export function SiteNavClient({ lang, user }: Props) {
   function renderMenu(key: string, label: string, links: MenuLink[]) {
     const active =
       key === "trends"
-        ? pathname.startsWith("/dashboard/trends")
+        ? isTrendsRoute(pathname)
         : key === "console"
-          ? isActive(pathname, "/dashboard") || isActive(pathname, "/library")
+          ? isConsoleRoute(pathname)
           : isActive(pathname, "/support");
 
     return (

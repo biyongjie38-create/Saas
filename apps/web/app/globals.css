@@ -1653,6 +1653,20 @@ a {
   gap: 24px;
 }
 
+.landing-demo-banner,
+.trend-demo-banner {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.landing-demo-banner strong,
+.trend-demo-banner strong {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .support-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1674,6 +1688,47 @@ a {
 .faq-item strong {
   display: block;
   margin-bottom: 6px;
+}
+
+.support-guide-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.support-guide-head {
+  gap: 18px;
+  align-items: center;
+}
+
+.support-quick-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.support-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.support-guide-card {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.support-step-block {
+  display: grid;
+  gap: 10px;
+}
+
+.support-step-block strong {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .support-contact-card {
@@ -2090,6 +2145,7 @@ a {
   .landing-showcase,
   .landing-showcase-reverse,
   .support-grid,
+  .support-guide-grid,
   .support-contact-card,
   .site-footer,
   .upgrade-modal-grid,
@@ -2107,6 +2163,15 @@ a {
   .nav-main-links,
   .nav-utilities-rich {
     width: 100%;
+  }
+
+  .support-quick-actions {
+    justify-content: flex-start;
+  }
+
+  .support-guide-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .nav-utilities-rich {

@@ -19,6 +19,7 @@ This build uses Supabase Auth users (Google + Email Magic Link) and stores data 
 - Server writes now use user session + RLS (no service role dependency)
 - Bilingual UI switch (English/Chinese) via navbar toggle
 - Viral Library search + JSON/CSV import workflow
+- Stripe hosted membership checkout + webhook reconciliation
 
 ## Project Structure
 
@@ -52,6 +53,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # Optional server aliases (fallback)
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
+
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+
+# Optional: reuse Stripe recurring prices instead of inline price_data
+STRIPE_PRO_MONTHLY_PRICE_ID=
+STRIPE_PRO_YEARLY_PRICE_ID=
+STRIPE_CURRENCY=cny
 ```
 
 Create `apps/ai-service/.env` or export these vars before running FastAPI:
@@ -75,6 +84,7 @@ Notes:
 - `NEXT_PUBLIC_APP_URL` is optional. Leave empty to auto-use the current browser origin.
 - Set `NEXT_PUBLIC_APP_URL` only when you need to override localhost callback (for example, tunnel URL).
 - `SUPABASE_SERVICE_ROLE_KEY` is no longer required for current report/usage writes.
+- `SUPABASE_SERVICE_ROLE_KEY` becomes required when you want Stripe webhooks to reconcile paid subscriptions back into Supabase.
 - `DATA_BACKEND=supabase` is recommended.
 - `AI_PROVIDER=auto` means: try OpenAI first, then fall back to local deterministic logic.
 - `AI_PROVIDER=local` forces local fallback mode for analysis, benchmark retrieval, and score.
@@ -108,9 +118,12 @@ Localhost/LAN (`localhost`, `192.168.x.x`) only works on same device/network and
 3. Ensure tables exist: `videos`, `reports`, `usage_logs`, `viral_library_items`.
 4. Confirm trigger `usage_logs_daily_limit_guard` exists on `usage_logs` (hard quota intercept).
 5. Confirm RLS is enabled on these tables and policies are created.
-6. Re-run `supabase/schema.sql` after pulling latest changes so `viral_library_items` gets:
+6. Re-run `supabase/schema.sql` after pulling latest changes so:
+   - `viral_library_items` gets:
    - `embedding_key` unique index
    - authenticated insert/update policies for library import
+   - `membership_orders` gets Stripe columns (`provider_session_id`, `provider_subscription_id`, etc.)
+   - `membership_orders_update_own` policy exists for post-checkout reconciliation
 
 ## Run
 
@@ -175,6 +188,9 @@ python scripts/index_viral_library.py --index-host=... --namespace=viral-library
 - `POST /api/usage/consume` (requires auth)
 - `POST /api/youtube/fetch` (requires auth)
 - `POST /api/benchmarks` (requires auth)
+- `POST /api/membership/checkout` (requires auth, creates Stripe Checkout session)
+- `POST /api/membership/checkout/confirm` (requires auth, verifies a completed Stripe session)
+- `POST /api/membership/webhook/stripe` (Stripe webhook endpoint)
 
 ## Release QA
 
@@ -237,6 +253,8 @@ The dashboard and report pages now surface explicit fallback notices when:
 
 These notices are part of the release smoke flow so degraded behavior is visible to users instead of silently changing output quality.
 
-## Next Upgrades
+## Current Preview Limits
 
-- Stripe billing
+- `/` is intentionally a product overview page, not a live data dashboard.
+- `/dashboard/trends` still uses curated preview rows for hot videos/channels/topics.
+- Real/provider-backed paths currently exist in single-video fetch, viral collection, BYOK testing, and membership checkout.

@@ -28,6 +28,9 @@ type Copy = {
   kicker: string;
   title: string;
   intro: string;
+  demoDataTitle: string;
+  demoDataDesc: string;
+  demoDataAction: string;
   videos: string;
   channels: string;
   topics: string;
@@ -68,6 +71,10 @@ const copyByLang: Record<Lang, Copy> = {
     kicker: "Hot Trends",
     title: "Spot videos, channels, and topics worth following before everyone else.",
     intro: "Use ViralBrain.ai to monitor breakout momentum, build a reusable topic pipeline, and decide what to analyze next in your console.",
+    demoDataTitle: "Curated preview data",
+    demoDataDesc:
+      "The hot videos, channels, and topics on this page are currently curated sample rows from the product preview layer. Live provider access today covers single-video fetch, viral collection, and BYOK connection testing.",
+    demoDataAction: "Open API setup guide",
     videos: "Hot Videos",
     channels: "Hot Channels",
     topics: "Hot Topics",
@@ -106,6 +113,9 @@ const copyByLang: Record<Lang, Copy> = {
     kicker: "热门趋势",
     title: "先一步发现正在起量的视频、频道和主题，决定下一条内容该往哪做。",
     intro: "用 ViralBrain.ai 跟踪爆款趋势、沉淀选题池，并把趋势洞察直接带回控制台分析和素材运营。",
+    demoDataTitle: "当前是演示趋势样例",
+    demoDataDesc: "这个页面里的热门视频、频道和主题目前还是产品预览层的静态样例，还没接入实时趋势聚合数据源。当前真实接入主要覆盖单视频抓取、爆款采集，以及用户自带 Key 的连接测试。",
+    demoDataAction: "查看 API 配置教程",
     videos: "热门视频",
     channels: "热门频道",
     topics: "热门主题",
@@ -226,6 +236,13 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
           <span className="badge trends-kicker">{copy.kicker}</span>
           <h1>{copy.title}</h1>
           <p>{copy.intro}</p>
+          <div className="qa-banner trend-demo-banner">
+            <strong>{copy.demoDataTitle}</strong>
+            <p>{copy.demoDataDesc}</p>
+            <a className="btn btn-ghost compact-button" href="/support#api-guide">
+              {copy.demoDataAction}
+            </a>
+          </div>
         </div>
         <div className="trends-hero-side card panel">
           <p className="card-kicker">{copy.preview}</p>
