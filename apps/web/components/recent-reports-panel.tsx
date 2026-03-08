@@ -197,7 +197,17 @@ export function RecentReportsPanel({ lang, plan, initialReports }: Props) {
                   {copy.open}
                 </Link>
               </div>
-              <ReportActions lang={lang} plan={plan} reportId={report.id} compact onRerunCreated={() => void refreshReports()} />
+              <ReportActions
+                lang={lang}
+                plan={plan}
+                reportId={report.id}
+                shareToken={report.shareToken}
+                shareEnabledAt={report.shareEnabledAt}
+                shareExpiresAt={report.shareExpiresAt}
+                shareRevokedAt={report.shareRevokedAt}
+                compact
+                onRerunCreated={() => void refreshReports()}
+              />
             </article>
           ))}
         </div>
@@ -231,7 +241,16 @@ export function RecentReportsPanel({ lang, plan, initialReports }: Props) {
                   <Link href={`/report/${localizedPreview.report.id}`} className="btn btn-primary report-history-action" style={{ marginTop: 16 }}>
                     {copy.openFull}
                   </Link>
-                  <ReportActions lang={lang} plan={plan} reportId={localizedPreview.report.id} includePrint={false} />
+                  <ReportActions
+                    lang={lang}
+                    plan={plan}
+                    reportId={localizedPreview.report.id}
+                    shareToken={localizedPreview.report.shareToken}
+                    shareEnabledAt={localizedPreview.report.shareEnabledAt}
+                    shareExpiresAt={localizedPreview.report.shareExpiresAt}
+                    shareRevokedAt={localizedPreview.report.shareRevokedAt}
+                    includePrint={false}
+                  />
                 </aside>
 
                 <ReportTabs

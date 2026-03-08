@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { captureAnalyticsEvent } from "@/lib/analytics";
 import type { BillingCycle, MembershipOrder, User } from "@/lib/types";
 import type { Lang } from "@/lib/i18n-shared";
 
@@ -201,8 +202,13 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
     if (checkoutState === "cancelled") {
       setMessage("");
       setError(copy.cancelled);
+      captureAnalyticsEvent("membership_checkout_cancelled", {
+        entry_point: "membership_page",
+        lang,
+        billing_cycle: billingCycle
+      });
     }
-  }, [checkoutState, copy.activated, copy.cancelled]);
+  }, [billingCycle, checkoutState, copy.activated, copy.cancelled, lang]);
 
   useEffect(() => {
     if (checkoutState !== "success" || !sessionId || confirmedSessionRef.current === sessionId) {
@@ -231,7 +237,15 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         if (!response.ok || !payload?.ok || !payload.data) {
           if (!ignore) {
             setMessage("");
-            setError(payload?.error?.message ?? "Payment confirmation failed.");
+            const failureMessage = payload?.error?.message ?? "Payment confirmation failed.";
+            setError(failureMessage);
+            captureAnalyticsEvent("membership_checkout_failed", {
+              entry_point: "membership_page",
+              stage: "confirm",
+              lang,
+              billing_cycle: billingCycle,
+              reason: failureMessage
+            });
           }
           return;
         }
@@ -248,6 +262,13 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         }
         setError("");
         setMessage(copy.activated);
+        captureAnalyticsEvent("membership_checkout_confirmed", {
+          entry_point: "membership_page",
+          lang,
+          billing_cycle: confirmedData.order?.billingCycle ?? billingCycle,
+          order_id: confirmedData.order?.id ?? null,
+          plan: confirmedData.user.plan
+        });
         router.refresh();
 
         const params = new URLSearchParams();
@@ -259,7 +280,15 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
       } catch (cause) {
         if (!ignore) {
           setMessage("");
-          setError(cause instanceof Error ? cause.message : "Payment confirmation failed.");
+          const failureMessage = cause instanceof Error ? cause.message : "Payment confirmation failed.";
+          setError(failureMessage);
+          captureAnalyticsEvent("membership_checkout_failed", {
+            entry_point: "membership_page",
+            stage: "confirm",
+            lang,
+            billing_cycle: billingCycle,
+            reason: failureMessage
+          });
         }
       } finally {
         if (!ignore) {
@@ -279,6 +308,12 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
     setSubmitting(true);
     setError("");
     setMessage("");
+    captureAnalyticsEvent("membership_checkout_started", {
+      entry_point: "membership_page",
+      lang,
+      billing_cycle: billingCycle,
+      current_plan: currentUser.plan
+    });
 
     try {
       const response = await fetch("/api/membership/checkout", {
@@ -293,7 +328,15 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
       });
       const payload = (await response.json().catch(() => null)) as CheckoutResponse | null;
       if (!response.ok || !payload?.ok || !payload.data) {
-        setError(payload?.error?.message ?? "Checkout failed.");
+        const failureMessage = payload?.error?.message ?? "Checkout failed.";
+        setError(failureMessage);
+        captureAnalyticsEvent("membership_checkout_failed", {
+          entry_point: "membership_page",
+          stage: "create",
+          lang,
+          billing_cycle: billingCycle,
+          reason: failureMessage
+        });
         return;
       }
 
@@ -310,9 +353,24 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
 
       setCurrentUser(checkoutData.user);
       setMessage(checkoutData.message || copy.activated);
+      captureAnalyticsEvent("membership_checkout_confirmed", {
+        entry_point: "membership_page",
+        lang,
+        billing_cycle: billingCycle,
+        order_id: checkoutData.order?.id ?? null,
+        plan: checkoutData.user.plan
+      });
       router.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Checkout failed.");
+      const failureMessage = cause instanceof Error ? cause.message : "Checkout failed.";
+      setError(failureMessage);
+      captureAnalyticsEvent("membership_checkout_failed", {
+        entry_point: "membership_page",
+        stage: "create",
+        lang,
+        billing_cycle: billingCycle,
+        reason: failureMessage
+      });
     } finally {
       setSubmitting(false);
     }

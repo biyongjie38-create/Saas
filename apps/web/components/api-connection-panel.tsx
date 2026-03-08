@@ -87,9 +87,9 @@ const copyByLang: Record<Lang, Copy> = {
   en: {
     title: "Bring Your Own API Keys",
     subtitle:
-      "Users can connect their own platform credentials so data and model costs are billed to their own provider accounts.",
+      "Users connect their own platform credentials so data and model costs are billed to their own provider accounts. This commercial build defaults to BYOK.",
     storageHint:
-      "Keys are stored only in the current browser and attached to requests on demand. This MVP does not write secrets into your database.",
+      "Keys are stored only in the current browser and attached to requests on demand. Secrets are not written into your database unless you explicitly redesign for server-managed billing.",
     liveNow: "Live now",
     connected: "Connected",
     missing: "Not connected",
@@ -118,7 +118,7 @@ const copyByLang: Record<Lang, Copy> = {
     saved: "API configuration saved in this browser.",
     cleared: "Selected API fields were cleared from this browser.",
     empty: "No keys have been entered yet.",
-    activeNotice: "Requests automatically prefer your own connected APIs when available.",
+    activeNotice: "In BYOK mode, requests use only your connected APIs. Hybrid server-paid fallback must be enabled explicitly on apps/ai-service.",
     advancedLocked: "Domestic/custom LLM providers are available in Pro.",
     providerNote: "Provider note",
     testSummary: "Connection summary",

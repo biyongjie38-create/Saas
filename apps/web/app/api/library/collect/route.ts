@@ -6,9 +6,10 @@ import {
   unauthorizedJsonResponse
 } from "@/lib/auth";
 import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
+import { syncLibraryVectors } from "@/lib/library-vector-sync";
 import { assertPlanFeature } from "@/lib/plan-access";
 import { getPlanFeatures } from "@/lib/plan-features";
-import { importLibraryItems } from "@/lib/report-store";
+import { buildLibraryEmbeddingKey, importLibraryItems } from "@/lib/report-store";
 import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { collectViralYoutubeItems } from "@/lib/youtube";
@@ -71,16 +72,32 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   let libraryItems = null;
+  let vectorSync;
   if (parsed.data.autoImport) {
+    const importInputs = collected.map((item) => ({
+      title: item.title,
+      sourceUrl: item.url,
+      summary: item.summary,
+      tags: item.tags
+    }));
+
     libraryItems = await importLibraryItems(
-      collected.map((item) => ({
-        title: item.title,
-        sourceUrl: item.url,
-        summary: item.summary,
-        tags: item.tags
-      })),
+      importInputs,
       { supabaseClient }
     );
+
+    const importedKeys = new Set(importInputs.map((item) => buildLibraryEmbeddingKey(item)));
+    const syncedItems = libraryItems.filter((item) =>
+      importedKeys.has(
+        buildLibraryEmbeddingKey({
+          title: item.title,
+          sourceUrl: item.sourceUrl,
+          summary: item.summary,
+          tags: item.tags
+        })
+      )
+    );
+    vectorSync = await syncLibraryVectors(syncedItems, providerConfig);
   }
 
   return okJsonResponse(
@@ -88,6 +105,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
       collected,
       imported_count: parsed.data.autoImport ? collected.length : 0,
       items: libraryItems,
+      vector_sync: vectorSync,
       max_results_applied: maxResults
     },
     requestId

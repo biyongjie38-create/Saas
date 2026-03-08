@@ -36,6 +36,8 @@ create table if not exists reports (
   error_message text,
   share_token text,
   share_enabled_at timestamptz,
+  share_expires_at timestamptz,
+  share_revoked_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -43,11 +45,35 @@ create table if not exists reports (
 alter table reports add column if not exists error_message text;
 alter table reports add column if not exists share_token text;
 alter table reports add column if not exists share_enabled_at timestamptz;
+alter table reports add column if not exists share_expires_at timestamptz;
+alter table reports add column if not exists share_revoked_at timestamptz;
+
+update reports
+set share_expires_at = coalesce(share_enabled_at, now()) + interval '7 days'
+where share_token is not null
+  and share_revoked_at is null
+  and share_expires_at is null;
 
 create index if not exists idx_reports_user_created on reports(user_id, created_at desc);
 create index if not exists idx_reports_video_id on reports(video_id);
 create index if not exists idx_reports_score_total on reports(score_total desc);
 create unique index if not exists idx_reports_share_token on reports(share_token) where share_token is not null;
+create index if not exists idx_reports_share_expires_at on reports(share_expires_at);
+create index if not exists idx_reports_share_revoked_at on reports(share_revoked_at);
+
+create table if not exists report_share_access_logs (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references reports(id) on delete cascade,
+  share_token text not null,
+  accessed_at timestamptz not null default now(),
+  user_agent text,
+  referer text
+);
+
+create index if not exists idx_report_share_access_logs_report_accessed
+  on report_share_access_logs(report_id, accessed_at desc);
+create index if not exists idx_report_share_access_logs_token_accessed
+  on report_share_access_logs(share_token, accessed_at desc);
 
 create table if not exists viral_library_items (
   id uuid primary key default gen_random_uuid(),
@@ -124,6 +150,7 @@ create index if not exists idx_membership_orders_provider_subscription_id on mem
 -- RLS
 alter table videos enable row level security;
 alter table reports enable row level security;
+alter table report_share_access_logs enable row level security;
 alter table viral_library_items enable row level security;
 alter table usage_logs enable row level security;
 alter table user_profiles enable row level security;
@@ -160,7 +187,13 @@ using (auth.uid() = user_id);
 
 create policy reports_select_shared on reports
 for select
-using (share_token is not null);
+using (
+  share_token is not null
+  and share_enabled_at is not null
+  and share_revoked_at is null
+  and share_expires_at is not null
+  and share_expires_at > now()
+);
 
 create policy reports_insert_own on reports
 for insert
@@ -170,6 +203,19 @@ create policy reports_update_own on reports
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+drop policy if exists report_share_access_logs_select_own on report_share_access_logs;
+
+create policy report_share_access_logs_select_own on report_share_access_logs
+for select
+using (
+  exists (
+    select 1
+    from reports
+    where reports.id = report_share_access_logs.report_id
+      and reports.user_id = auth.uid()
+  )
+);
 
 -- Viral library policies (authenticated users can read/import/update/delete)
 drop policy if exists viral_library_select_authenticated on viral_library_items;

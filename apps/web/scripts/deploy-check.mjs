@@ -109,6 +109,16 @@ const recommended = [
 
 const missingRequired = required.filter((key) => !readEnv(key));
 const missingRecommended = recommended.filter((key) => !readEnv(key));
+const dataBackendMode = (readEnv("DATA_BACKEND") || "auto").toLowerCase();
+const stripeSecretKey = readEnv("STRIPE_SECRET_KEY");
+const stripeWebhookSecret = readEnv("STRIPE_WEBHOOK_SECRET");
+const supabaseServiceRoleKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
+const posthogKey = readEnv("NEXT_PUBLIC_POSTHOG_KEY");
+const posthogHost = readEnv("NEXT_PUBLIC_POSTHOG_HOST");
+
+const supabaseConfigured = Boolean(readEnv("NEXT_PUBLIC_SUPABASE_URL") && readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
+const usesSupabaseBackend = dataBackendMode === "supabase" || (dataBackendMode !== "mock" && supabaseConfigured);
+const stripeEnabled = Boolean(stripeSecretKey);
 
 console.log("ViralBrain deploy check");
 console.log("======================");
@@ -128,6 +138,25 @@ if (missingRecommended.length > 0) {
   for (const key of missingRecommended) {
     console.warn(`- ${key}`);
   }
+}
+
+if (stripeEnabled && !stripeWebhookSecret) {
+  console.error("STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is missing.");
+  process.exitCode = 1;
+}
+
+if (stripeEnabled && usesSupabaseBackend && !supabaseServiceRoleKey) {
+  console.error("Stripe billing is enabled with a Supabase backend, but SUPABASE_SERVICE_ROLE_KEY is missing.");
+  console.error("Stripe webhooks need a Supabase admin client to sync membership state.");
+  process.exitCode = 1;
+}
+
+if (posthogHost && !posthogKey) {
+  console.warn("NEXT_PUBLIC_POSTHOG_HOST is set but NEXT_PUBLIC_POSTHOG_KEY is missing. PostHog will stay disabled.");
+}
+
+if (posthogKey && !posthogHost) {
+  console.warn("NEXT_PUBLIC_POSTHOG_KEY is set without NEXT_PUBLIC_POSTHOG_HOST. The app will default to https://us.i.posthog.com.");
 }
 
 const appUrlRaw = readEnv("NEXT_PUBLIC_APP_URL");

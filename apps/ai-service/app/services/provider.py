@@ -53,6 +53,13 @@ def get_provider_mode() -> str:
     return "auto"
 
 
+def get_billing_mode() -> str:
+    value = os.getenv("AI_BILLING_MODE", "byok").strip().lower()
+    if value == "hybrid":
+        return "hybrid"
+    return "byok"
+
+
 def get_runtime_mode() -> str:
     value = (os.getenv("AI_RUNTIME_MODE") or os.getenv("APP_RUNTIME_MODE") or "preview").strip().lower()
     if value == "production":
@@ -68,6 +75,10 @@ def allow_local_fallbacks() -> bool:
     return not is_production_runtime_mode()
 
 
+def allow_server_provider_fallback() -> bool:
+    return get_billing_mode() == "hybrid"
+
+
 def _resolve_timeout() -> float:
     raw = os.getenv("OPENAI_TIMEOUT_SEC", "20").strip()
     try:
@@ -81,6 +92,8 @@ def _has_openai_credentials(overrides: ProviderOverrides | None = None) -> bool:
         return False
     if overrides and overrides.api_key:
         return True
+    if not allow_server_provider_fallback():
+        return False
     return bool(os.getenv("OPENAI_API_KEY"))
 
 
@@ -101,8 +114,15 @@ def _create_openai_client(overrides: ProviderOverrides | None = None) -> Any:
     if OpenAI is None:
         raise RuntimeError("OPENAI_SDK_MISSING")
 
-    api_key = overrides.api_key if overrides and overrides.api_key else os.getenv("OPENAI_API_KEY")
-    base_url = overrides.base_url if overrides and overrides.base_url else os.getenv("OPENAI_BASE_URL")
+    api_key = overrides.api_key if overrides and overrides.api_key else None
+    base_url = overrides.base_url if overrides and overrides.base_url else None
+
+    if allow_server_provider_fallback():
+        api_key = api_key or os.getenv("OPENAI_API_KEY")
+        base_url = base_url or os.getenv("OPENAI_BASE_URL")
+
+    if not api_key:
+        raise RuntimeError("AI_PROVIDER_CREDENTIALS_MISSING")
 
     kwargs: dict[str, Any] = {
         "api_key": api_key,

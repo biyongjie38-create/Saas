@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
+import { captureAnalyticsEvent } from "@/lib/analytics";
 import type { Lang } from "@/lib/i18n-shared";
 
 type QuotaDetails = {
@@ -54,8 +55,10 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     title: "Generate a Viral Report from YouTube URL",
     run: "Run Analysis",
     running: "Analyzing...",
-    demoHint: "If you configure your model provider below, this workspace will prefer your own API quota. Unknown links or unavailable providers still fall back to stable demo data.",
-    strictHint: "This workspace is running in production mode. It requires real YouTube and AI providers, and it will return explicit errors instead of mock or local fallback output.",
+    demoHint:
+      "If you configure your model provider below, this workspace will prefer your own API quota. Unknown links or unavailable providers still fall back to stable demo data.",
+    strictHint:
+      "This workspace is running in production mode. It requires real YouTube and AI providers, and it will return explicit errors instead of mock or local fallback output.",
     streaming: "Streaming Progress",
     viewReport: "View Report",
     analysisFailed: "Analysis failed",
@@ -157,18 +160,43 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
   }
 
   async function onAnalyze() {
+    const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    let failureTracked = false;
+
+    const trackFailure = (reason: string) => {
+      if (failureTracked) {
+        return;
+      }
+
+      failureTracked = true;
+      captureAnalyticsEvent("analysis_failed", {
+        reason,
+        lang,
+        strict_mode: strictMode
+      });
+    };
+
     setLoading(true);
     setStages([]);
     setReportId(null);
     setError(null);
     setNotices([]);
 
+    const providerConfig = readApiIntegrationConfigFromStorage();
+    captureAnalyticsEvent("analysis_started", {
+      lang,
+      strict_mode: strictMode,
+      has_llm_key: Boolean(providerConfig.openaiApiKey),
+      has_pinecone_key: Boolean(providerConfig.pineconeApiKey),
+      has_youtube_key: Boolean(providerConfig.youtubeApiKey)
+    });
+
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
+          ...buildApiIntegrationHeaders(providerConfig)
         },
         body: JSON.stringify({
           url,
@@ -182,7 +210,9 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
       }
 
       if (!response.ok) {
-        setError(await parseResponseError(response, copy));
+        const message = await parseResponseError(response, copy);
+        setError(message);
+        trackFailure(message);
         return;
       }
 
@@ -222,10 +252,30 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
 
           if (event.stage === "done") {
             const id = event.envelope.data?.reportId;
+            const source = typeof event.envelope.data?.source === "string" ? event.envelope.data.source : null;
+            const modelTrace = event.envelope.data?.modelTrace as
+              | {
+                  fallback_used?: unknown;
+                  totalLatencyMs?: unknown;
+                }
+              | undefined;
+
             if (typeof id === "string") {
               setReportId(id);
               window.dispatchEvent(new CustomEvent("viralbrain:reports-refresh"));
             }
+
+            captureAnalyticsEvent("analysis_completed", {
+              report_id: typeof id === "string" ? id : null,
+              source,
+              lang,
+              strict_mode: strictMode,
+              fallback_used: modelTrace?.fallback_used === true,
+              total_latency_ms:
+                typeof modelTrace?.totalLatencyMs === "number"
+                  ? modelTrace.totalLatencyMs
+                  : Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt)
+            });
 
             const fallbackUsed = event.envelope.data?.modelTrace;
             if (
@@ -246,15 +296,21 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
               typeof details?.used_today === "number" &&
               typeof details?.limit_per_day === "number"
             ) {
-              setError(`${message} (${details.used_today}/${details.limit_per_day})`);
+              const failureMessage = `${message} (${details.used_today}/${details.limit_per_day})`;
+              setError(failureMessage);
+              trackFailure(failureMessage);
             } else {
-              setError(typeof message === "string" ? message : copy.analysisFailed);
+              const failureMessage = typeof message === "string" ? message : copy.analysisFailed;
+              setError(failureMessage);
+              trackFailure(failureMessage);
             }
           }
         }
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.analysisFailed);
+      const failureMessage = cause instanceof Error ? cause.message : copy.analysisFailed;
+      setError(failureMessage);
+      trackFailure(failureMessage);
     } finally {
       setLoading(false);
     }

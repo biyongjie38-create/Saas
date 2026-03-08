@@ -30,7 +30,11 @@ export function toUserFacingRuntimeMessage(error: unknown): string {
   }
 
   if (message === "AI_PROVIDER_CREDENTIALS_MISSING") {
-    return "Missing model provider credentials. Configure an OpenAI-compatible API key and base URL for the AI service.";
+    return "Missing model provider credentials. In BYOK mode, connect your own OpenAI-compatible key in the browser. In hybrid mode, set OPENAI_API_KEY on apps/ai-service.";
+  }
+
+  if (message === "RAG_PROVIDER_CREDENTIALS_MISSING") {
+    return "Missing embedding or Pinecone credentials. In BYOK mode, connect your own OpenAI-compatible embedding key and Pinecone key in the browser. In hybrid mode, set them on apps/ai-service.";
   }
 
   if (message === "AI_PROVIDER_REQUEST_FAILED") {

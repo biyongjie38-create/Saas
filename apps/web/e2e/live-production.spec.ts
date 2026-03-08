@@ -32,25 +32,30 @@ test("production mode uses real services instead of mock fallback", async ({ pag
   const errorMessage = page.getByTestId("analysis-error");
 
   await Promise.race([
-    reportButton.waitFor({ state: "visible", timeout: 90_000 }).catch(() => null),
-    errorMessage.waitFor({ state: "visible", timeout: 90_000 }).catch(() => null),
-  ]);
+    reportButton.waitFor({ state: "visible", timeout: 90_000 }),
+    errorMessage.waitFor({ state: "visible", timeout: 90_000 })
+  ]).catch(() => null);
 
   if (await errorMessage.isVisible().catch(() => false)) {
     const text = (await errorMessage.innerText()).trim();
     test.info().annotations.push({ type: "production-error", description: text });
-    expect(text).not.toMatch(/mock|fallback|local::|演示数据|兜底/i);
-  } else {
-    await expect(reportButton).toBeVisible();
-
-    const notices = page.getByTestId("analysis-notices");
-    if (await notices.isVisible().catch(() => false)) {
-      const text = await notices.innerText();
-      expect(text).not.toMatch(/mock|fallback|演示数据|兜底/i);
-    }
+    throw new Error(`Production smoke failed before report creation: ${text}`);
   }
+
+  await expect(reportButton).toBeVisible();
+  await expect(page.getByTestId("analysis-notices")).toHaveCount(0);
+
+  await reportButton.click();
+  await expect(page).toHaveURL(/\/report\//);
+  await expect(page.getByTestId("report-tabs")).toBeVisible();
+  await expect(page.getByTestId("report-notices")).toHaveCount(0);
+  await expect(page.getByText(/Source: Live API|来源: 实时 API/)).toBeVisible();
+
+  await page.getByRole("button", { name: /Playbook|方案/ }).click();
+  await expect(page.getByText(/Provider: local|提供方: local/)).toHaveCount(0);
+  await expect(page.getByText(/Fallback: Yes|兜底: 是/)).toHaveCount(0);
 
   await page.goto("/dashboard/trends");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByText(/Fallback preview feed|样例回退数据/)).toHaveCount(0);
+  await expect(page.getByText(/Fallback preview feed|鏍蜂緥鍥為€€鏁版嵁/)).toHaveCount(0);
 });

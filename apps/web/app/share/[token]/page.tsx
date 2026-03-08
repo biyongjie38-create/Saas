@@ -1,10 +1,11 @@
-﻿import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { SiteNav } from "@/components/site-nav";
 import { ReportTabs } from "@/components/report-tabs";
 import { getServerLang, text } from "@/lib/i18n";
 import { localizeAnalysisJson, localizeBenchmarksJson, localizeScoreJson } from "@/lib/report-localize";
-import { getReportByShareToken } from "@/lib/report-store";
-import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
+import { getReportByShareToken, recordReportShareAccess } from "@/lib/report-store";
+import { maybeCreateAdminSupabaseClient, maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
 
 type Props = {
@@ -29,6 +30,18 @@ export default async function SharedReportPage({ params }: Props) {
 
   if (!report) {
     notFound();
+  }
+
+  const headerStore = await headers();
+  const adminSupabaseClient = maybeCreateAdminSupabaseClient();
+  if (adminSupabaseClient) {
+    await recordReportShareAccess(report.id, token, {
+      supabaseClient: adminSupabaseClient,
+      userAgent: headerStore.get("user-agent"),
+      referer: headerStore.get("referer")
+    }).catch(() => {
+      // Ignore audit write failures so a valid shared report still renders.
+    });
   }
 
   const video = await getVideoByVideoId(report.videoId, { supabaseClient });
@@ -75,4 +88,3 @@ export default async function SharedReportPage({ params }: Props) {
     </main>
   );
 }
-

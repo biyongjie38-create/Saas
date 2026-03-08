@@ -8,7 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from app.schemas import RagCompareRequest
-from app.services.provider import ModelExecution, allow_local_fallbacks, get_provider_mode
+from app.services.provider import (
+    ModelExecution,
+    allow_local_fallbacks,
+    allow_server_provider_fallback,
+    get_provider_mode,
+)
 
 try:
     from openai import OpenAI
@@ -258,13 +263,18 @@ def _create_openai_client(provider_overrides: dict[str, str] | None = None) -> A
     if not provider_overrides or not (
         provider_overrides.get("openai_api_key") or provider_overrides.get("openai_base_url")
     ):
+        if not allow_server_provider_fallback():
+            raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING")
         return _get_openai_client()
 
     kwargs: dict[str, Any] = {
-        "api_key": provider_overrides.get("openai_api_key") or os.getenv("OPENAI_API_KEY"),
+        "api_key": provider_overrides.get("openai_api_key") or (os.getenv("OPENAI_API_KEY") if allow_server_provider_fallback() else None),
         "max_retries": 0,
     }
-    base_url = provider_overrides.get("openai_base_url") or os.getenv("OPENAI_BASE_URL")
+    if not kwargs["api_key"]:
+        raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING")
+
+    base_url = provider_overrides.get("openai_base_url") or (os.getenv("OPENAI_BASE_URL") if allow_server_provider_fallback() else None)
     if base_url:
         kwargs["base_url"] = base_url
     return OpenAI(**kwargs)
@@ -281,9 +291,12 @@ def _get_pinecone_index() -> Any:
     if Pinecone is None:
         raise RuntimeError("PINECONE_SDK_MISSING")
 
+    if not allow_server_provider_fallback():
+        raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING")
+
     api_key = os.getenv("PINECONE_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("PINECONE_API_KEY_MISSING")
+        raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING")
 
     host = os.getenv("PINECONE_INDEX_HOST", "").strip()
     index_name = os.getenv("PINECONE_INDEX_NAME", "").strip()
@@ -308,17 +321,19 @@ def _create_pinecone_index(provider_overrides: dict[str, str] | None = None) -> 
         or provider_overrides.get("pinecone_index_host")
         or provider_overrides.get("pinecone_index_name")
     ):
+        if not allow_server_provider_fallback():
+            raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING")
         return _get_pinecone_index()
 
     if Pinecone is None:
         raise RuntimeError("PINECONE_SDK_MISSING")
 
-    api_key = provider_overrides.get("pinecone_api_key") or os.getenv("PINECONE_API_KEY", "").strip()
+    api_key = provider_overrides.get("pinecone_api_key") or (os.getenv("PINECONE_API_KEY", "").strip() if allow_server_provider_fallback() else "")
     if not api_key:
-        raise RuntimeError("PINECONE_API_KEY_MISSING")
+        raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING")
 
-    host = provider_overrides.get("pinecone_index_host") or os.getenv("PINECONE_INDEX_HOST", "").strip()
-    index_name = provider_overrides.get("pinecone_index_name") or os.getenv("PINECONE_INDEX_NAME", "").strip()
+    host = provider_overrides.get("pinecone_index_host") or (os.getenv("PINECONE_INDEX_HOST", "").strip() if allow_server_provider_fallback() else "")
+    index_name = provider_overrides.get("pinecone_index_name") or (os.getenv("PINECONE_INDEX_NAME", "").strip() if allow_server_provider_fallback() else "")
 
     pc = Pinecone(api_key=api_key)
 
@@ -447,6 +462,8 @@ def run_benchmark_retrieval(
         )
     except Exception as exc:
         if not allow_local_fallbacks():
+            if str(exc).strip() == "RAG_PROVIDER_CREDENTIALS_MISSING":
+                raise RuntimeError("RAG_PROVIDER_CREDENTIALS_MISSING") from exc
             raise RuntimeError("RAG_PROVIDER_REQUEST_FAILED") from exc
         print(f"[ai-service][rag] Pinecone retrieval failed, falling back to local similarity: {exc}")
         return _build_local_execution(mode, data, started)

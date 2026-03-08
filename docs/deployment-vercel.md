@@ -24,9 +24,21 @@ In your deployment platform, set:
 - `NEXT_PUBLIC_APP_URL` (recommended): `https://your-domain.com`
 - `DATA_BACKEND=supabase`
 
+If you enable Stripe billing, also set these server-only env vars in the web app:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_PRO_MONTHLY_PRICE_ID` (optional)
+- `STRIPE_PRO_YEARLY_PRICE_ID` (optional)
+- `STRIPE_CURRENCY` (optional, defaults to `cny`)
+
+`SUPABASE_SERVICE_ROLE_KEY` is required because the Stripe webhook uses an admin Supabase client to update membership state after checkout and subscription events. Never expose this key in client-side env vars.
+
 For the FastAPI AI service, set:
 
 - `AI_PROVIDER=auto`
+- `AI_BILLING_MODE=byok` (recommended) or `AI_BILLING_MODE=hybrid`
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL` (optional)
 - `OPENAI_ANALYSIS_MODEL` (optional)
@@ -35,6 +47,31 @@ For the FastAPI AI service, set:
 - `PINECONE_API_KEY`
 - `PINECONE_INDEX_HOST` or `PINECONE_INDEX_NAME`
 - `PINECONE_NAMESPACE` (optional, default `viral-library`)
+
+Recommended commercial boundary:
+
+- `AI_BILLING_MODE=byok`: user-provided browser keys are required for model and Pinecone calls; server env keys are not used as a hidden fallback.
+- `AI_BILLING_MODE=hybrid`: the platform may spend its own `OPENAI_*` and `PINECONE_*` credentials when the user does not provide BYOK values.
+
+Optional observability envs:
+
+- Web: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, `SENTRY_ENVIRONMENT`, `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_TRACES_SAMPLE_RATE`
+- Web source maps (optional): `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`
+- AI Service: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`
+- Product analytics: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`)
+
+Recommended PostHog setup:
+
+- Create a PostHog project and copy the Web SDK project API key into `NEXT_PUBLIC_POSTHOG_KEY`.
+- Use the region host that matches your PostHog project:
+  - US cloud: `https://us.i.posthog.com`
+  - EU cloud: `https://eu.i.posthog.com`
+- ViralBrain now tracks the main product funnel:
+  - analysis started / completed / failed
+  - membership checkout started / confirmed / cancelled / failed
+  - share link created / revoked
+  - report rerun started / completed / failed
+  - PDF export success / failure
 
 ## 3) Prepare Pinecone benchmark index
 
@@ -89,6 +126,7 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 - Run one analysis and open report detail
 - Confirm report page shows model/provider/token/latency trace
 - Confirm benchmark trace shows `openai+pinecone` when Pinecone is configured
+- Complete one Stripe test checkout and confirm the webhook endpoint `https://your-domain.com/api/membership/webhook/stripe` updates the user's membership state
 
 ## Notes
 
@@ -96,6 +134,7 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 - For production traffic, always use HTTPS domain.
 - `AI_PROVIDER=auto` will try OpenAI first and fall back to local logic if the model call fails.
 - If Pinecone config is missing, benchmark retrieval automatically falls back to local similarity ranking.
+- If `STRIPE_SECRET_KEY` is set while `DATA_BACKEND=supabase`, `SUPABASE_SERVICE_ROLE_KEY` must also be set or Stripe webhooks will return `503`.
 
 ## 8) Common Vercel Domain Errors
 

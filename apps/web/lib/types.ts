@@ -126,8 +126,24 @@ export type Report = {
   errorMessage?: string;
   shareToken?: string | null;
   shareEnabledAt?: string | null;
+  shareExpiresAt?: string | null;
+  shareRevokedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ReportShareAccessLog = {
+  id: string;
+  reportId: string;
+  shareToken: string;
+  accessedAt: string;
+  userAgent?: string | null;
+  referer?: string | null;
+};
+
+export type ReportShareAuditSummary = {
+  accessCount: number;
+  lastAccessedAt: string | null;
 };
 
 export type UsageLog = {
@@ -199,6 +215,7 @@ export type MockDb = {
   users: User[];
   videos: YoutubeVideo[];
   reports: Report[];
+  reportShareAccessLogs: ReportShareAccessLog[];
   usageLogs: UsageLog[];
   library: ViralLibraryItem[];
   membershipOrders: MembershipOrder[];

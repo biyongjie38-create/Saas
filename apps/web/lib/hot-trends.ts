@@ -53,6 +53,7 @@ type YoutubeApiChannelResponse = {
 type FetchOptions = {
   apiKeyOverride?: string | null;
   regionCode?: string | null;
+  allowServerKeyFallback?: boolean;
 };
 
 const STOP_WORDS = new Set([
@@ -354,7 +355,9 @@ function buildVideoRows(items: YoutubeApiVideoItem[]): TrendVideoRow[] {
 }
 
 export async function fetchHotTrendsDataset(options?: FetchOptions): Promise<HotTrendsDataset> {
-  const apiKey = (options?.apiKeyOverride || process.env.YOUTUBE_API_KEY || "").trim();
+  const apiKeyOverride = (options?.apiKeyOverride || "").trim();
+  const serverApiKey = options?.allowServerKeyFallback === false ? "" : (process.env.YOUTUBE_API_KEY || "").trim();
+  const apiKey = apiKeyOverride || serverApiKey;
   const regionCode = (options?.regionCode ?? "US").trim().toUpperCase() || "US";
 
   if (!apiKey) {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { captureAnalyticsEvent } from "@/lib/analytics";
 import type { BillingCycle, UserPlan } from "@/lib/types";
 import type { Lang } from "@/lib/i18n-shared";
 
@@ -265,6 +266,12 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
     setSubmitting(true);
     setError("");
     setMessage("");
+    captureAnalyticsEvent("membership_checkout_started", {
+      entry_point: "upgrade_modal",
+      lang,
+      billing_cycle: nextCycle,
+      current_plan: plan
+    });
 
     try {
       const response = await fetch("/api/membership/checkout", {
@@ -281,7 +288,15 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
 
       const payload = (await response.json().catch(() => null)) as CheckoutResponse | null;
       if (!response.ok || !payload?.ok || !payload.data) {
-        setError(payload?.error?.message ?? copy.failed);
+        const failureMessage = payload?.error?.message ?? copy.failed;
+        setError(failureMessage);
+        captureAnalyticsEvent("membership_checkout_failed", {
+          entry_point: "upgrade_modal",
+          stage: "create",
+          lang,
+          billing_cycle: nextCycle,
+          reason: failureMessage
+        });
         return;
       }
 
@@ -291,12 +306,26 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
       }
 
       setMessage(payload.data.message || copy.success);
+      captureAnalyticsEvent("membership_checkout_confirmed", {
+        entry_point: "upgrade_modal",
+        lang,
+        billing_cycle: nextCycle,
+        plan: "pro"
+      });
       router.refresh();
       setTimeout(() => {
         onClose();
       }, 500);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.failed);
+      const failureMessage = cause instanceof Error ? cause.message : copy.failed;
+      setError(failureMessage);
+      captureAnalyticsEvent("membership_checkout_failed", {
+        entry_point: "upgrade_modal",
+        stage: "create",
+        lang,
+        billing_cycle: nextCycle,
+        reason: failureMessage
+      });
     } finally {
       setSubmitting(false);
     }

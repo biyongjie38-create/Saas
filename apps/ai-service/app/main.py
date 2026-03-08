@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI, Header, HTTPException
 
+from app.monitoring import init_sentry
 from app.runtime_env import load_runtime_env
 from app.schemas import (
     AnalysisPayload,
@@ -25,7 +26,7 @@ from app.services.analysis import (
     build_analysis_user_prompt,
 )
 from app.services.model_router import route_analysis_model, route_score_model
-from app.services.provider import build_provider_overrides, run_json_task
+from app.services.provider import build_provider_overrides, get_billing_mode, run_json_task
 from app.services.rag import (
     build_rag_provider_overrides,
     delete_library_index,
@@ -39,6 +40,7 @@ from app.services.scoring import (
 )
 
 load_runtime_env()
+init_sentry()
 
 app = FastAPI(title="ViralBrain AI Service", version="0.4.0")
 
@@ -46,6 +48,7 @@ SERVICE_RUNTIME_ERRORS = {
     "AI_PROVIDER_LOCAL_MODE_DISABLED",
     "AI_PROVIDER_CREDENTIALS_MISSING",
     "AI_PROVIDER_REQUEST_FAILED",
+    "RAG_PROVIDER_CREDENTIALS_MISSING",
     "RAG_PROVIDER_REQUEST_FAILED",
 }
 
@@ -59,7 +62,7 @@ def raise_service_error(error: Exception) -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True}
+    return {"ok": True, "billing_mode": get_billing_mode()}
 
 
 @app.post("/ai/analyze", response_model=AnalyzeResponse)
@@ -169,7 +172,10 @@ def rag_index(
         pinecone_index_name=x_vb_pinecone_index_name,
         pinecone_namespace=x_vb_pinecone_namespace,
     )
-    result = upsert_library_index([item.model_dump() for item in data.items], provider_overrides)
+    try:
+        result = upsert_library_index([item.model_dump() for item in data.items], provider_overrides)
+    except Exception as error:
+        raise_service_error(error)
     return RagIndexResponse(**result)
 
 
@@ -195,7 +201,10 @@ def rag_delete(
         pinecone_index_name=x_vb_pinecone_index_name,
         pinecone_namespace=x_vb_pinecone_namespace,
     )
-    result = delete_library_index(data.ids, provider_overrides)
+    try:
+        result = delete_library_index(data.ids, provider_overrides)
+    except Exception as error:
+        raise_service_error(error)
     return RagDeleteResponse(**result)
 
 

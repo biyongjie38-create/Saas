@@ -16,6 +16,11 @@ type CollectResponse = {
     collected: CollectedViralItem[];
     imported_count: number;
     max_results_applied: number;
+    vector_sync?: {
+      ok: boolean;
+      message: string;
+      detail?: string;
+    };
   } | null;
   error?: {
     message?: string;
@@ -93,7 +98,14 @@ export function ViralCollectorPanel({ lang, plan }: Props) {
       }
 
       setCollectPreview(payload.data.collected);
-      setMessage(`${copy.loaded} ${payload.data.imported_count} ${copy.items}`);
+      setMessage(
+        [
+          `${copy.loaded} ${payload.data.imported_count} ${copy.items}`,
+          payload.data.vector_sync?.message ?? ""
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
       window.dispatchEvent(new Event("viralbrain:library-refresh"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.failed);

@@ -11,6 +11,7 @@ import { normalizeUserIdForBackend, useSupabaseBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type {
   Report,
+  ReportShareAuditSummary,
   ReportStatus,
   UsageLog,
   User,
@@ -36,8 +37,19 @@ type ReportRow = {
   error_message?: string | null;
   share_token?: string | null;
   share_enabled_at?: string | null;
+  share_expires_at?: string | null;
+  share_revoked_at?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type ReportShareAccessLogRow = {
+  id: string;
+  report_id: string;
+  share_token: string;
+  accessed_at: string;
+  user_agent?: string | null;
+  referer?: string | null;
 };
 
 type LibraryRow = {
@@ -58,6 +70,8 @@ export type LibraryImportInput = {
   tags?: Partial<ViralLibraryItem["tags"]>;
 };
 
+const REPORT_SHARE_TTL_HOURS = 24 * 7;
+
 function toReport(row: ReportRow): Report {
   return {
     id: row.id,
@@ -72,9 +86,25 @@ function toReport(row: ReportRow): Report {
     errorMessage: row.error_message ?? undefined,
     shareToken: row.share_token ?? null,
     shareEnabledAt: row.share_enabled_at ?? null,
+    shareExpiresAt: row.share_expires_at ?? null,
+    shareRevokedAt: row.share_revoked_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function resolveReportShareExpiresAt(ttlHours = REPORT_SHARE_TTL_HOURS) {
+  const safeTtlHours = Math.max(1, Math.floor(ttlHours));
+  return new Date(Date.now() + safeTtlHours * 3600_000).toISOString();
+}
+
+function isReportShareActive(report: Pick<Report, "shareToken" | "shareEnabledAt" | "shareExpiresAt" | "shareRevokedAt">) {
+  if (!report.shareToken || !report.shareEnabledAt || !report.shareExpiresAt || report.shareRevokedAt) {
+    return false;
+  }
+
+  const expiresAt = new Date(report.shareExpiresAt).getTime();
+  return Number.isFinite(expiresAt) && expiresAt > Date.now();
 }
 
 function parseUsageLimitDetails(raw: unknown): {
@@ -156,6 +186,8 @@ export async function createReport(
       model_trace: null,
       share_token: null,
       share_enabled_at: null,
+      share_expires_at: null,
+      share_revoked_at: null,
       created_at: now,
       updated_at: now
     };
@@ -186,6 +218,8 @@ export async function createReport(
     modelTrace: null,
     shareToken: null,
     shareEnabledAt: null,
+    shareExpiresAt: null,
+    shareRevokedAt: null,
     createdAt: now,
     updatedAt: now
   };
@@ -232,6 +266,12 @@ export async function updateReport(
     }
     if (patch.shareEnabledAt !== undefined) {
       payload.share_enabled_at = patch.shareEnabledAt;
+    }
+    if (patch.shareExpiresAt !== undefined) {
+      payload.share_expires_at = patch.shareExpiresAt;
+    }
+    if (patch.shareRevokedAt !== undefined) {
+      payload.share_revoked_at = patch.shareRevokedAt;
     }
 
     const { data, error } = await client
@@ -316,31 +356,140 @@ export async function getReportByShareToken(
   }
 
   const db = await readDb();
-  return db.reports.find((item) => item.shareToken === shareToken) ?? null;
+  return db.reports.find((item) => item.shareToken === shareToken && isReportShareActive(item)) ?? null;
 }
 
 export async function enableReportShare(
   reportId: string,
   userId: string,
-  options?: QueryOptions
+  options?: QueryOptions & { ttlHours?: number }
 ): Promise<Report | null> {
   const report = await getReportById(reportId, userId, options);
   if (!report) {
     return null;
   }
 
-  if (report.shareToken && report.shareEnabledAt) {
+  const now = new Date().toISOString();
+  const keepExistingToken = isReportShareActive(report) && report.shareToken;
+
+  return updateReport(
+    reportId,
+    {
+      shareToken: keepExistingToken ? report.shareToken : crypto.randomUUID(),
+      shareEnabledAt: now,
+      shareExpiresAt: resolveReportShareExpiresAt(options?.ttlHours),
+      shareRevokedAt: null
+    },
+    options
+  );
+}
+
+export async function disableReportShare(
+  reportId: string,
+  userId: string,
+  options?: QueryOptions
+): Promise<Report | null> {
+  const report = await getReportById(reportId, userId, options);
+  if (!report || !report.shareToken || !report.shareEnabledAt || report.shareRevokedAt) {
     return report;
   }
 
   return updateReport(
     reportId,
     {
-      shareToken: report.shareToken ?? crypto.randomUUID(),
-      shareEnabledAt: report.shareEnabledAt ?? new Date().toISOString()
+      shareRevokedAt: new Date().toISOString()
     },
     options
   );
+}
+
+export async function recordReportShareAccess(
+  reportId: string,
+  shareToken: string,
+  metadata?: {
+    userAgent?: string | null;
+    referer?: string | null;
+    supabaseClient?: SupabaseClient | null;
+  }
+): Promise<void> {
+  if (useSupabaseBackend()) {
+    const client = metadata?.supabaseClient;
+    if (!client) {
+      return;
+    }
+
+    const { error } = await client.from("report_share_access_logs").insert({
+      report_id: reportId,
+      share_token: shareToken,
+      user_agent: metadata?.userAgent?.trim() || null,
+      referer: metadata?.referer?.trim() || null
+    });
+
+    if (error) {
+      throw new Error(`SUPABASE_RECORD_SHARE_ACCESS_FAILED:${error.message}`);
+    }
+    return;
+  }
+
+  const db = await readDb();
+  const report = db.reports.find((item) => item.id === reportId && item.shareToken === shareToken);
+  if (!report || !isReportShareActive(report)) {
+    return;
+  }
+
+  db.reportShareAccessLogs.unshift({
+    id: crypto.randomUUID(),
+    reportId,
+    shareToken,
+    accessedAt: new Date().toISOString(),
+    userAgent: metadata?.userAgent?.trim() || null,
+    referer: metadata?.referer?.trim() || null
+  });
+  await writeDb(db);
+}
+
+export async function getReportShareAuditSummary(
+  reportId: string,
+  options?: QueryOptions
+): Promise<ReportShareAuditSummary> {
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const [{ count, error: countError }, { data, error: lastError }] = await Promise.all([
+      client
+        .from("report_share_access_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("report_id", reportId),
+      client
+        .from("report_share_access_logs")
+        .select("accessed_at")
+        .eq("report_id", reportId)
+        .order("accessed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<Pick<ReportShareAccessLogRow, "accessed_at">>()
+    ]);
+
+    if (countError) {
+      throw new Error(`SUPABASE_REPORT_SHARE_AUDIT_COUNT_FAILED:${countError.message}`);
+    }
+    if (lastError) {
+      throw new Error(`SUPABASE_REPORT_SHARE_AUDIT_LAST_FAILED:${lastError.message}`);
+    }
+
+    return {
+      accessCount: count ?? 0,
+      lastAccessedAt: data?.accessed_at ?? null
+    };
+  }
+
+  const db = await readDb();
+  const matchingLogs = db.reportShareAccessLogs
+    .filter((item) => item.reportId === reportId)
+    .sort((left, right) => +new Date(right.accessedAt) - +new Date(left.accessedAt));
+
+  return {
+    accessCount: matchingLogs.length,
+    lastAccessedAt: matchingLogs[0]?.accessedAt ?? null
+  };
 }
 
 export async function listReports(

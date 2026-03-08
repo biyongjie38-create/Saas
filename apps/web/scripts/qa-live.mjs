@@ -52,6 +52,8 @@ spawnManaged("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", 
   cwd: aiDir,
   env: {
     ...process.env,
+    APP_RUNTIME_MODE: "production",
+    AI_RUNTIME_MODE: "production",
   },
 });
 
