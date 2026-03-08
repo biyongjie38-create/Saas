@@ -19,6 +19,8 @@
     "@sentry/nextjs": "^10.42.0",
     "@supabase/ssr": "0.5.2",
     "@supabase/supabase-js": "2.57.4",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.36.3",
     "next": "15.5.12",
     "pdf-lib": "^1.17.1",
     "posthog-js": "^1.359.1",

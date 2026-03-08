@@ -3,6 +3,7 @@ import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { getApiAuthUser } from "@/lib/auth";
 import { fetchHotTrendsDataset } from "@/lib/hot-trends";
 import { getFallbackHotTrendsDataset } from "@/lib/hot-trends-data";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
 
 export const runtime = "nodejs";
@@ -13,6 +14,22 @@ export const GET = withApiRoute(async (request, { requestId }) => {
   const authUser = await getApiAuthUser();
   const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
   const hasUserYoutubeKey = Boolean(providerConfig.youtubeApiKey?.trim());
+  const rateLimitDecision = await enforceRateLimit({
+    request,
+    requestId,
+    namespace: "hot-trends",
+    userId: authUser?.id,
+    maxRequests: authUser ? (hasUserYoutubeKey ? 120 : 30) : hasUserYoutubeKey ? 60 : 20,
+    window: {
+      label: "10 m",
+      ms: 10 * 60 * 1000
+    },
+    message: "Too many hot trend requests. Please wait a few minutes and try again."
+  });
+
+  if (!rateLimitDecision.allowed) {
+    return rateLimitDecision.response;
+  }
 
   if (!authUser && !hasUserYoutubeKey) {
     return okJsonResponse(

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
+import { SupportContactForm } from "@/components/support-contact-form";
 import { SiteNav } from "@/components/site-nav";
 import { getServerLang, text } from "@/lib/i18n";
 import { SUPPORT_EMAIL, buildSupportMailto } from "@/lib/support-contact";
@@ -15,8 +16,14 @@ type GuideCard = {
   note: string;
 };
 
-export default async function SupportPage() {
+export default async function SupportPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ email?: string }>;
+}) {
   const lang = await getServerLang();
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const initialEmail = typeof resolvedSearchParams.email === "string" ? resolvedSearchParams.email : "";
 
   const manualItems: ReactNode[] = [
     text(lang, "Open Link Analysis and paste one YouTube URL.", "打开“链接分析”并粘贴一个 YouTube 链接。"),
@@ -395,6 +402,8 @@ export default async function SupportPage() {
             </a>
           </div>
         </article>
+
+        <SupportContactForm lang={lang} initialEmail={initialEmail} />
       </section>
       <SiteFooter lang={lang} />
     </main>

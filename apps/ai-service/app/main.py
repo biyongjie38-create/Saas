@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, Header, HTTPException
 
 from app.monitoring import init_sentry
@@ -62,7 +64,20 @@ def raise_service_error(error: Exception) -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "billing_mode": get_billing_mode()}
+    return {
+        "ok": True,
+        "service": "ai-service",
+        "billing_mode": get_billing_mode(),
+        "provider_mode": (os.getenv("AI_PROVIDER") or "auto").strip() or "auto",
+        "sentry_enabled": bool((os.getenv("SENTRY_DSN") or "").strip()),
+        "pinecone_configured": bool(
+            (os.getenv("PINECONE_API_KEY") or "").strip()
+            and (
+                (os.getenv("PINECONE_INDEX_HOST") or "").strip()
+                or (os.getenv("PINECONE_INDEX_NAME") or "").strip()
+            )
+        ),
+    }
 
 
 @app.post("/ai/analyze", response_model=AnalyzeResponse)

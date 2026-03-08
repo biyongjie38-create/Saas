@@ -128,6 +128,82 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 - Confirm benchmark trace shows `openai+pinecone` when Pinecone is configured
 - Complete one Stripe test checkout and confirm the webhook endpoint `https://your-domain.com/api/membership/webhook/stripe` updates the user's membership state
 
+## 8) Configure uptime monitoring
+
+Recommended: Better Stack. Fallback: UptimeRobot.
+
+Create these HTTP monitors after the app is public:
+
+- Web readiness: `https://your-domain.com/api/ready`
+  - Use this as the primary production alert.
+  - It returns `503` when required runtime dependencies are not ready, including AI service reachability.
+- Web health: `https://your-domain.com/api/health`
+  - Use this as a lightweight process-level monitor.
+  - It stays `200` while the web app is alive, even if a dependency is degraded.
+- AI service health: `https://your-ai-service-domain.com/health`
+  - Monitor the FastAPI service separately so you can distinguish “web down” from “AI backend down”.
+
+Recommended alert policy:
+
+- Check interval: `60s` for readiness and AI service, `180-300s` for lightweight health.
+- Alert channels: at least email plus one realtime channel such as WeCom, Slack, Telegram, or phone.
+- Require multiple consecutive failures before opening an incident to reduce flapping.
+
+Recommended Better Stack monitor fields:
+
+- Monitor type: HTTP / HTTPS
+- Expected status: `200`
+- URL keyword check:
+  - `/api/ready` and `/api/health`: JSON contains `"ok":true`
+  - `/health`: JSON contains `"ok": true`
+
+If you prefer UptimeRobot:
+
+- Create the same three HTTP(S) monitors with the same URLs.
+- Free plans usually check less frequently; paid plans are better for production response time.
+
+## 9) Configure public API rate limiting
+
+Recommended: Upstash Redis for distributed serverless rate limiting.
+
+Set these env vars in the web app if you want production-grade shared limits across instances:
+
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+
+Current protection already in code:
+
+- `/api/hot-trends` is rate limited.
+- Anonymous preview traffic is limited more aggressively than signed-in traffic.
+- Requests that use the platform server key are limited more aggressively than requests using the user's own YouTube key.
+
+Behavior without Upstash:
+
+- The app still rate limits, but only with local in-memory counters inside each process.
+- This is acceptable for local development, but weaker in multi-instance production.
+
+## 10) Configure branded email delivery
+
+Recommended: Resend.
+
+Set these env vars in the web app:
+
+- `RESEND_API_KEY`
+- `SUPPORT_FROM_EMAIL`
+- `SUPPORT_TO_EMAIL` (optional but recommended)
+
+What this enables now:
+
+- `/support` includes a real contact form.
+- The platform sends one branded email to your support inbox.
+- The user also receives a confirmation email.
+
+Operational notes:
+
+- `SUPPORT_FROM_EMAIL` must use a domain that is verified in Resend.
+- If `SUPPORT_TO_EMAIL` is missing, the app falls back to `NEXT_PUBLIC_SUPPORT_EMAIL`.
+- Support form submissions are rate limited.
+
 ## Notes
 
 - Localhost/LAN origin cannot serve public users.
@@ -136,7 +212,7 @@ This checks required env vars and warns for localhost/private/non-HTTPS callback
 - If Pinecone config is missing, benchmark retrieval automatically falls back to local similarity ranking.
 - If `STRIPE_SECRET_KEY` is set while `DATA_BACKEND=supabase`, `SUPABASE_SERVICE_ROLE_KEY` must also be set or Stripe webhooks will return `503`.
 
-## 8) Common Vercel Domain Errors
+## 11) Common Vercel Domain Errors
 
 - `401` on `*.vercel.app`: Deployment Protection is active. Disable protection for Production or use a custom production domain.
 - `404` + `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`: the domain alias points to a missing/deleted deployment. Re-assign that domain in `Project -> Domains`.

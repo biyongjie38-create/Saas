@@ -115,6 +115,11 @@ const stripeWebhookSecret = readEnv("STRIPE_WEBHOOK_SECRET");
 const supabaseServiceRoleKey = readEnv("SUPABASE_SERVICE_ROLE_KEY");
 const posthogKey = readEnv("NEXT_PUBLIC_POSTHOG_KEY");
 const posthogHost = readEnv("NEXT_PUBLIC_POSTHOG_HOST");
+const upstashRedisUrl = readEnv("UPSTASH_REDIS_REST_URL");
+const upstashRedisToken = readEnv("UPSTASH_REDIS_REST_TOKEN");
+const resendApiKey = readEnv("RESEND_API_KEY");
+const supportFromEmail = readEnv("SUPPORT_FROM_EMAIL");
+const supportToEmail = readEnv("SUPPORT_TO_EMAIL");
 
 const supabaseConfigured = Boolean(readEnv("NEXT_PUBLIC_SUPABASE_URL") && readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
 const usesSupabaseBackend = dataBackendMode === "supabase" || (dataBackendMode !== "mock" && supabaseConfigured);
@@ -159,8 +164,32 @@ if (posthogKey && !posthogHost) {
   console.warn("NEXT_PUBLIC_POSTHOG_KEY is set without NEXT_PUBLIC_POSTHOG_HOST. The app will default to https://us.i.posthog.com.");
 }
 
+if ((upstashRedisUrl && !upstashRedisToken) || (!upstashRedisUrl && upstashRedisToken)) {
+  console.error("Upstash rate limiting requires both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.");
+  process.exitCode = 1;
+}
+
+if (!upstashRedisUrl && !upstashRedisToken) {
+  console.warn("Upstash Redis is not configured. Public API rate limiting will fall back to local process memory.");
+}
+
+if ((resendApiKey && !supportFromEmail) || (!resendApiKey && supportFromEmail)) {
+  console.error("Branded email requires both RESEND_API_KEY and SUPPORT_FROM_EMAIL.");
+  process.exitCode = 1;
+}
+
+if (resendApiKey && supportFromEmail && !supportToEmail) {
+  console.warn("SUPPORT_TO_EMAIL is not set. Support requests will fall back to NEXT_PUBLIC_SUPPORT_EMAIL.");
+}
+
+if (!resendApiKey && !supportFromEmail) {
+  console.warn("Resend is not configured. The support form will not send branded emails yet.");
+}
+
 const appUrlRaw = readEnv("NEXT_PUBLIC_APP_URL");
 const appUrl = appUrlRaw ? parseUrl(appUrlRaw) : null;
+const aiServiceUrlRaw = readEnv("AI_SERVICE_URL");
+const aiServiceUrl = aiServiceUrlRaw ? parseUrl(aiServiceUrlRaw) : null;
 
 if (appUrlRaw && !appUrl) {
   console.error("NEXT_PUBLIC_APP_URL is not a valid URL.");
@@ -190,6 +219,9 @@ if (appUrl) {
   console.log("Suggested Supabase Auth URL Configuration:");
   console.log(`- Site URL: ${appUrl.origin}`);
   console.log(`- Redirect URL: ${appUrl.origin}/auth/callback`);
+  console.log("Suggested uptime monitoring URLs:");
+  console.log(`- Web health: ${appUrl.origin}/api/health`);
+  console.log(`- Web readiness: ${appUrl.origin}/api/ready`);
 } else {
   const vercelProdOrigin =
     normalizeOrigin(readEnv("PUBLIC_VERCEL_PROJECT_PRODUCTION_URL")) ??
@@ -204,6 +236,13 @@ if (appUrl) {
     console.log("NEXT_PUBLIC_APP_URL not set. App will use runtime origin.");
     console.log("For production, set NEXT_PUBLIC_APP_URL to your public HTTPS domain.");
   }
+}
+
+if (aiServiceUrlRaw && !aiServiceUrl) {
+  console.error("AI_SERVICE_URL is not a valid URL.");
+  process.exitCode = 1;
+} else if (aiServiceUrl) {
+  console.log(`- AI service health: ${aiServiceUrl.origin}${aiServiceUrl.pathname.replace(/\/+$/, "")}/health`);
 }
 
 if (process.exitCode && process.exitCode !== 0) {
