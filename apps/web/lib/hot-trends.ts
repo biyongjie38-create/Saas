@@ -226,7 +226,7 @@ function buildTopicRows(videos: TrendVideoRow[]): TrendTopicRow[] {
       };
     })
     .sort((left, right) => right.momentumScore - left.momentumScore)
-    .slice(0, 6);
+    .slice(0, 10);
 }
 
 function buildChannelRows(
@@ -297,7 +297,7 @@ function buildChannelRows(
       };
     })
     .sort((left, right) => right.growthScore - left.growthScore)
-    .slice(0, 8);
+    .slice(0, 12);
 }
 
 async function fetchMostPopularVideos(apiKey: string, regionCode: string) {
@@ -376,12 +376,12 @@ export async function fetchHotTrendsDataset(options?: FetchOptions): Promise<Hot
     const channels = buildChannelRows(videos, channelDetails, regionCode);
     const topics = buildTopicRows(videos);
 
-    return {
-      source: "live",
-      updatedAt: new Date().toISOString(),
-      videos: videos.slice(0, 24),
-      channels,
-      topics,
+      return {
+        source: "live",
+        updatedAt: new Date().toISOString(),
+        videos: videos.slice(0, 36),
+        channels,
+        topics,
       message: "Live trend data was loaded from the YouTube Data API."
     };
   } catch (error) {

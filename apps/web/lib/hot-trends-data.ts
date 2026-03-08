@@ -134,6 +134,146 @@ export function getFallbackHotTrendsDataset(): HotTrendsDataset {
         hook: "Promise deal volume before revealing the workflow stack.",
         type: "short",
         thumbnailUrl: "https://i.ytimg.com/vi/5qap5aO4i9A/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-7",
+        videoId: "e-ORhEE9VVg",
+        url: "https://www.youtube.com/watch?v=e-ORhEE9VVg",
+        title: "I cloned three winning thumbnails and doubled CTR in a week",
+        channel: "Thumbnail Sprint",
+        channelId: "thumbnail-sprint",
+        publishedAt: new Date(now - 7 * 3600 * 1000).toISOString(),
+        views: 2_700_000,
+        keyword: "thumbnail ctr",
+        hook: "Show the CTR delta before opening Photoshop.",
+        type: "short",
+        thumbnailUrl: "https://i.ytimg.com/vi/e-ORhEE9VVg/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-8",
+        videoId: "M7lc1UVf-VE",
+        url: "https://www.youtube.com/watch?v=M7lc1UVf-VE",
+        title: "This prompt stack writes faceless shorts scripts in 9 minutes",
+        channel: "Script Engine",
+        channelId: "script-engine",
+        publishedAt: new Date(now - 10 * 3600 * 1000).toISOString(),
+        views: 1_480_000,
+        keyword: "faceless scripts",
+        hook: "Start with finished script output, then reverse engineer the prompts.",
+        type: "short",
+        thumbnailUrl: "https://i.ytimg.com/vi/M7lc1UVf-VE/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-9",
+        videoId: "9bZkp7q19f0",
+        url: "https://www.youtube.com/watch?v=9bZkp7q19f0",
+        title: "How I rebuilt my comments section into a conversion funnel",
+        channel: "Audience Loop",
+        channelId: "audience-loop",
+        publishedAt: new Date(now - 15 * 3600 * 1000).toISOString(),
+        views: 934_000,
+        keyword: "comment funnel",
+        hook: "Lead with conversion uplift before showing the pinned comment structure.",
+        type: "long",
+        thumbnailUrl: "https://i.ytimg.com/vi/9bZkp7q19f0/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-10",
+        videoId: "Zi_XLOBDo_Y",
+        url: "https://www.youtube.com/watch?v=Zi_XLOBDo_Y",
+        title: "The B-roll pacing trick that makes tutorial videos feel expensive",
+        channel: "Editing Deck",
+        channelId: "editing-deck",
+        publishedAt: new Date(now - 18 * 3600 * 1000).toISOString(),
+        views: 1_060_000,
+        keyword: "b-roll pacing",
+        hook: "Open with the side-by-side pacing comparison, not the timeline.",
+        type: "long",
+        thumbnailUrl: "https://i.ytimg.com/vi/Zi_XLOBDo_Y/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-11",
+        videoId: "L_jWHffIx5E",
+        url: "https://www.youtube.com/watch?v=L_jWHffIx5E",
+        title: "This boring finance format is suddenly printing millions of views",
+        channel: "Niche Radar",
+        channelId: "niche-radar",
+        publishedAt: new Date(now - 23 * 3600 * 1000).toISOString(),
+        views: 4_200_000,
+        keyword: "finance format",
+        hook: "Start with the surprising niche reveal before any charts.",
+        type: "short",
+        thumbnailUrl: "https://i.ytimg.com/vi/L_jWHffIx5E/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-12",
+        videoId: "60ItHLz5WEA",
+        url: "https://www.youtube.com/watch?v=60ItHLz5WEA",
+        title: "I turned one benchmark report into 14 new content angles",
+        channel: "Benchmark Lab",
+        channelId: "benchmark-lab",
+        publishedAt: new Date(now - 27 * 3600 * 1000).toISOString(),
+        views: 736_000,
+        keyword: "benchmark workflow",
+        hook: "Promise 14 angles up front, then reveal the report framework.",
+        type: "long",
+        thumbnailUrl: "https://i.ytimg.com/vi/60ItHLz5WEA/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-13",
+        videoId: "RgKAFK5djSk",
+        url: "https://www.youtube.com/watch?v=RgKAFK5djSk",
+        title: "The shorts hook framework SaaS founders keep copying right now",
+        channel: "Growth Sprint",
+        channelId: "growth-sprint",
+        publishedAt: new Date(now - 41 * 3600 * 1000).toISOString(),
+        views: 2_240_000,
+        keyword: "shorts hook",
+        hook: "Open with the copied pattern before naming the framework.",
+        type: "short",
+        thumbnailUrl: "https://i.ytimg.com/vi/RgKAFK5djSk/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-14",
+        videoId: "CevxZvSJLk8",
+        url: "https://www.youtube.com/watch?v=CevxZvSJLk8",
+        title: "What fast-growing channels do in the first 30 seconds that you do not",
+        channel: "Creator Lab",
+        channelId: "creator-lab",
+        publishedAt: new Date(now - 52 * 3600 * 1000).toISOString(),
+        views: 1_560_000,
+        keyword: "first 30 seconds",
+        hook: "Use a direct comparison opener instead of a generic lesson frame.",
+        type: "long",
+        thumbnailUrl: "https://i.ytimg.com/vi/CevxZvSJLk8/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-15",
+        videoId: "hT_nvWreIhg",
+        url: "https://www.youtube.com/watch?v=hT_nvWreIhg",
+        title: "I tested 20 faceless intros and only 3 survived the retention graph",
+        channel: "Silent Scale",
+        channelId: "silent-scale",
+        publishedAt: new Date(now - 61 * 3600 * 1000).toISOString(),
+        views: 3_180_000,
+        keyword: "retention graph",
+        hook: "Lead with the losing intros first to create contrast.",
+        type: "short",
+        thumbnailUrl: "https://i.ytimg.com/vi/hT_nvWreIhg/hqdefault.jpg"
+      },
+      {
+        id: "trend-video-16",
+        videoId: "kJQP7kiw5Fk",
+        url: "https://www.youtube.com/watch?v=kJQP7kiw5Fk",
+        title: "This micro-niche channel crossed 100k subs with one repeatable format",
+        channel: "Micro Channel Ops",
+        channelId: "micro-channel-ops",
+        publishedAt: new Date(now - 79 * 3600 * 1000).toISOString(),
+        views: 588_000,
+        keyword: "micro niche",
+        hook: "Open with the 100k milestone, then show the repeatable content loop.",
+        type: "long",
+        thumbnailUrl: "https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg"
       }
     ],
     channels: [
@@ -169,6 +309,61 @@ export function getFallbackHotTrendsDataset(): HotTrendsDataset {
         subscribers: 97_000,
         growthScore: 11.1,
         country: "GB"
+      },
+      {
+        id: "trend-channel-4",
+        channel: "Growth Sprint",
+        channelId: "growth-sprint",
+        url: "https://www.youtube.com/@growthsprint",
+        niche: "AI creator workflows",
+        videos: 173,
+        subscribers: 528_000,
+        growthScore: 22.3,
+        country: "US"
+      },
+      {
+        id: "trend-channel-5",
+        channel: "Editing Deck",
+        channelId: "editing-deck",
+        url: "https://www.youtube.com/@editingdeck",
+        niche: "editing systems",
+        videos: 97,
+        subscribers: 184_000,
+        growthScore: 16.7,
+        country: "AU"
+      },
+      {
+        id: "trend-channel-6",
+        channel: "Thumbnail Sprint",
+        channelId: "thumbnail-sprint",
+        url: "https://www.youtube.com/@thumbnailsprint",
+        niche: "thumbnail optimization",
+        videos: 66,
+        subscribers: 143_000,
+        growthScore: 19.9,
+        country: "US"
+      },
+      {
+        id: "trend-channel-7",
+        channel: "Benchmark Lab",
+        channelId: "benchmark-lab",
+        url: "https://www.youtube.com/@benchmarklab",
+        niche: "content research",
+        videos: 43,
+        subscribers: 78_000,
+        growthScore: 12.8,
+        country: "SG"
+      },
+      {
+        id: "trend-channel-8",
+        channel: "Niche Radar",
+        channelId: "niche-radar",
+        url: "https://www.youtube.com/@nicheradar",
+        niche: "format discovery",
+        videos: 58,
+        subscribers: 119_000,
+        growthScore: 17.5,
+        country: "DE"
       }
     ],
     topics: [
@@ -195,6 +390,38 @@ export function getFallbackHotTrendsDataset(): HotTrendsDataset {
         avgViews: 1_100_000,
         momentumScore: 81,
         summary: "The winning format shows time savings first, then reveals the exact tool chain and cost breakdown."
+      },
+      {
+        id: "trend-topic-4",
+        topic: "Thumbnail CTR rebuilds",
+        sampleVideos: 31,
+        avgViews: 1_340_000,
+        momentumScore: 87,
+        summary: "Creators are packaging thumbnail experiments as clear before-and-after wins instead of generic design tips."
+      },
+      {
+        id: "trend-topic-5",
+        topic: "Benchmark-driven ideation",
+        sampleVideos: 18,
+        avgViews: 668_000,
+        momentumScore: 74,
+        summary: "Reports that turn one winning video into multiple publishable angles are resonating with small teams."
+      },
+      {
+        id: "trend-topic-6",
+        topic: "Comment-to-offer funnels",
+        sampleVideos: 14,
+        avgViews: 592_000,
+        momentumScore: 69,
+        summary: "More channels are reframing community engagement as a conversion asset rather than just audience proof."
+      },
+      {
+        id: "trend-topic-7",
+        topic: "Retention graph teardowns",
+        sampleVideos: 22,
+        avgViews: 1_020_000,
+        momentumScore: 83,
+        summary: "Videos that reveal what failed before showing the winning intro format are outperforming generic editing lessons."
       }
     ]
   };

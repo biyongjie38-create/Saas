@@ -44,6 +44,7 @@ AI_SERVICE_URL=http://127.0.0.1:8000
 
 YOUTUBE_API_KEY=
 YOUTUBE_FETCH_MODE=auto
+ENABLE_E2E_AUTH_BYPASS=false
 
 DATA_BACKEND=supabase
 
@@ -61,6 +62,10 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_PRO_MONTHLY_PRICE_ID=
 STRIPE_PRO_YEARLY_PRICE_ID=
 STRIPE_CURRENCY=cny
+
+# Optional CJK fonts for report PDF export
+PDF_CJK_FONT_PATH=
+PDF_CJK_BOLD_FONT_PATH=
 ```
 
 Create `apps/ai-service/.env` or export these vars before running FastAPI:
@@ -89,6 +94,9 @@ Notes:
 - `AI_PROVIDER=auto` means: try OpenAI first, then fall back to local deterministic logic.
 - `AI_PROVIDER=local` forces local fallback mode for analysis, benchmark retrieval, and score.
 - Benchmark retrieval tries OpenAI embeddings + Pinecone first. If either side is unavailable, it falls back to local similarity ranking.
+- `ENABLE_E2E_AUTH_BYPASS=true` enables the local test-auth bypass route at `/api/test-auth/login`.
+- On Windows development machines, PDF export will also auto-detect common Chinese fonts such as Noto Sans SC and SimHei.
+- In cloud deployment, set `PDF_CJK_FONT_PATH` explicitly if you need stable Chinese PDF output.
 
 ## Auth Redirect Strategy (for real users)
 
@@ -174,6 +182,50 @@ python scripts/index_viral_library.py --index-host=... --namespace=viral-library
 - `/library`
 - `/settings`
 
+## Membership Control
+
+There are 3 practical ways to switch your own account between `free` and `pro`:
+
+1. Production Supabase
+   - Edit your row in `user_profiles`
+   - Set `plan` to `free` or `pro`
+   - Set `subscription_status` to `none` or `active`
+2. Local mock backend
+   - Edit `data/mock-db.json`
+   - Update the current user row's `plan` and `subscriptionStatus`
+3. Local test-auth bypass
+   - Set `ENABLE_E2E_AUTH_BYPASS=true` in `apps/web/.env.local`
+   - Restart Next.js
+   - Switch to Pro: `/api/test-auth/login?plan=pro&next=/dashboard`
+   - Switch to Free: `/api/test-auth/login?plan=free&next=/dashboard`
+
+For production billing, Stripe checkout and webhook reconciliation should remain the source of truth.
+
+## Testing Captions And Thumbnail Multimodal
+
+To test these two live chains, the machine running the app must be able to reach:
+
+- `www.youtube.com`
+- `i.ytimg.com`
+- `www.googleapis.com`
+- your model provider endpoint
+
+Suggested test flow:
+
+1. Set `YOUTUBE_API_KEY` in `apps/web/.env.local`
+2. Set `OPENAI_API_KEY` or another compatible provider in `apps/ai-service/.env`
+3. Start both services
+4. Call `POST /api/youtube/fetch` with a public YouTube URL that definitely has captions
+5. Confirm the response includes `captionsText`
+6. Run the same URL through `/dashboard`
+7. Confirm the generated report snapshot shows transcript content
+8. Check `apps/ai-service` logs:
+   - if thumbnail download succeeds, analysis should try image input first
+   - if image fetch fails, it should fall back to text-only input
+9. Repeat with a video that has no captions to verify graceful fallback
+
+If your current network cannot reach YouTube from the server, move this test to a machine or deployment target that can.
+
 ## API
 
 - Unified JSON envelope for all `/api/*` JSON routes: `ok/data/error/request_id` + `x-request-id` header
@@ -256,5 +308,5 @@ These notices are part of the release smoke flow so degraded behavior is visible
 ## Current Preview Limits
 
 - `/` is intentionally a product overview page, not a live data dashboard.
-- `/dashboard/trends` still uses curated preview rows for hot videos/channels/topics.
+- `/dashboard/trends` now prefers live YouTube data and falls back to expanded preview rows when no usable key is available.
 - Real/provider-backed paths currently exist in single-video fetch, viral collection, BYOK testing, and membership checkout.

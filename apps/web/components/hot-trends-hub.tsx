@@ -1,14 +1,14 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import { MembershipUpgradeModal } from "@/components/membership-upgrade-modal";
+import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import {
   getFallbackHotTrendsDataset,
   type HotTrendsDataset,
   type TrendChannelRow,
   type TrendTopicRow,
-  type TrendVideoRow
+  type TrendVideoRow,
 } from "@/lib/hot-trends-data";
 import type { Lang } from "@/lib/i18n-shared";
 import type { UserPlan } from "@/lib/types";
@@ -58,9 +58,11 @@ type Copy = {
   unlockTitle: string;
   unlockSubtitle: string;
   viewDetails: string;
+  upgradeToView: string;
   loginForMore: string;
   rank: string;
   thumbnail: string;
+  titleColumn: string;
   publishDate: string;
   channel: string;
   views: string;
@@ -72,12 +74,19 @@ type Copy = {
   topic: string;
   avgViews: string;
   momentum: string;
+  niche: string;
+  action: string;
+  videoType: string;
+  publishWindow: string;
   detailTitle: string;
   detailHook: string;
   detailAnalysis: string;
+  close: string;
+  upgradeForFullDetail: string;
   proNote: string;
   noRows: string;
   openYoutube: string;
+  consoleRadarTitle: string;
 };
 
 const copyByLang: Record<Lang, Copy> = {
@@ -106,9 +115,11 @@ const copyByLang: Record<Lang, Copy> = {
     unlockTitle: "Unlock trend intelligence",
     unlockSubtitle: "Upgrade to Pro to open full hot video, channel, and topic details.",
     viewDetails: "View Details",
+    upgradeToView: "Upgrade to View",
     loginForMore: "Sign in for upgrade options",
     rank: "#",
     thumbnail: "Thumbnail",
+    titleColumn: "Title",
     publishDate: "Publish Date",
     channel: "Channel",
     views: "Views",
@@ -120,20 +131,27 @@ const copyByLang: Record<Lang, Copy> = {
     topic: "Topic",
     avgViews: "Avg Views",
     momentum: "Momentum",
+    niche: "Niche",
+    action: "Action",
+    videoType: "Video Type",
+    publishWindow: "Publish Window",
     detailTitle: "Trend detail",
     detailHook: "Winning hook",
     detailAnalysis: "Why it is moving now",
-    proNote: "Free users can browse the list but need Pro to open the full detail panel.",
+    close: "Close",
+    upgradeForFullDetail: "Upgrade for full detail",
+    proNote: "Free users can browse the trend list, but opening the full detail panel requires Pro.",
     noRows: "No recent rows matched the current filter.",
-    openYoutube: "Open on YouTube"
+    openYoutube: "Open on YouTube",
+    consoleRadarTitle: "Trend radar inside your console",
   },
   zh: {
     kicker: "热门趋势",
     title: "先一步发现正在起量的视频、频道和主题，决定下一条内容该往哪做。",
     intro: "用 ViralBrain.ai 跟踪爆款趋势、沉淀选题池，并把趋势洞察直接带回控制台分析和素材运营。",
-    liveTitle: "真实 YouTube 趋势数据",
+    liveTitle: "实时 YouTube 趋势数据",
     fallbackTitle: "样例回退数据",
-    liveDesc: "这个页面现在会优先拉取真实 YouTube 趋势候选。当前浏览器里的 Key 优先，其次才会使用服务端 Key。",
+    liveDesc: "这个页面会优先拉取真实 YouTube 趋势候选。当前浏览器里的 Key 优先，其次才会使用服务端 Key。",
     fallbackDesc: "当前没有可用的 YouTube Key，所以页面自动回退到稳定样例，而不是直接显示空白。",
     openGuide: "查看接入教程",
     updatedAt: "更新时间",
@@ -152,9 +170,11 @@ const copyByLang: Record<Lang, Copy> = {
     unlockTitle: "解锁热门趋势详情",
     unlockSubtitle: "升级到 Pro 后可查看热门视频、频道和主题的完整数据与详情。",
     viewDetails: "查看详情",
+    upgradeToView: "升级查看",
     loginForMore: "登录后可升级解锁",
     rank: "排名",
     thumbnail: "缩略图",
+    titleColumn: "标题",
     publishDate: "发布时间",
     channel: "频道",
     views: "观看数",
@@ -166,13 +186,20 @@ const copyByLang: Record<Lang, Copy> = {
     topic: "主题",
     avgViews: "平均播放",
     momentum: "势能",
+    niche: "赛道",
+    action: "操作",
+    videoType: "视频类型",
+    publishWindow: "发布时间",
     detailTitle: "趋势详情",
     detailHook: "高表现钩子",
     detailAnalysis: "为什么现在在涨",
+    close: "关闭",
+    upgradeForFullDetail: "升级查看完整详情",
     proNote: "免费用户可以浏览趋势列表，但查看完整详情需要升级到 Pro。",
     noRows: "当前筛选条件下没有命中最近趋势。",
-    openYoutube: "打开 YouTube"
-  }
+    openYoutube: "打开 YouTube",
+    consoleRadarTitle: "控制台里的趋势雷达",
+  },
 };
 
 function pillClass(active: boolean) {
@@ -190,7 +217,7 @@ function isChannelRow(row: TrendDetailRow): row is TrendChannelRow {
 function formatCompactNumber(value: number, lang: Lang) {
   return new Intl.NumberFormat(lang === "zh" ? "zh-CN" : "en-US", {
     notation: "compact",
-    maximumFractionDigits: 1
+    maximumFractionDigits: 1,
   }).format(value);
 }
 
@@ -215,7 +242,7 @@ function formatRelativeTime(value: string, lang: Lang) {
 
   return new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
     month: "short",
-    day: "numeric"
+    day: "numeric",
   }).format(new Date(timestamp));
 }
 
@@ -224,7 +251,7 @@ function formatTimestamp(value: string, lang: Lang) {
     month: "short",
     day: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   }).format(new Date(value));
 }
 
@@ -243,7 +270,7 @@ function formatMomentum(score: number, lang: Lang) {
 
 function formatTopicSummaryText(row: TrendTopicRow, lang: Lang) {
   if (lang === "zh") {
-    return `${row.topic} 在最近 ${row.sampleVideos} 条起量内容里反复出现，平均播放约 ${formatCompactNumber(row.avgViews, lang)}，并且更偏向“先给结果、再讲过程”的表达方式。`;
+    return `${row.topic} 在最近 ${row.sampleVideos} 条起量内容里反复出现，平均播放约 ${formatCompactNumber(row.avgViews, lang)}，而且更偏向“先给结果、再讲过程”的表达方式。`;
   }
 
   return `${row.topic} is appearing across ${row.sampleVideos} recent breakout videos, averaging ${formatCompactNumber(row.avgViews, lang)} views with a payoff-first framing pattern.`;
@@ -268,7 +295,7 @@ function isWithinWindow(publishedAt: string, window: VideoWindow) {
 function TrendDetailModal({
   lang,
   row,
-  onClose
+  onClose,
 }: {
   lang: Lang;
   row: TrendDetailRow;
@@ -287,7 +314,7 @@ function TrendDetailModal({
   const analysis = isVideoRow(row)
     ? row.hook
     : isChannelRow(row)
-      ? `${row.niche} · ${lang === "zh" ? "增长势能" : "Momentum"} ${row.growthScore.toFixed(1)}%`
+      ? `${row.niche} / ${copy.growth} ${row.growthScore.toFixed(1)}%`
       : formatTopicSummaryText(row, lang);
   const sourceHref = isVideoRow(row)
     ? row.url
@@ -304,7 +331,7 @@ function TrendDetailModal({
             <h2 style={{ margin: 0 }}>{title}</h2>
           </div>
           <button type="button" className="btn btn-ghost compact-button" onClick={onClose}>
-            {lang === "zh" ? "关闭" : "Close"}
+            {copy.close}
           </button>
         </div>
         <div className="trend-detail-body">
@@ -316,11 +343,11 @@ function TrendDetailModal({
             <p>
               {isVideoRow(row)
                 ? lang === "zh"
-                  ? "这条视频当前起量，通常说明它在开头就交代了结果承诺，并且用非常低的理解成本把观众留住。"
+                  ? "这条视频当前起量，通常说明它在开头就交代了结果承诺，而且用很低的理解成本把观众留住。"
                   : "This video is moving because the payoff promise lands early and the viewer can immediately tell why the content is worth watching."
                 : isChannelRow(row)
                   ? lang === "zh"
-                    ? "这个频道近期热视频密度更高，说明它在标题角度、选题复用和更新节奏上已经形成稳定打法。"
+                    ? "这个频道近期热门视频密度更高，说明它在标题角度、选题复用和更新节奏上已经形成稳定打法。"
                     : "This channel is surfacing because more of its recent uploads are converting attention into breakout-level reach."
                   : lang === "zh"
                     ? "这个主题在最近热门内容里重复出现，说明观众已经开始对同类结果承诺和表达方式形成稳定需求。"
@@ -366,8 +393,8 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
         const response = await fetch("/api/hot-trends?region=US", {
           cache: "no-store",
           headers: {
-            ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
-          }
+            ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage()),
+          },
         });
         const payload = (await response.json().catch(() => null)) as HotTrendsResponse | null;
         if (!response.ok || !payload?.ok || !payload.data) {
@@ -383,7 +410,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
         });
       } catch (error) {
         if (!ignore) {
-          setRefreshError(error instanceof Error && error.message ? `${copy.refreshFailed}` : copy.refreshFailed);
+          setRefreshError(error instanceof Error && error.message ? copy.refreshFailed : copy.refreshFailed);
         }
       } finally {
         if (!ignore) {
@@ -402,8 +429,8 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
     () =>
       trendData.videos
         .filter((item) => item.type === videoType && isWithinWindow(item.publishedAt, videoWindow))
-        .slice(0, 12),
-    [trendData.videos, videoType, videoWindow]
+        .slice(0, 24),
+    [trendData.videos, videoType, videoWindow],
   );
 
   function onOpenDetail(row: TrendDetailRow) {
@@ -416,6 +443,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
 
   const sourceTitle = trendData.source === "live" ? copy.liveTitle : copy.fallbackTitle;
   const sourceDescription = trendData.source === "live" ? copy.liveDesc : copy.fallbackDesc;
+  const detailActionLabel = isPro ? copy.viewDetails : copy.upgradeToView;
 
   return (
     <div className="trends-shell">
@@ -429,7 +457,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
             <p>{sourceDescription}</p>
             <p className="small">
               {copy.updatedAt}: {formatTimestamp(trendData.updatedAt, lang)}
-              {loading ? ` · ${copy.refreshing}` : ""}
+              {loading ? ` | ${copy.refreshing}` : ""}
             </p>
             {refreshError ? <p className="small">{refreshError}</p> : null}
             <a className="btn btn-ghost compact-button" href="/support#api-guide">
@@ -439,11 +467,11 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
         </div>
         <div className="trends-hero-side card panel">
           <p className="card-kicker">{copy.preview}</p>
-          <h3>{lang === "zh" ? "控制台里的趋势雷达" : "Trend radar inside your console"}</h3>
+          <h3>{copy.consoleRadarTitle}</h3>
           <p>{copy.proNote}</p>
           {!isPro ? (
             <button type="button" className="btn btn-primary" onClick={() => setUpgradeOpen(true)}>
-              {signedIn ? (lang === "zh" ? "升级查看完整详情" : "Upgrade for full detail") : copy.loginForMore}
+              {signedIn ? copy.upgradeForFullDetail : copy.loginForMore}
             </button>
           ) : null}
         </div>
@@ -465,7 +493,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
         {tab === "videos" ? (
           <div className="trends-filter-row">
             <div className="trends-filter-group">
-              <span className="small">{lang === "zh" ? "视频类型" : "Video Type"}</span>
+              <span className="small">{copy.videoType}</span>
               <button type="button" className={pillClass(videoType === "short")} onClick={() => setVideoType("short")}>
                 {copy.short}
               </button>
@@ -474,7 +502,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
               </button>
             </div>
             <div className="trends-filter-group">
-              <span className="small">{lang === "zh" ? "发布时间" : "Publish Window"}</span>
+              <span className="small">{copy.publishWindow}</span>
               <button type="button" className={pillClass(videoWindow === "24h")} onClick={() => setVideoWindow("24h")}>
                 {copy.twentyFour}
               </button>
@@ -494,12 +522,12 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
           <div className="trends-table-head trends-video-grid">
             <span>{copy.rank}</span>
             <span>{copy.thumbnail}</span>
-            <span>{lang === "zh" ? "标题" : "Title"}</span>
+            <span>{copy.titleColumn}</span>
             <span>{copy.publishDate}</span>
             <span>{copy.channel}</span>
             <span>{copy.views}</span>
             <span>{copy.keyword}</span>
-            <span>{lang === "zh" ? "操作" : "Action"}</span>
+            <span>{copy.action}</span>
           </div>
           <div className="trends-table-body">
             {visibleVideos.length === 0 ? (
@@ -522,7 +550,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
                   <span>{formatCompactNumber(row.views, lang)}</span>
                   <span>{row.keyword}</span>
                   <button type="button" className="btn btn-ghost compact-button" onClick={() => onOpenDetail(row)}>
-                    {isPro ? copy.viewDetails : copy.locked}
+                    {detailActionLabel}
                   </button>
                 </div>
               ))
@@ -536,12 +564,12 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
           <div className="trends-table-head trends-channel-grid">
             <span>{copy.rank}</span>
             <span>{copy.channel}</span>
-            <span>{lang === "zh" ? "赛道" : "Niche"}</span>
+            <span>{copy.niche}</span>
             <span>{copy.videosCount}</span>
             <span>{copy.subscribers}</span>
             <span>{copy.growth}</span>
             <span>{copy.country}</span>
-            <span>{lang === "zh" ? "操作" : "Action"}</span>
+            <span>{copy.action}</span>
           </div>
           <div className="trends-table-body">
             {trendData.channels.length === 0 ? (
@@ -559,7 +587,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
                   <span>{row.growthScore.toFixed(1)}%</span>
                   <span>{row.country}</span>
                   <button type="button" className="btn btn-ghost compact-button" onClick={() => onOpenDetail(row)}>
-                    {isPro ? copy.viewDetails : copy.locked}
+                    {detailActionLabel}
                   </button>
                 </div>
               ))
@@ -596,7 +624,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
                   </div>
                 </div>
                 <button type="button" className="btn btn-primary compact-button" onClick={() => onOpenDetail(row)}>
-                  {isPro ? copy.viewDetails : copy.locked}
+                  {detailActionLabel}
                 </button>
               </article>
             ))
