@@ -25,7 +25,7 @@ type CollectResponse = {
 const copyByLang = {
   en: {
     title: "Viral Work Collector",
-    subtitle: "Pull recent breakout YouTube candidates into your library with a configurable time window and view threshold.",
+    subtitle: "Pull recent breakout YouTube candidates into your library with a configurable time window and view threshold. The YouTube Data API key for this workflow now lives below this panel.",
     hoursWithin: "Published within hours",
     minViews: "Minimum views",
     maxResults: "Max results",
@@ -40,7 +40,7 @@ const copyByLang = {
   },
   zh: {
     title: "爆款作品采集",
-    subtitle: "按发布时间窗口和最低播放量筛选近期爆款作品，并直接导入你的爆款库。",
+    subtitle: "按发布时间窗口和最低播放量筛选近期爆款作品，并直接导入你的爆款库。这个工作流所需的 YouTube Data API Key 现在就在当前面板下方配置。",
     hoursWithin: "采集最近多少小时",
     minViews: "最低播放量",
     maxResults: "最多采集条数",

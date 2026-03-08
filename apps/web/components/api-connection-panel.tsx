@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
@@ -16,9 +16,17 @@ import {
 } from "@/lib/api-integrations";
 import type { UserPlan } from "@/lib/types";
 
+type ApiSection = "youtube" | "llm" | "pinecone";
+type TestTarget = "youtube" | "llm" | "pinecone";
+
 type Props = {
   lang: Lang;
   plan: UserPlan;
+  sections?: ApiSection[];
+  title?: string;
+  subtitle?: string;
+  storageHint?: string;
+  activeNotice?: string;
 };
 
 type Copy = {
@@ -26,7 +34,6 @@ type Copy = {
   subtitle: string;
   storageHint: string;
   liveNow: string;
-  planned: string;
   connected: string;
   missing: string;
   youtubeTitle: string;
@@ -61,6 +68,8 @@ type Copy = {
   providerHint: string;
   providerSelected: string;
   providerDefaultNote: string;
+  clearVisible: string;
+  testFailed: string;
 };
 
 type TestResponse = {
@@ -72,6 +81,8 @@ type TestResponse = {
   error?: { message?: string } | null;
 };
 
+const DEFAULT_SECTIONS: ApiSection[] = ["youtube", "llm", "pinecone"];
+
 const copyByLang: Record<Lang, Copy> = {
   en: {
     title: "Bring Your Own API Keys",
@@ -80,7 +91,6 @@ const copyByLang: Record<Lang, Copy> = {
     storageHint:
       "Keys are stored only in the current browser and attached to requests on demand. This MVP does not write secrets into your database.",
     liveNow: "Live now",
-    planned: "Reserved",
     connected: "Connected",
     missing: "Not connected",
     youtubeTitle: "YouTube Data API",
@@ -106,22 +116,23 @@ const copyByLang: Record<Lang, Copy> = {
     test: "Test Connection",
     testing: "Testing...",
     saved: "API configuration saved in this browser.",
-    cleared: "Local API configuration cleared.",
+    cleared: "Selected API fields were cleared from this browser.",
     empty: "No keys have been entered yet.",
-    activeNotice: "Analysis requests automatically prefer your own connected APIs when available.",
+    activeNotice: "Requests automatically prefer your own connected APIs when available.",
     advancedLocked: "Domestic/custom LLM providers are available in Pro.",
     providerNote: "Provider note",
     testSummary: "Connection summary",
-    providerHint: "Click to open a clear provider picker and auto-fill the recommended defaults.",
+    providerHint: "Click to open the provider picker and auto-fill the recommended defaults.",
     providerSelected: "Selected",
-    providerDefaultNote: "Use the default compatible settings, then fill in the key and test the connection."
+    providerDefaultNote: "Use the default compatible settings, then fill in the key and test the connection.",
+    clearVisible: "Clear visible fields",
+    testFailed: "Connection test failed."
   },
   zh: {
     title: "对接用户自己的 API",
     subtitle: "让用户自己接入平台和模型凭证，把真实数据与模型调用费用计到用户自己的供应商账户上。",
     storageHint: "Key 只保存在当前浏览器，本次请求按需附带。这个 MVP 版本不会把密钥写入数据库。",
     liveNow: "已接入",
-    planned: "预留",
     connected: "已配置",
     missing: "未配置",
     youtubeTitle: "YouTube Data API",
@@ -147,23 +158,91 @@ const copyByLang: Record<Lang, Copy> = {
     test: "测试连接",
     testing: "测试中...",
     saved: "API 配置已保存到当前浏览器。",
-    cleared: "本地 API 配置已清空。",
+    cleared: "当前页面涉及的 API 配置已清空。",
     empty: "还没有填写任何 Key。",
-    activeNotice: "当你填写了自己的 API 后，分析请求会优先走你自己的平台额度。",
+    activeNotice: "当你填写了自己的 API 后，请求会优先走你自己的平台额度。",
     advancedLocked: "国产 / 自定义模型供应商属于专业版能力。",
     providerNote: "供应商说明",
     testSummary: "连接结果",
     providerHint: "点击后会展开清晰的供应商选择面板，并自动带入推荐配置。",
     providerSelected: "当前选择",
-    providerDefaultNote: "先使用默认兼容配置，再填写对应 Key 并执行测试连接。"
+    providerDefaultNote: "先使用默认兼容配置，再填写对应 Key 并执行测试连接。",
+    clearVisible: "清空当前页配置",
+    testFailed: "测试连接失败。"
   }
 };
 
-export function ApiConnectionPanel({ lang, plan }: Props) {
+function toVisibleSections(input?: ApiSection[]) {
+  if (!input?.length) {
+    return DEFAULT_SECTIONS;
+  }
+
+  const unique = Array.from(new Set(input));
+  return unique.filter(
+    (section): section is ApiSection =>
+      section === "youtube" || section === "llm" || section === "pinecone"
+  );
+}
+
+function mapSectionToTargets(section: ApiSection): TestTarget[] {
+  if (section === "llm") {
+    return ["llm"];
+  }
+  if (section === "pinecone") {
+    return ["pinecone"];
+  }
+  return ["youtube"];
+}
+
+function persistVisibleConfig(config: ApiIntegrationConfig) {
+  if (hasConnectedKeys(config)) {
+    persistApiIntegrationConfig(config);
+    return;
+  }
+  clearApiIntegrationConfig();
+}
+
+function clearSections(config: ApiIntegrationConfig, sections: ApiSection[]) {
+  let next = { ...config };
+
+  if (sections.includes("youtube")) {
+    next.youtubeApiKey = "";
+  }
+
+  if (sections.includes("llm")) {
+    next = applyProviderPreset(next, "openai");
+    next.openaiApiKey = "";
+  }
+
+  if (sections.includes("pinecone")) {
+    next.pineconeApiKey = "";
+    next.pineconeIndexHost = "";
+    next.pineconeIndexName = "";
+    next.pineconeNamespace = "viral-library";
+  }
+
+  return next;
+}
+
+export function ApiConnectionPanel({
+  lang,
+  plan,
+  sections,
+  title,
+  subtitle,
+  storageHint,
+  activeNotice
+}: Props) {
   const copy = copyByLang[lang];
   const presets = useMemo(() => listProviderPresets(), []);
+  const visibleSections = useMemo(() => toVisibleSections(sections), [sections]);
+  const visibleTargets = useMemo(
+    () => Array.from(new Set(visibleSections.flatMap((section) => mapSectionToTargets(section)))),
+    [visibleSections]
+  );
   const [config, setConfig] = useState<ApiIntegrationConfig>(createEmptyApiIntegrationConfig());
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "error">("success");
   const [testing, setTesting] = useState(false);
   const [results, setResults] = useState<Record<string, { ok: boolean; message: string; detail?: string }>>({});
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
@@ -190,92 +269,134 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
 
   const currentPreset = getProviderPreset(config.llmProvider);
   const providerCards = useMemo(
-    () => [
-      {
-        id: "youtube",
-        title: copy.youtubeTitle,
-        desc: copy.youtubeDesc,
-        state: config.youtubeApiKey ? copy.connected : copy.missing,
-        mask: maskSecret(config.youtubeApiKey)
-      },
-      {
-        id: "llm",
-        title: `${copy.llmTitle}: ${currentPreset.label}`,
-        desc: copy.llmDesc,
-        state: config.openaiApiKey ? copy.connected : copy.missing,
-        mask: maskSecret(config.openaiApiKey)
-      },
-      {
-        id: "pinecone",
-        title: copy.pineconeTitle,
-        desc: copy.pineconeDesc,
-        state: config.pineconeApiKey ? copy.connected : copy.missing,
-        mask: maskSecret(config.pineconeApiKey)
-      }
-    ],
-    [config, copy, currentPreset.label]
+    () =>
+      [
+        {
+          id: "youtube" as const,
+          title: copy.youtubeTitle,
+          desc: copy.youtubeDesc,
+          state: config.youtubeApiKey ? copy.connected : copy.missing,
+          mask: maskSecret(config.youtubeApiKey)
+        },
+        {
+          id: "llm" as const,
+          title: `${copy.llmTitle}: ${currentPreset.label}`,
+          desc: copy.llmDesc,
+          state: config.openaiApiKey ? copy.connected : copy.missing,
+          mask: maskSecret(config.openaiApiKey)
+        },
+        {
+          id: "pinecone" as const,
+          title: copy.pineconeTitle,
+          desc: copy.pineconeDesc,
+          state: config.pineconeApiKey ? copy.connected : copy.missing,
+          mask: maskSecret(config.pineconeApiKey)
+        }
+      ].filter((item) => visibleSections.includes(item.id)),
+    [config, copy, currentPreset.label, visibleSections]
   );
+
+  function clearMessages() {
+    setMessage("");
+    setMessageTone("success");
+  }
 
   function updateField<K extends keyof ApiIntegrationConfig>(key: K, value: ApiIntegrationConfig[K]) {
     setConfig((current) => ({ ...current, [key]: value }));
-    setMessage("");
+    clearMessages();
   }
 
   function changeProvider(nextProvider: ApiIntegrationConfig["llmProvider"]) {
     setConfig((current) => applyProviderPreset(current, nextProvider, { preserveSecrets: true }));
-    setMessage("");
+    clearMessages();
     setProviderMenuOpen(false);
   }
 
   function saveConfig() {
-    persistApiIntegrationConfig(config);
+    persistVisibleConfig(config);
     setMessage(hasConnectedKeys(config) ? copy.saved : copy.empty);
+    setMessageTone("success");
   }
 
   function clearConfig() {
-    clearApiIntegrationConfig();
-    setConfig(createEmptyApiIntegrationConfig());
-    setResults({});
+    const nextConfig = clearSections(config, visibleSections);
+    persistVisibleConfig(nextConfig);
+    setConfig(nextConfig);
+    setResults((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([key]) => {
+          if (key === "youtube") {
+            return !visibleSections.includes("youtube");
+          }
+          if (key === "llm") {
+            return !visibleSections.includes("llm");
+          }
+          if (key === "pinecone") {
+            return !visibleSections.includes("pinecone");
+          }
+          return true;
+        })
+      )
+    );
     setMessage(copy.cleared);
+    setMessageTone("success");
     setProviderMenuOpen(false);
+  }
+
+  async function testSingleTarget(target: TestTarget) {
+    const response = await fetch("/api/integrations/test", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        target,
+        config
+      })
+    });
+
+    const payload = (await response.json().catch(() => null)) as TestResponse | null;
+    if (!response.ok || !payload?.ok || !payload.data) {
+      throw new Error(payload?.error?.message ?? copy.testFailed);
+    }
+
+    return payload.data.results;
   }
 
   async function testConfig() {
     setTesting(true);
-    setMessage("");
+    clearMessages();
+    setResults({});
+
     try {
-      const response = await fetch("/api/integrations/test", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          target: "all",
-          config
-        })
-      });
-      const payload = (await response.json().catch(() => null)) as TestResponse | null;
-      if (!response.ok || !payload?.ok || !payload.data) {
-        setMessage(payload?.error?.message ?? "Test failed.");
-        return;
+      const mergedResults: Record<string, { ok: boolean; message: string; detail?: string }> = {};
+
+      for (const target of visibleTargets) {
+        const targetResults = await testSingleTarget(target);
+        Object.assign(mergedResults, targetResults);
       }
-      setResults(payload.data.results);
+
+      setResults(mergedResults);
       setMessage(copy.testSummary);
+      setMessageTone("success");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Test failed.");
+      setMessage(error instanceof Error ? error.message : copy.testFailed);
+      setMessageTone("error");
     } finally {
       setTesting(false);
     }
   }
 
+  const messageClass = messageTone === "error" ? "status-failed" : "status-done";
+
   return (
     <section className="card panel integrations-panel">
       <div className="integrations-header">
         <div>
-          <h2 style={{ marginTop: 0 }}>{copy.title}</h2>
-          <p>{copy.subtitle}</p>
-          <p className="small">{copy.storageHint}</p>
-          {plan === "free" ? <div className="upgrade-hint">{copy.advancedLocked}</div> : null}
+          <h2 style={{ marginTop: 0 }}>{title ?? copy.title}</h2>
+          <p>{subtitle ?? copy.subtitle}</p>
+          <p className="small">{storageHint ?? copy.storageHint}</p>
+          {plan === "free" && visibleSections.includes("llm") ? <div className="upgrade-hint">{copy.advancedLocked}</div> : null}
         </div>
         <div className="integration-status-stack">
           {providerCards.map((item) => (
@@ -285,93 +406,170 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
                 <span className="badge badge-live">{copy.liveNow}</span>
               </div>
               <p className="small">{item.desc}</p>
-              <p className="small mono">{item.state}{item.mask ? `: ${item.mask}` : ""}</p>
+              <p className="small mono">
+                {item.state}
+                {item.mask ? `: ${item.mask}` : ""}
+              </p>
             </article>
           ))}
         </div>
       </div>
 
       <div className="integration-form-grid">
-        <label className="integration-field">
-          <span className="small">{copy.youtubeKey}</span>
-          <input className="input" value={config.youtubeApiKey} onChange={(event) => updateField("youtubeApiKey", event.target.value)} placeholder="AIza..." />
-        </label>
-        <div className="integration-field provider-picker" ref={providerPickerRef}>
-          <span className="small">{copy.provider}</span>
-          <button
-            type="button"
-            className={`provider-picker-trigger ${providerMenuOpen ? "provider-picker-trigger-active" : ""}`}
-            onClick={() => setProviderMenuOpen((current) => !current)}
-            aria-haspopup="dialog"
-            aria-expanded={providerMenuOpen}
-          >
-            <div className="provider-picker-text">
-              <strong>{currentPreset.label}</strong>
-              <span className="small">{copy.providerHint}</span>
+        {visibleSections.includes("youtube") ? (
+          <label className="integration-field">
+            <span className="small">{copy.youtubeKey}</span>
+            <input
+              className="input"
+              value={config.youtubeApiKey}
+              onChange={(event) => updateField("youtubeApiKey", event.target.value)}
+              placeholder="AIza..."
+            />
+          </label>
+        ) : null}
+
+        {visibleSections.includes("llm") ? (
+          <>
+            <div className="integration-field provider-picker" ref={providerPickerRef}>
+              <span className="small">{copy.provider}</span>
+              <button
+                type="button"
+                className={`provider-picker-trigger ${providerMenuOpen ? "provider-picker-trigger-active" : ""}`}
+                onClick={() => setProviderMenuOpen((current) => !current)}
+                aria-haspopup="dialog"
+                aria-expanded={providerMenuOpen}
+              >
+                <div className="provider-picker-text">
+                  <strong>{currentPreset.label}</strong>
+                  <span className="small">{copy.providerHint}</span>
+                </div>
+                <span className="provider-picker-chevron">
+                  {providerMenuOpen ? (lang === "zh" ? "收起" : "Close") : (lang === "zh" ? "选择" : "Choose")}
+                </span>
+              </button>
+              {providerMenuOpen ? (
+                <div className="provider-picker-popover" role="dialog" aria-label={copy.provider}>
+                  {presets.map((preset) => {
+                    const active = config.llmProvider === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className={`provider-option ${active ? "provider-option-active" : ""}`}
+                        onClick={() => changeProvider(preset.id)}
+                      >
+                        <div className="provider-option-head">
+                          <strong>{preset.label}</strong>
+                          {active ? <span className="badge badge-live">{copy.providerSelected}</span> : null}
+                        </div>
+                        <p className="small provider-option-note">{preset.note ?? copy.providerDefaultNote}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
-            <span className="provider-picker-chevron">{providerMenuOpen ? (lang === "zh" ? "收起" : "Close") : (lang === "zh" ? "选择" : "Choose")}</span>
-          </button>
-          {providerMenuOpen ? (
-            <div className="provider-picker-popover" role="dialog" aria-label={copy.provider}>
-              {presets.map((preset) => {
-                const active = config.llmProvider === preset.id;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    className={`provider-option ${active ? "provider-option-active" : ""}`}
-                    onClick={() => changeProvider(preset.id)}
-                  >
-                    <div className="provider-option-head">
-                      <strong>{preset.label}</strong>
-                      {active ? <span className="badge badge-live">{copy.providerSelected}</span> : null}
-                    </div>
-                    <p className="small provider-option-note">{preset.note ?? copy.providerDefaultNote}</p>
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-        <label className="integration-field">
-          <span className="small">{copy.llmKey}</span>
-          <input className="input" value={config.openaiApiKey} onChange={(event) => updateField("openaiApiKey", event.target.value)} placeholder="sk-..." />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.llmBaseUrl}</span>
-          <input className="input" value={config.openaiBaseUrl} onChange={(event) => updateField("openaiBaseUrl", event.target.value)} placeholder="https://api.openai.com/v1" />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.analysisModel}</span>
-          <input className="input" value={config.analysisModel} onChange={(event) => updateField("analysisModel", event.target.value)} placeholder="gpt-4o-mini" />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.scoreModel}</span>
-          <input className="input" value={config.scoreModel} onChange={(event) => updateField("scoreModel", event.target.value)} placeholder="gpt-4o" />
-        </label>
-        <label className="integration-field integration-field-wide">
-          <span className="small">{copy.embeddingModel} ({copy.optional})</span>
-          <input className="input" value={config.embeddingModel} onChange={(event) => updateField("embeddingModel", event.target.value)} placeholder="text-embedding-3-small" />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.pineconeKey} ({copy.optional})</span>
-          <input className="input" value={config.pineconeApiKey} onChange={(event) => updateField("pineconeApiKey", event.target.value)} placeholder="pcsk_..." />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.pineconeHost} ({copy.optional})</span>
-          <input className="input" value={config.pineconeIndexHost} onChange={(event) => updateField("pineconeIndexHost", event.target.value)} placeholder="example.svc.aped-...pinecone.io" />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.pineconeName} ({copy.optional})</span>
-          <input className="input" value={config.pineconeIndexName} onChange={(event) => updateField("pineconeIndexName", event.target.value)} placeholder="viralbrain-library" />
-        </label>
-        <label className="integration-field">
-          <span className="small">{copy.pineconeNamespace} ({copy.optional})</span>
-          <input className="input" value={config.pineconeNamespace} onChange={(event) => updateField("pineconeNamespace", event.target.value)} placeholder="viral-library" />
-        </label>
+            <label className="integration-field">
+              <span className="small">{copy.llmKey}</span>
+              <input
+                className="input"
+                value={config.openaiApiKey}
+                onChange={(event) => updateField("openaiApiKey", event.target.value)}
+                placeholder="sk-..."
+              />
+            </label>
+            <label className="integration-field">
+              <span className="small">{copy.llmBaseUrl}</span>
+              <input
+                className="input"
+                value={config.openaiBaseUrl}
+                onChange={(event) => updateField("openaiBaseUrl", event.target.value)}
+                placeholder="https://api.openai.com/v1"
+              />
+            </label>
+            <label className="integration-field">
+              <span className="small">{copy.analysisModel}</span>
+              <input
+                className="input"
+                value={config.analysisModel}
+                onChange={(event) => updateField("analysisModel", event.target.value)}
+                placeholder="gpt-4o-mini"
+              />
+            </label>
+            <label className="integration-field">
+              <span className="small">{copy.scoreModel}</span>
+              <input
+                className="input"
+                value={config.scoreModel}
+                onChange={(event) => updateField("scoreModel", event.target.value)}
+                placeholder="gpt-4o"
+              />
+            </label>
+            <label className="integration-field integration-field-wide">
+              <span className="small">
+                {copy.embeddingModel} ({copy.optional})
+              </span>
+              <input
+                className="input"
+                value={config.embeddingModel}
+                onChange={(event) => updateField("embeddingModel", event.target.value)}
+                placeholder="text-embedding-3-small"
+              />
+            </label>
+          </>
+        ) : null}
+
+        {visibleSections.includes("pinecone") ? (
+          <>
+            <label className="integration-field">
+              <span className="small">
+                {copy.pineconeKey} ({copy.optional})
+              </span>
+              <input
+                className="input"
+                value={config.pineconeApiKey}
+                onChange={(event) => updateField("pineconeApiKey", event.target.value)}
+                placeholder="pcsk_..."
+              />
+            </label>
+            <label className="integration-field">
+              <span className="small">
+                {copy.pineconeHost} ({copy.optional})
+              </span>
+              <input
+                className="input"
+                value={config.pineconeIndexHost}
+                onChange={(event) => updateField("pineconeIndexHost", event.target.value)}
+                placeholder="example.svc.aped-...pinecone.io"
+              />
+            </label>
+            <label className="integration-field">
+              <span className="small">
+                {copy.pineconeName} ({copy.optional})
+              </span>
+              <input
+                className="input"
+                value={config.pineconeIndexName}
+                onChange={(event) => updateField("pineconeIndexName", event.target.value)}
+                placeholder="viralbrain-library"
+              />
+            </label>
+            <label className="integration-field">
+              <span className="small">
+                {copy.pineconeNamespace} ({copy.optional})
+              </span>
+              <input
+                className="input"
+                value={config.pineconeNamespace}
+                onChange={(event) => updateField("pineconeNamespace", event.target.value)}
+                placeholder="viral-library"
+              />
+            </label>
+          </>
+        ) : null}
       </div>
 
-      {currentPreset.note ? (
+      {visibleSections.includes("llm") && currentPreset.note ? (
         <div className="api-roadmap card panel">
           <div className="library-card-head">
             <strong>{copy.providerNote}</strong>
@@ -389,16 +587,23 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
           {testing ? copy.testing : copy.test}
         </button>
         <button type="button" className="btn btn-ghost plan-action-button" onClick={clearConfig}>
-          {copy.clear}
+          {visibleSections.length === DEFAULT_SECTIONS.length ? copy.clear : copy.clearVisible}
         </button>
       </div>
 
-      {message ? <p className="status-done small" style={{ marginTop: 14 }}>{message}</p> : null}
+      {message ? (
+        <p className={`${messageClass} small`} style={{ marginTop: 14 }}>
+          {message}
+        </p>
+      ) : null}
 
       {Object.keys(results).length > 0 ? (
         <div className="integration-status-stack">
           {Object.entries(results).map(([key, result]) => (
-            <article key={key} className={`integration-provider-card ${result.ok ? "integration-result-success" : "integration-result-failed"}`}>
+            <article
+              key={key}
+              className={`integration-provider-card ${result.ok ? "integration-result-success" : "integration-result-failed"}`}
+            >
               <div className="library-card-head">
                 <strong>{key}</strong>
                 <span className="badge">{result.ok ? copy.connected : copy.missing}</span>
@@ -410,7 +615,9 @@ export function ApiConnectionPanel({ lang, plan }: Props) {
         </div>
       ) : null}
 
-      <p className="small" style={{ marginTop: 8 }}>{copy.activeNotice}</p>
+      <p className="small" style={{ marginTop: 8 }}>
+        {activeNotice ?? copy.activeNotice}
+      </p>
     </section>
   );
 }

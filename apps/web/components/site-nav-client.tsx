@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { MembershipUpgradeModal } from "@/components/membership-upgrade-modal";
 import type { Lang } from "@/lib/i18n-shared";
 import type { UserPlan } from "@/lib/types";
 
@@ -44,8 +43,6 @@ type Copy = {
   libraryDesc: string;
   collectorEntry: string;
   collectorDesc: string;
-  apiEntry: string;
-  apiDesc: string;
   reportsEntry: string;
   reportsDesc: string;
   manual: string;
@@ -83,8 +80,6 @@ const copyByLang: Record<Lang, Copy> = {
     libraryDesc: "Search, import, and maintain reusable references.",
     collectorEntry: "Viral Collector",
     collectorDesc: "Pull fresh breakout candidates into your library.",
-    apiEntry: "API Integrations",
-    apiDesc: "Bring your own provider and data keys.",
     reportsEntry: "Recent Reports",
     reportsDesc: "Review history, rerun, and export.",
     manual: "User Manual",
@@ -120,8 +115,6 @@ const copyByLang: Record<Lang, Copy> = {
     libraryDesc: "搜索、导入并维护运营素材。",
     collectorEntry: "爆款作品采集",
     collectorDesc: "单独采集近期爆款候选并导入素材库。",
-    apiEntry: "API 对接",
-    apiDesc: "接入你自己的模型和数据 Key。",
     reportsEntry: "历史报告",
     reportsDesc: "查看历史、重跑和导出报告。",
     manual: "用户手册",
@@ -157,7 +150,6 @@ function isConsoleRoute(pathname: string) {
     pathname === "/library" ||
     pathname.startsWith("/library/") ||
     pathname.startsWith("/dashboard/collector") ||
-    pathname.startsWith("/dashboard/integrations") ||
     pathname.startsWith("/dashboard/reports") ||
     pathname.startsWith("/report/")
   );
@@ -167,7 +159,6 @@ export function SiteNavClient({ lang, user }: Props) {
   const copy = copyByLang[lang];
   const pathname = usePathname() ?? "/";
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [membershipOpen, setMembershipOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const shellRef = useRef<HTMLDivElement | null>(null);
 
@@ -203,7 +194,6 @@ export function SiteNavClient({ lang, user }: Props) {
     { href: "/dashboard", label: copy.consoleEntry, desc: copy.consoleDesc },
     { href: "/library", label: copy.libraryEntry, desc: copy.libraryDesc },
     { href: "/dashboard/collector", label: copy.collectorEntry, desc: copy.collectorDesc },
-    { href: "/dashboard/integrations", label: copy.apiEntry, desc: copy.apiDesc },
     { href: "/dashboard/reports", label: copy.reportsEntry, desc: copy.reportsDesc }
   ];
 
@@ -217,6 +207,7 @@ export function SiteNavClient({ lang, user }: Props) {
     const source = user?.displayName?.trim() || user?.email || "V";
     return source.slice(0, 1).toUpperCase();
   }, [user]);
+  const membershipHref = `/membership?next=${encodeURIComponent(pathname)}`;
 
   function toggleMenu(key: string) {
     setOpenMenu((current) => (current === key ? null : key));
@@ -320,25 +311,18 @@ export function SiteNavClient({ lang, user }: Props) {
                     <strong>{copy.personalCenter}</strong>
                     <span>{lang === "zh" ? "管理资料、额度和会话。" : "Manage profile, quota, and sessions."}</span>
                   </Link>
-                  <button
-                    type="button"
-                    className="nav-menu-item nav-menu-item-button"
-                    onClick={() => {
-                      closeMenus();
-                      setMembershipOpen(true);
-                    }}
-                  >
+                  <Link href={membershipHref} className="nav-menu-item" onClick={closeMenus}>
                     <strong>{copy.membership}</strong>
                     <span>
                       {user.plan === "pro"
                         ? lang === "zh"
-                          ? "查看当前套餐与升级信息。"
-                          : "View current plan information."
+                          ? "查看当前套餐、订单记录和续费信息。"
+                          : "View your current plan, billing history, and renewal options."
                         : lang === "zh"
-                          ? "升级后解锁完整趋势和更高额度。"
-                          : "Upgrade for full trends and higher limits."}
+                          ? "查看套餐差异并完成会员升级。"
+                          : "Review plan differences and upgrade when you are ready."}
                     </span>
-                  </button>
+                  </Link>
                   <form action="/auth/signout" method="post" className="avatar-signout-form">
                     <button type="submit" className="nav-menu-item nav-menu-item-button nav-menu-danger">
                       <strong>{copy.signOut}</strong>
@@ -355,22 +339,6 @@ export function SiteNavClient({ lang, user }: Props) {
           )}
         </div>
       </div>
-
-      <MembershipUpgradeModal
-        open={membershipOpen}
-        onClose={() => setMembershipOpen(false)}
-        lang={lang}
-        plan={user?.plan ?? "free"}
-        signedIn={Boolean(user)}
-        title={lang === "zh" ? "会员方案" : "Membership plans"}
-        subtitle={
-          lang === "zh"
-            ? "直接在当前页面查看套餐差异和升级方式，不再跳转到设置页。"
-            : "Review plan differences and upgrade paths directly from the current page."
-        }
-        nextPath={pathname}
-      />
-
     </>
   );
 }

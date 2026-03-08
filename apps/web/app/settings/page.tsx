@@ -1,4 +1,4 @@
-﻿import { MembershipModalTrigger } from "@/components/membership-modal-trigger";
+import Link from "next/link";
 import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
@@ -92,18 +92,9 @@ export default async function SettingsPage() {
             ) : (
               <p className="small">{text(lang, "No membership orders yet.", "还没有会员订单。")}</p>
             )}
-            <MembershipModalTrigger
-              lang={lang}
-              plan={user.plan}
-              label={text(lang, "Open Membership", "查看会员方案")}
-              className="btn btn-primary compact-button"
-              title={text(lang, "Membership Plans", "会员方案")}
-              subtitle={text(
-                lang,
-                "Upgrade here without leaving the current page. ViralBrain.ai charges for the workflow; provider API costs stay with the user.",
-                "不离开当前页面即可查看并升级套餐。ViralBrain.ai 收费的是工作流，第三方 API 费用仍由用户自行承担。"
-              )}
-            />
+            <Link className="btn btn-primary compact-button" href="/membership?next=%2Fsettings">
+              {text(lang, "Open Membership", "查看会员方案")}
+            </Link>
           </article>
         </div>
 
@@ -113,7 +104,7 @@ export default async function SettingsPage() {
             <h3>{text(lang, "Language & Integrations", "语言与 API 配置")}</h3>
             <ul className="list">
               <li>{text(lang, "Use the top EN / 中文 switch to change the current interface language.", "使用顶部 EN / 中文 切换当前界面语言。")}</li>
-              <li>{text(lang, "Connect YouTube, OpenAI, Bailian, Yunwu, or Pinecone keys from the dashboard integration panel.", "在控制台的 API 面板中接入 YouTube、OpenAI、百炼、云雾或 Pinecone Key。")}</li>
+              <li>{text(lang, "Configure model providers below Link Analysis, and configure YouTube below Viral Collector.", "在“链接分析”下方配置模型供应商，在“爆款作品采集”下方配置 YouTube。")}</li>
               <li>{text(lang, "Reports, library operations, and rerun capability follow the current plan permissions.", "报告、爆款库和重跑能力都会跟随当前套餐权限。")}</li>
             </ul>
           </article>

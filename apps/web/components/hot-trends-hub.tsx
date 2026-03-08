@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
+import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import { MembershipUpgradeModal } from "@/components/membership-upgrade-modal";
 import {
-  HOT_TREND_CHANNELS,
-  HOT_TREND_TOPICS,
-  HOT_TREND_VIDEOS,
+  getFallbackHotTrendsDataset,
+  type HotTrendsDataset,
   type TrendChannelRow,
   type TrendTopicRow,
   type TrendVideoRow
@@ -16,6 +16,7 @@ import type { UserPlan } from "@/lib/types";
 type TrendTab = "videos" | "channels" | "topics";
 type VideoType = "short" | "long";
 type VideoWindow = "24h" | "48h" | "7d";
+type TrendDetailRow = TrendVideoRow | TrendChannelRow | TrendTopicRow;
 
 type Props = {
   lang: Lang;
@@ -24,13 +25,26 @@ type Props = {
   signedIn: boolean;
 };
 
+type HotTrendsResponse = {
+  ok: boolean;
+  data: HotTrendsDataset | null;
+  error?: {
+    message?: string;
+  } | null;
+};
+
 type Copy = {
   kicker: string;
   title: string;
   intro: string;
-  demoDataTitle: string;
-  demoDataDesc: string;
-  demoDataAction: string;
+  liveTitle: string;
+  fallbackTitle: string;
+  liveDesc: string;
+  fallbackDesc: string;
+  openGuide: string;
+  updatedAt: string;
+  refreshing: string;
+  refreshFailed: string;
   videos: string;
   channels: string;
   topics: string;
@@ -39,7 +53,6 @@ type Copy = {
   twentyFour: string;
   fortyEight: string;
   sevenDays: string;
-  discover: string;
   preview: string;
   locked: string;
   unlockTitle: string;
@@ -59,11 +72,12 @@ type Copy = {
   topic: string;
   avgViews: string;
   momentum: string;
-  summary: string;
   detailTitle: string;
   detailHook: string;
   detailAnalysis: string;
   proNote: string;
+  noRows: string;
+  openYoutube: string;
 };
 
 const copyByLang: Record<Lang, Copy> = {
@@ -71,10 +85,14 @@ const copyByLang: Record<Lang, Copy> = {
     kicker: "Hot Trends",
     title: "Spot videos, channels, and topics worth following before everyone else.",
     intro: "Use ViralBrain.ai to monitor breakout momentum, build a reusable topic pipeline, and decide what to analyze next in your console.",
-    demoDataTitle: "Curated preview data",
-    demoDataDesc:
-      "The hot videos, channels, and topics on this page are currently curated sample rows from the product preview layer. Live provider access today covers single-video fetch, viral collection, and BYOK connection testing.",
-    demoDataAction: "Open API setup guide",
+    liveTitle: "Live YouTube trend feed",
+    fallbackTitle: "Fallback preview feed",
+    liveDesc: "This page is now pulling real YouTube trend candidates. Your browser key takes priority; if missing, the server key is used.",
+    fallbackDesc: "No usable YouTube key is available right now, so the page is showing stable preview rows instead of a blank state.",
+    openGuide: "Open setup guide",
+    updatedAt: "Updated",
+    refreshing: "Refreshing live trends...",
+    refreshFailed: "Live refresh failed. Showing the fallback dataset.",
     videos: "Hot Videos",
     channels: "Hot Channels",
     topics: "Hot Topics",
@@ -83,8 +101,7 @@ const copyByLang: Record<Lang, Copy> = {
     twentyFour: "24 Hours",
     fortyEight: "48 Hours",
     sevenDays: "7 Days",
-    discover: "Discover Trends",
-    preview: "Preview only",
+    preview: "Preview",
     locked: "Pro required",
     unlockTitle: "Unlock trend intelligence",
     unlockSubtitle: "Upgrade to Pro to open full hot video, channel, and topic details.",
@@ -97,25 +114,31 @@ const copyByLang: Record<Lang, Copy> = {
     views: "Views",
     keyword: "Keyword",
     subscribers: "Subscribers",
-    growth: "Growth",
+    growth: "Momentum",
     country: "Country",
     videosCount: "Videos",
     topic: "Topic",
     avgViews: "Avg Views",
     momentum: "Momentum",
-    summary: "Summary",
     detailTitle: "Trend detail",
     detailHook: "Winning hook",
     detailAnalysis: "Why it is moving now",
-    proNote: "Free users can browse the list but need Pro to open the full detail panel."
+    proNote: "Free users can browse the list but need Pro to open the full detail panel.",
+    noRows: "No recent rows matched the current filter.",
+    openYoutube: "Open on YouTube"
   },
   zh: {
     kicker: "热门趋势",
     title: "先一步发现正在起量的视频、频道和主题，决定下一条内容该往哪做。",
     intro: "用 ViralBrain.ai 跟踪爆款趋势、沉淀选题池，并把趋势洞察直接带回控制台分析和素材运营。",
-    demoDataTitle: "当前是演示趋势样例",
-    demoDataDesc: "这个页面里的热门视频、频道和主题目前还是产品预览层的静态样例，还没接入实时趋势聚合数据源。当前真实接入主要覆盖单视频抓取、爆款采集，以及用户自带 Key 的连接测试。",
-    demoDataAction: "查看 API 配置教程",
+    liveTitle: "真实 YouTube 趋势数据",
+    fallbackTitle: "样例回退数据",
+    liveDesc: "这个页面现在会优先拉取真实 YouTube 趋势候选。当前浏览器里的 Key 优先，其次才会使用服务端 Key。",
+    fallbackDesc: "当前没有可用的 YouTube Key，所以页面自动回退到稳定样例，而不是直接显示空白。",
+    openGuide: "查看接入教程",
+    updatedAt: "更新时间",
+    refreshing: "正在刷新实时趋势...",
+    refreshFailed: "实时刷新失败，当前展示回退样例。",
     videos: "热门视频",
     channels: "热门频道",
     topics: "热门主题",
@@ -124,8 +147,7 @@ const copyByLang: Record<Lang, Copy> = {
     twentyFour: "24 小时",
     fortyEight: "48 小时",
     sevenDays: "7 天",
-    discover: "发现热门趋势",
-    preview: "仅预览",
+    preview: "预览",
     locked: "需 Pro 解锁",
     unlockTitle: "解锁热门趋势详情",
     unlockSubtitle: "升级到 Pro 后可查看热门视频、频道和主题的完整数据与详情。",
@@ -138,22 +160,109 @@ const copyByLang: Record<Lang, Copy> = {
     views: "观看数",
     keyword: "关键词",
     subscribers: "订阅数",
-    growth: "增长",
+    growth: "增长势能",
     country: "国家",
     videosCount: "视频数",
     topic: "主题",
     avgViews: "平均播放",
     momentum: "势能",
-    summary: "摘要",
     detailTitle: "趋势详情",
     detailHook: "高表现钩子",
     detailAnalysis: "为什么现在在涨",
-    proNote: "免费用户可以浏览趋势列表，但查看完整详情需要升级到 Pro。"
+    proNote: "免费用户可以浏览趋势列表，但查看完整详情需要升级到 Pro。",
+    noRows: "当前筛选条件下没有命中最近趋势。",
+    openYoutube: "打开 YouTube"
   }
 };
 
 function pillClass(active: boolean) {
   return `trend-filter-pill ${active ? "trend-filter-pill-active" : ""}`;
+}
+
+function isVideoRow(row: TrendDetailRow): row is TrendVideoRow {
+  return "thumbnailUrl" in row;
+}
+
+function isChannelRow(row: TrendDetailRow): row is TrendChannelRow {
+  return "growthScore" in row;
+}
+
+function formatCompactNumber(value: number, lang: Lang) {
+  return new Intl.NumberFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1
+  }).format(value);
+}
+
+function formatRelativeTime(value: string, lang: Lang) {
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  const diffMs = timestamp - Date.now();
+  const diffHours = diffMs / 3_600_000;
+  const rtf = new Intl.RelativeTimeFormat(lang === "zh" ? "zh-CN" : "en-US", { numeric: "auto" });
+
+  if (Math.abs(diffHours) < 24) {
+    return rtf.format(Math.round(diffHours), "hour");
+  }
+
+  const diffDays = diffHours / 24;
+  if (Math.abs(diffDays) < 7) {
+    return rtf.format(Math.round(diffDays), "day");
+  }
+
+  return new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric"
+  }).format(new Date(timestamp));
+}
+
+function formatTimestamp(value: string, lang: Lang) {
+  return new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatMomentum(score: number, lang: Lang) {
+  if (score >= 90) {
+    return lang === "zh" ? "非常高" : "Very high";
+  }
+  if (score >= 75) {
+    return lang === "zh" ? "高" : "High";
+  }
+  if (score >= 60) {
+    return lang === "zh" ? "中高" : "Medium-high";
+  }
+  return lang === "zh" ? "中等" : "Medium";
+}
+
+function formatTopicSummaryText(row: TrendTopicRow, lang: Lang) {
+  if (lang === "zh") {
+    return `${row.topic} 在最近 ${row.sampleVideos} 条起量内容里反复出现，平均播放约 ${formatCompactNumber(row.avgViews, lang)}，并且更偏向“先给结果、再讲过程”的表达方式。`;
+  }
+
+  return `${row.topic} is appearing across ${row.sampleVideos} recent breakout videos, averaging ${formatCompactNumber(row.avgViews, lang)} views with a payoff-first framing pattern.`;
+}
+
+function isWithinWindow(publishedAt: string, window: VideoWindow) {
+  const timestamp = new Date(publishedAt).getTime();
+  if (Number.isNaN(timestamp)) {
+    return false;
+  }
+
+  const diffHours = (Date.now() - timestamp) / 3_600_000;
+  if (window === "24h") {
+    return diffHours <= 24;
+  }
+  if (window === "48h") {
+    return diffHours <= 48;
+  }
+  return diffHours <= 168;
 }
 
 function TrendDetailModal({
@@ -162,14 +271,29 @@ function TrendDetailModal({
   onClose
 }: {
   lang: Lang;
-  row: TrendVideoRow | TrendChannelRow | TrendTopicRow;
+  row: TrendDetailRow;
   onClose: () => void;
 }) {
   const copy = copyByLang[lang];
-  const title = "title" in row ? row.title : "topic" in row ? row.topic : row.channel;
-  const meta = "keyword" in row ? row.keyword : "country" in row ? row.country : row.momentum;
-  const primaryMetric = "views" in row ? row.views : "subscribers" in row ? row.subscribers : row.avgViews;
-  const analysis = "hook" in row ? row.hook : "summary" in row ? row.summary : `${row.niche} · ${row.growth}`;
+
+  const title = isVideoRow(row) ? row.title : isChannelRow(row) ? row.channel : row.topic;
+  const badge = isVideoRow(row) ? row.keyword : isChannelRow(row) ? row.country : formatMomentum(row.momentumScore, lang);
+  const primaryLabel = isVideoRow(row) ? copy.views : isChannelRow(row) ? copy.subscribers : copy.avgViews;
+  const primaryMetric = isVideoRow(row)
+    ? formatCompactNumber(row.views, lang)
+    : isChannelRow(row)
+      ? formatCompactNumber(row.subscribers, lang)
+      : formatCompactNumber(row.avgViews, lang);
+  const analysis = isVideoRow(row)
+    ? row.hook
+    : isChannelRow(row)
+      ? `${row.niche} · ${lang === "zh" ? "增长势能" : "Momentum"} ${row.growthScore.toFixed(1)}%`
+      : formatTopicSummaryText(row, lang);
+  const sourceHref = isVideoRow(row)
+    ? row.url
+    : isChannelRow(row)
+      ? row.url
+      : `https://www.youtube.com/results?search_query=${encodeURIComponent(row.topic)}`;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -185,20 +309,32 @@ function TrendDetailModal({
         </div>
         <div className="trend-detail-body">
           <div className="trend-detail-main card panel">
-            <span className="badge">{meta}</span>
+            <span className="badge">{badge}</span>
             <h3>{copy.detailHook}</h3>
             <p>{analysis}</p>
             <h3>{copy.detailAnalysis}</h3>
             <p>
-              {lang === "zh"
-                ? "这类内容之所以在当前时间窗口内快速增长，通常是因为它把结果承诺放在最前面，同时让观众能马上判断是否值得继续看下去。"
-                : "This format is climbing because the outcome promise appears early and the viewer can immediately judge whether the content is worth continuing."}
+              {isVideoRow(row)
+                ? lang === "zh"
+                  ? "这条视频当前起量，通常说明它在开头就交代了结果承诺，并且用非常低的理解成本把观众留住。"
+                  : "This video is moving because the payoff promise lands early and the viewer can immediately tell why the content is worth watching."
+                : isChannelRow(row)
+                  ? lang === "zh"
+                    ? "这个频道近期热视频密度更高，说明它在标题角度、选题复用和更新节奏上已经形成稳定打法。"
+                    : "This channel is surfacing because more of its recent uploads are converting attention into breakout-level reach."
+                  : lang === "zh"
+                    ? "这个主题在最近热门内容里重复出现，说明观众已经开始对同类结果承诺和表达方式形成稳定需求。"
+                    : "This topic is recurring across recent breakout videos, which usually means the audience now recognizes the payoff pattern quickly."}
             </p>
           </div>
           <div className="trend-detail-side card panel">
-            <p className="small">{copy.views}</p>
+            <p className="small">{primaryLabel}</p>
             <strong>{primaryMetric}</strong>
-            <p className="small">{lang === "zh" ? "适合继续做相近选题、缩略图和标题拆解。" : "Use this to guide your next topic, thumbnail, and title teardown."}</p>
+            {isChannelRow(row) ? <p className="small">{copy.growth}: {row.growthScore.toFixed(1)}%</p> : null}
+            {"momentumScore" in row ? <p className="small">{copy.momentum}: {formatMomentum(row.momentumScore, lang)}</p> : null}
+            <a className="btn btn-ghost compact-button" href={sourceHref} target="_blank" rel="noreferrer">
+              {copy.openYoutube}
+            </a>
           </div>
         </div>
       </div>
@@ -212,22 +348,74 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
   const [videoType, setVideoType] = useState<VideoType>("short");
   const [videoWindow, setVideoWindow] = useState<VideoWindow>("48h");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [detailRow, setDetailRow] = useState<TrendVideoRow | TrendChannelRow | TrendTopicRow | null>(null);
+  const [detailRow, setDetailRow] = useState<TrendDetailRow | null>(null);
+  const [trendData, setTrendData] = useState<HotTrendsDataset>(() => getFallbackHotTrendsDataset());
+  const [loading, setLoading] = useState(true);
+  const [refreshError, setRefreshError] = useState("");
 
   const isPro = plan === "pro";
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadHotTrends() {
+      setLoading(true);
+      setRefreshError("");
+
+      try {
+        const response = await fetch("/api/hot-trends?region=US", {
+          cache: "no-store",
+          headers: {
+            ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
+          }
+        });
+        const payload = (await response.json().catch(() => null)) as HotTrendsResponse | null;
+        if (!response.ok || !payload?.ok || !payload.data) {
+          throw new Error(payload?.error?.message ?? copy.refreshFailed);
+        }
+
+        if (ignore) {
+          return;
+        }
+
+        startTransition(() => {
+          setTrendData(payload.data ?? getFallbackHotTrendsDataset());
+        });
+      } catch (error) {
+        if (!ignore) {
+          setRefreshError(error instanceof Error && error.message ? `${copy.refreshFailed}` : copy.refreshFailed);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadHotTrends();
+    return () => {
+      ignore = true;
+    };
+  }, [copy.refreshFailed]);
+
   const visibleVideos = useMemo(
-    () => HOT_TREND_VIDEOS.filter((item) => item.type === videoType && item.window === videoWindow),
-    [videoType, videoWindow]
+    () =>
+      trendData.videos
+        .filter((item) => item.type === videoType && isWithinWindow(item.publishedAt, videoWindow))
+        .slice(0, 12),
+    [trendData.videos, videoType, videoWindow]
   );
 
-  function onOpenDetail(row: TrendVideoRow | TrendChannelRow | TrendTopicRow) {
+  function onOpenDetail(row: TrendDetailRow) {
     if (!isPro) {
       setUpgradeOpen(true);
       return;
     }
     setDetailRow(row);
   }
+
+  const sourceTitle = trendData.source === "live" ? copy.liveTitle : copy.fallbackTitle;
+  const sourceDescription = trendData.source === "live" ? copy.liveDesc : copy.fallbackDesc;
 
   return (
     <div className="trends-shell">
@@ -237,10 +425,15 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
           <h1>{copy.title}</h1>
           <p>{copy.intro}</p>
           <div className="qa-banner trend-demo-banner">
-            <strong>{copy.demoDataTitle}</strong>
-            <p>{copy.demoDataDesc}</p>
+            <strong>{sourceTitle}</strong>
+            <p>{sourceDescription}</p>
+            <p className="small">
+              {copy.updatedAt}: {formatTimestamp(trendData.updatedAt, lang)}
+              {loading ? ` · ${copy.refreshing}` : ""}
+            </p>
+            {refreshError ? <p className="small">{refreshError}</p> : null}
             <a className="btn btn-ghost compact-button" href="/support#api-guide">
-              {copy.demoDataAction}
+              {copy.openGuide}
             </a>
           </div>
         </div>
@@ -258,23 +451,39 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
 
       <section className="trends-toolbar card panel">
         <div className="tab-bar trends-tabs">
-          <button type="button" className={`tab-button ${tab === "videos" ? "tab-button-active" : ""}`} onClick={() => setTab("videos")}>{copy.videos}</button>
-          <button type="button" className={`tab-button ${tab === "channels" ? "tab-button-active" : ""}`} onClick={() => setTab("channels")}>{copy.channels}</button>
-          <button type="button" className={`tab-button ${tab === "topics" ? "tab-button-active" : ""}`} onClick={() => setTab("topics")}>{copy.topics}</button>
+          <button type="button" className={`tab-button ${tab === "videos" ? "tab-button-active" : ""}`} onClick={() => setTab("videos")}>
+            {copy.videos}
+          </button>
+          <button type="button" className={`tab-button ${tab === "channels" ? "tab-button-active" : ""}`} onClick={() => setTab("channels")}>
+            {copy.channels}
+          </button>
+          <button type="button" className={`tab-button ${tab === "topics" ? "tab-button-active" : ""}`} onClick={() => setTab("topics")}>
+            {copy.topics}
+          </button>
         </div>
 
         {tab === "videos" ? (
           <div className="trends-filter-row">
             <div className="trends-filter-group">
               <span className="small">{lang === "zh" ? "视频类型" : "Video Type"}</span>
-              <button type="button" className={pillClass(videoType === "short")} onClick={() => setVideoType("short")}>{copy.short}</button>
-              <button type="button" className={pillClass(videoType === "long")} onClick={() => setVideoType("long")}>{copy.long}</button>
+              <button type="button" className={pillClass(videoType === "short")} onClick={() => setVideoType("short")}>
+                {copy.short}
+              </button>
+              <button type="button" className={pillClass(videoType === "long")} onClick={() => setVideoType("long")}>
+                {copy.long}
+              </button>
             </div>
             <div className="trends-filter-group">
               <span className="small">{lang === "zh" ? "发布时间" : "Publish Window"}</span>
-              <button type="button" className={pillClass(videoWindow === "24h")} onClick={() => setVideoWindow("24h")}>{copy.twentyFour}</button>
-              <button type="button" className={pillClass(videoWindow === "48h")} onClick={() => setVideoWindow("48h")}>{copy.fortyEight}</button>
-              <button type="button" className={pillClass(videoWindow === "7d")} onClick={() => setVideoWindow("7d")}>{copy.sevenDays}</button>
+              <button type="button" className={pillClass(videoWindow === "24h")} onClick={() => setVideoWindow("24h")}>
+                {copy.twentyFour}
+              </button>
+              <button type="button" className={pillClass(videoWindow === "48h")} onClick={() => setVideoWindow("48h")}>
+                {copy.fortyEight}
+              </button>
+              <button type="button" className={pillClass(videoWindow === "7d")} onClick={() => setVideoWindow("7d")}>
+                {copy.sevenDays}
+              </button>
             </div>
           </div>
         ) : null}
@@ -293,23 +502,31 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
             <span>{lang === "zh" ? "操作" : "Action"}</span>
           </div>
           <div className="trends-table-body">
-            {visibleVideos.map((row, index) => (
-              <div key={row.id} className={`trends-video-grid trend-row ${!isPro ? "trend-row-locked" : ""}`}>
-                <span className="trend-rank">{index + 1}</span>
-                <div className="trend-thumb" />
-                <div className="trend-title-block">
-                  <strong>{row.title}</strong>
-                  <span>{row.hook}</span>
-                </div>
-                <span>{row.publishedAt}</span>
-                <span>{row.channel}</span>
-                <span>{row.views}</span>
-                <span>{row.keyword}</span>
-                <button type="button" className="btn btn-ghost compact-button" onClick={() => onOpenDetail(row)}>
-                  {isPro ? copy.viewDetails : copy.locked}
-                </button>
+            {visibleVideos.length === 0 ? (
+              <div className="empty-state">
+                <p className="small">{copy.noRows}</p>
               </div>
-            ))}
+            ) : (
+              visibleVideos.map((row, index) => (
+                <div key={row.id} className={`trends-video-grid trend-row ${!isPro ? "trend-row-locked" : ""}`}>
+                  <span className="trend-rank">{index + 1}</span>
+                  <div className="trend-thumb">
+                    <img className="trend-thumb-image" src={row.thumbnailUrl} alt={row.title} />
+                  </div>
+                  <div className="trend-title-block">
+                    <strong>{row.title}</strong>
+                    <span>{row.hook}</span>
+                  </div>
+                  <span>{formatRelativeTime(row.publishedAt, lang)}</span>
+                  <span>{row.channel}</span>
+                  <span>{formatCompactNumber(row.views, lang)}</span>
+                  <span>{row.keyword}</span>
+                  <button type="button" className="btn btn-ghost compact-button" onClick={() => onOpenDetail(row)}>
+                    {isPro ? copy.viewDetails : copy.locked}
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </section>
       ) : null}
@@ -327,51 +544,63 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
             <span>{lang === "zh" ? "操作" : "Action"}</span>
           </div>
           <div className="trends-table-body">
-            {HOT_TREND_CHANNELS.map((row, index) => (
-              <div key={row.id} className={`trends-channel-grid trend-row ${!isPro ? "trend-row-locked" : ""}`}>
-                <span className="trend-rank">{index + 1}</span>
-                <strong>{row.channel}</strong>
-                <span>{row.niche}</span>
-                <span>{row.videos}</span>
-                <span>{row.subscribers}</span>
-                <span>{row.growth}</span>
-                <span>{row.country}</span>
-                <button type="button" className="btn btn-ghost compact-button" onClick={() => onOpenDetail(row)}>
-                  {isPro ? copy.viewDetails : copy.locked}
-                </button>
+            {trendData.channels.length === 0 ? (
+              <div className="empty-state">
+                <p className="small">{copy.noRows}</p>
               </div>
-            ))}
+            ) : (
+              trendData.channels.map((row, index) => (
+                <div key={row.id} className={`trends-channel-grid trend-row ${!isPro ? "trend-row-locked" : ""}`}>
+                  <span className="trend-rank">{index + 1}</span>
+                  <strong>{row.channel}</strong>
+                  <span>{row.niche}</span>
+                  <span>{row.videos}</span>
+                  <span>{formatCompactNumber(row.subscribers, lang)}</span>
+                  <span>{row.growthScore.toFixed(1)}%</span>
+                  <span>{row.country}</span>
+                  <button type="button" className="btn btn-ghost compact-button" onClick={() => onOpenDetail(row)}>
+                    {isPro ? copy.viewDetails : copy.locked}
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </section>
       ) : null}
 
       {tab === "topics" ? (
         <section className="trend-topic-grid">
-          {HOT_TREND_TOPICS.map((row) => (
-            <article key={row.id} className={`card panel trend-topic-card ${!isPro ? "trend-row-locked" : ""}`}>
-              <div className="library-card-head">
-                <div>
-                  <p className="card-kicker">{copy.topic}</p>
-                  <h3>{row.topic}</h3>
-                </div>
-                <span className="badge">{row.momentum}</span>
-              </div>
-              <p>{row.summary}</p>
-              <div className="trend-topic-metrics">
-                <div>
-                  <span className="small">{copy.videosCount}</span>
-                  <strong>{row.sampleVideos}</strong>
-                </div>
-                <div>
-                  <span className="small">{copy.avgViews}</span>
-                  <strong>{row.avgViews}</strong>
-                </div>
-              </div>
-              <button type="button" className="btn btn-primary compact-button" onClick={() => onOpenDetail(row)}>
-                {isPro ? copy.viewDetails : copy.locked}
-              </button>
+          {trendData.topics.length === 0 ? (
+            <article className="card panel empty-state">
+              <p className="small">{copy.noRows}</p>
             </article>
-          ))}
+          ) : (
+            trendData.topics.map((row) => (
+              <article key={row.id} className={`card panel trend-topic-card ${!isPro ? "trend-row-locked" : ""}`}>
+                <div className="library-card-head">
+                  <div>
+                    <p className="card-kicker">{copy.topic}</p>
+                    <h3>{row.topic}</h3>
+                  </div>
+                  <span className="badge">{formatMomentum(row.momentumScore, lang)}</span>
+                </div>
+                <p>{formatTopicSummaryText(row, lang)}</p>
+                <div className="trend-topic-metrics">
+                  <div>
+                    <span className="small">{copy.videosCount}</span>
+                    <strong>{row.sampleVideos}</strong>
+                  </div>
+                  <div>
+                    <span className="small">{copy.avgViews}</span>
+                    <strong>{formatCompactNumber(row.avgViews, lang)}</strong>
+                  </div>
+                </div>
+                <button type="button" className="btn btn-primary compact-button" onClick={() => onOpenDetail(row)}>
+                  {isPro ? copy.viewDetails : copy.locked}
+                </button>
+              </article>
+            ))
+          )}
         </section>
       ) : null}
 

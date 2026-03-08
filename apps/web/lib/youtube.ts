@@ -371,7 +371,7 @@ export async function fetchYoutubeData(url: string, options?: QueryOptions): Pro
   }
 
   const mode = resolveFetchMode();
-  const apiKey = (options?.apiKeyOverride ?? process.env.YOUTUBE_API_KEY ?? "").trim();
+  const apiKey = (options?.apiKeyOverride || process.env.YOUTUBE_API_KEY || "").trim();
   const shouldAttemptLiveFetch = mode !== "mock" || Boolean(apiKey);
 
   let record: Omit<YoutubeVideo, "id" | "fetchedAt"> | null = null;
@@ -475,7 +475,7 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
   const maxResults = Math.min(50, Math.max(1, Math.floor(options.maxResults || 10)));
   const regionCode = (options.regionCode || "US").trim().toUpperCase() || "US";
   const mode = resolveFetchMode();
-  const apiKey = (options.apiKeyOverride ?? process.env.YOUTUBE_API_KEY ?? "").trim();
+  const apiKey = (options.apiKeyOverride || process.env.YOUTUBE_API_KEY || "").trim();
 
   if (!apiKey) {
     return buildMockCollectedItems({ hoursWithin, minViews, maxResults });

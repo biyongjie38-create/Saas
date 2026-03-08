@@ -43,11 +43,11 @@ export default async function HomePage() {
       )
     },
     {
-      title: text(lang, "Bring Your Own APIs", "自带 API 接入"),
+      title: text(lang, "Context-Aware API Setup", "按工作流分布的 API 配置"),
       desc: text(
         lang,
-        "Connect YouTube, OpenAI, Bailian, Yunwu, and Pinecone with your own keys so the platform does not eat your provider cost.",
-        "接入你自己的 YouTube、OpenAI、百炼、云雾和 Pinecone Key，平台不代付供应商成本。"
+        "Configure model providers below link analysis, and configure YouTube below viral collection, so each workflow makes its required APIs obvious.",
+        "把模型供应商配置放在链接分析下面，把 YouTube 配置放在爆款采集下面，让用户一眼就知道每个工作流分别需要哪些 API。"
       )
     },
     {
@@ -66,8 +66,8 @@ export default async function HomePage() {
       title: text(lang, "Operate everything from a single YouTube growth console.", "把所有动作都收进一个 YouTube 增长控制台。"),
       desc: text(
         lang,
-        "Instead of scattering tools across multiple products, ViralBrain.ai keeps trend discovery, API setup, analysis, report review, and library management inside one workflow.",
-        "不把能力拆散到多个产品里，ViralBrain.ai 把趋势发现、API 配置、分析、报告查看和爆款库管理统一放在一个工作流里。"
+        "Instead of scattering tools across multiple products, ViralBrain.ai keeps trend discovery, page-specific API setup, analysis, report review, and library management inside one workflow.",
+        "不把能力拆散到多个产品里，ViralBrain.ai 把趋势发现、按页面归位的 API 配置、分析、报告查看和爆款库管理统一放在一个工作流里。"
       )
     },
     {
@@ -100,8 +100,8 @@ export default async function HomePage() {
           <p>
             {text(
               lang,
-              "The homepage is intentionally a marketing overview. It does not bind to live provider data. Real data paths currently exist in single-video analysis, viral collection, and BYOK connection tests.",
-              "首页本身是产品能力展示页，并不直接绑定实时数据源。当前真实接入主要覆盖单视频分析、爆款采集，以及用户自带 Key 的连接测试。"
+              "The homepage is intentionally a marketing overview. It does not bind to live provider data. Real data paths now exist in single-video analysis, Hot Trends, viral collection, and BYOK connection tests.",
+              "首页本身是产品能力展示页，并不直接绑定实时数据源。当前真实接入已经覆盖单视频分析、热门趋势、爆款采集，以及用户自带 Key 的连接测试。"
             )}
           </p>
         </div>
