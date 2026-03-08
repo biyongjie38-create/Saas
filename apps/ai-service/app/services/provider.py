@@ -145,7 +145,7 @@ def _call_openai_json(
     *,
     model: str,
     system_prompt: str,
-    user_prompt: str,
+    user_prompt: Any,
     temperature: float,
     provider_overrides: ProviderOverrides | None = None,
 ) -> tuple[dict[str, Any], str, int, int, int, str | None]:
@@ -174,12 +174,13 @@ def run_json_task(
     task_name: str,
     model: str,
     system_prompt: str,
-    user_prompt: str,
+    user_prompt: Any,
     fallback_factory: Callable[[], dict[str, Any]],
     validator: Callable[[dict[str, Any]], Any],
     temperature: float = 0.3,
     max_retries: int = 1,
     provider_overrides: ProviderOverrides | None = None,
+    text_only_user_prompt: str | None = None,
 ) -> ModelExecution:
     started = time.perf_counter()
     mode = get_provider_mode()
@@ -210,6 +211,33 @@ def run_json_task(
                     provider_request_id=provider_request_id,
                 )
             except Exception as exc:
+                if text_only_user_prompt and not isinstance(user_prompt, str):
+                    try:
+                        payload, resolved_model, input_tokens, output_tokens, total_tokens, provider_request_id = _call_openai_json(
+                            model=model,
+                            system_prompt=system_prompt,
+                            user_prompt=text_only_user_prompt,
+                            temperature=temperature,
+                            provider_overrides=provider_overrides,
+                        )
+                        validator(payload)
+                        return ModelExecution(
+                            payload=payload,
+                            model=resolved_model,
+                            provider=provider_name,
+                            fallback_used=False,
+                            retries=attempt,
+                            latency_ms=int((time.perf_counter() - started) * 1000),
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            total_tokens=total_tokens,
+                            provider_request_id=provider_request_id,
+                        )
+                    except Exception as text_only_exc:
+                        last_error = text_only_exc
+                        print(f"[ai-service][{task_name}] {provider_name} text-only retry after multimodal failure: {text_only_exc}")
+                        continue
+
                 last_error = exc
                 print(f"[ai-service][{task_name}] {provider_name} attempt {attempt + 1} failed: {exc}")
     elif mode == "openai":

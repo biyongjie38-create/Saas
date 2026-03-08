@@ -21,6 +21,8 @@ export const demoVideos: Record<string, Omit<YoutubeVideo, "id" | "fetchedAt">> 
       "The case breakdown is practical and reusable.",
       "Before/after contrast in the thumbnail is effective."
     ],
+    captionsText:
+      "Never gonna give you up. Never gonna let you down. Never gonna run around and desert you.",
     dataSource: "mock_demo"
   },
   M7lc1UVfVEU: {
@@ -43,6 +45,8 @@ export const demoVideos: Record<string, Omit<YoutubeVideo, "id" | "fetchedAt">> 
       "Would love more real examples.",
       "Pacing markers are very useful."
     ],
+    captionsText:
+      "In the first week we stopped writing from scratch and moved every idea into a reusable script matrix.",
     dataSource: "mock_demo"
   },
   "E7wJTI-1dvQ": {
@@ -65,6 +69,8 @@ export const demoVideos: Record<string, Omit<YoutubeVideo, "id" | "fetchedAt">> 
       "Please add more AB test examples.",
       "The second comparison was very convincing."
     ],
+    captionsText:
+      "We tested one variable at a time, kept the visual promise obvious, and removed every extra word from the frame.",
     dataSource: "mock_demo"
   }
 };

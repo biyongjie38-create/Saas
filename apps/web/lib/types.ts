@@ -24,6 +24,7 @@ export type YoutubeVideo = {
   stats: VideoStats;
   thumbnailUrl: string;
   topComments: string[];
+  captionsText?: string | null;
   dataSource: VideoDataSource;
   fetchedAt: string;
 };

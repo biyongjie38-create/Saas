@@ -15,6 +15,32 @@ type QueryOptions = {
   apiKeyOverride?: string | null;
 };
 
+type YoutubeCaptionTrack = {
+  baseUrl?: string;
+  languageCode?: string;
+  kind?: string;
+  name?: {
+    simpleText?: string;
+    runs?: Array<{ text?: string }>;
+  };
+};
+
+type YoutubePlayerResponse = {
+  captions?: {
+    playerCaptionsTracklistRenderer?: {
+      captionTracks?: YoutubeCaptionTrack[];
+    };
+  };
+};
+
+type YoutubeCaptionJson3Response = {
+  events?: Array<{
+    segs?: Array<{
+      utf8?: string;
+    }>;
+  }>;
+};
+
 type YoutubeApiVideoItem = {
   id: string;
   snippet?: {
@@ -87,6 +113,7 @@ function toVideoFromRow(row: Record<string, unknown>): YoutubeVideo {
     },
     thumbnailUrl: String(row.thumbnail_url ?? ""),
     topComments,
+    captionsText: typeof row.captions_text === "string" ? row.captions_text : null,
     dataSource: normalizeDataSource(row.data_source),
     fetchedAt: String(row.fetched_at ?? new Date().toISOString())
   };
@@ -105,6 +132,7 @@ function toVideoRow(video: YoutubeVideo, includeDataSource = true): Record<strin
     stats: video.stats,
     thumbnail_url: video.thumbnailUrl,
     top_comments: video.topComments,
+    captions_text: video.captionsText ?? null,
     fetched_at: video.fetchedAt
   };
 
@@ -160,6 +188,7 @@ async function saveVideo(video: YoutubeVideo, options?: QueryOptions): Promise<Y
 
     const compatibilityPayload = toVideoRow(video, false);
     delete compatibilityPayload.description;
+    delete compatibilityPayload.captions_text;
 
     const fallbackTry = await client.from("videos").upsert(compatibilityPayload, { onConflict: "video_id" }).select("*").single();
 
@@ -171,7 +200,8 @@ async function saveVideo(video: YoutubeVideo, options?: QueryOptions): Promise<Y
     return {
       ...toVideoFromRow(row),
       dataSource: video.dataSource,
-      description: video.description
+      description: video.description,
+      captionsText: video.captionsText ?? null
     };
   }
 
@@ -243,6 +273,10 @@ function createMockVideo(
       "Would like more practical examples.",
       "Strong consistency between title and thumbnail."
     ],
+    captionsText:
+      source === "mock_demo"
+        ? demoVideos[videoId]?.captionsText ?? null
+        : "Synthetic transcript preview generated because live captions were unavailable in the current environment.",
     dataSource: "mock_synthetic"
   };
 }
@@ -282,12 +316,133 @@ function pickThumbnail(item: YoutubeApiVideoItem, videoId: string): string {
   );
 }
 
+function decodeHtmlJsonLiteral(value: string): string {
+  return value
+    .replace(/\\u0026/g, "&")
+    .replace(/\\u003d/g, "=")
+    .replace(/\\u002F/g, "/");
+}
+
+function parsePlayerResponse(html: string): YoutubePlayerResponse | null {
+  const patterns = [
+    /ytInitialPlayerResponse\s*=\s*({.+?});<\/script>/s,
+    /ytInitialPlayerResponse\s*=\s*({.+?});/s,
+    /"playerResponse":"({.+?})"/s
+  ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match?.[1]) {
+      continue;
+    }
+
+    const candidate = pattern.source.includes('"playerResponse"')
+      ? decodeHtmlJsonLiteral(match[1]).replace(/\\"/g, '"')
+      : match[1];
+
+    try {
+      return JSON.parse(candidate) as YoutubePlayerResponse;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function scoreCaptionTrack(track: YoutubeCaptionTrack): number {
+  const language = (track.languageCode ?? "").toLowerCase();
+  const label = [
+    track.name?.simpleText ?? "",
+    ...(track.name?.runs?.map((item) => item.text ?? "") ?? [])
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  let score = 0;
+
+  if (track.kind !== "asr") {
+    score += 5;
+  }
+  if (language.startsWith("en")) {
+    score += 4;
+  }
+  if (language.startsWith("zh")) {
+    score += 3;
+  }
+  if (label.includes("english")) {
+    score += 2;
+  }
+  if (label.includes("chinese") || label.includes("中文")) {
+    score += 2;
+  }
+
+  return score;
+}
+
+function pickCaptionTrack(tracks: YoutubeCaptionTrack[]): YoutubeCaptionTrack | null {
+  if (!tracks.length) {
+    return null;
+  }
+
+  return [...tracks].sort((left, right) => scoreCaptionTrack(right) - scoreCaptionTrack(left))[0] ?? null;
+}
+
+function normalizeCaptionLine(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .trim();
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`YT_HTTP_${response.status}`);
   }
   return (await response.json()) as T;
+}
+
+async function fetchCaptionText(trackBaseUrl: string): Promise<string | null> {
+  const captionUrl = new URL(trackBaseUrl);
+  captionUrl.searchParams.set("fmt", "json3");
+
+  const payload = await fetchJson<YoutubeCaptionJson3Response>(captionUrl.toString());
+  const lines = (payload.events ?? [])
+    .map((event) => (event.segs ?? []).map((segment) => segment.utf8 ?? "").join(""))
+    .map(normalizeCaptionLine)
+    .filter(Boolean);
+
+  if (!lines.length) {
+    return null;
+  }
+
+  return lines.join(" ").slice(0, 12000);
+}
+
+async function fetchCaptionsFromWatchPage(videoId: string): Promise<string | null> {
+  const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`YT_WATCH_HTTP_${response.status}`);
+  }
+
+  const html = await response.text();
+  const playerResponse = parsePlayerResponse(html);
+  const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  const preferredTrack = pickCaptionTrack(tracks);
+
+  if (!preferredTrack?.baseUrl) {
+    return null;
+  }
+
+  return fetchCaptionText(preferredTrack.baseUrl);
 }
 
 async function fetchFromYoutubeApi(videoId: string, url: string, apiKey: string): Promise<Omit<YoutubeVideo, "id" | "fetchedAt">> {
@@ -312,6 +467,7 @@ async function fetchFromYoutubeApi(videoId: string, url: string, apiKey: string)
   commentsApiUrl.searchParams.set("key", apiKey);
 
   let topComments: string[] = [];
+  let captionsText: string | null = null;
 
   try {
     const commentsPayload = await fetchJson<YoutubeApiCommentsResponse>(commentsApiUrl.toString());
@@ -325,6 +481,12 @@ async function fetchFromYoutubeApi(videoId: string, url: string, apiKey: string)
       .slice(0, 20);
   } catch {
     topComments = [];
+  }
+
+  try {
+    captionsText = await fetchCaptionsFromWatchPage(videoId);
+  } catch {
+    captionsText = null;
   }
 
   return {
@@ -343,6 +505,7 @@ async function fetchFromYoutubeApi(videoId: string, url: string, apiKey: string)
     },
     thumbnailUrl: pickThumbnail(item, videoId),
     topComments,
+    captionsText,
     dataSource: "youtube_api"
   };
 }
@@ -365,7 +528,7 @@ export async function fetchYoutubeData(url: string, options?: QueryOptions): Pro
 
   if (existing) {
     const age = Date.now() - new Date(existing.fetchedAt).getTime();
-    if (age < CACHE_TTL_MS) {
+    if (age < CACHE_TTL_MS && (existing.captionsText || existing.dataSource !== "youtube_api")) {
       return existing;
     }
   }
@@ -505,6 +668,7 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
           },
           thumbnailUrl: pickThumbnail(item, videoId),
           topComments: [],
+          captionsText: null,
           dataSource: "youtube_api",
           fetchedAt: new Date().toISOString(),
         };

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
+import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import type { Lang } from "@/lib/i18n-shared";
 import type { UserPlan, ViralLibraryItem } from "@/lib/types";
 
@@ -23,6 +24,11 @@ type ImportResponse = {
   data: {
     imported_count: number;
     items: ViralLibraryItem[];
+    vector_sync?: {
+      ok: boolean;
+      message: string;
+      detail?: string;
+    };
   } | null;
   error?: ApiError | null;
 };
@@ -34,6 +40,11 @@ type DeleteResponse = {
     id: string;
     action?: "restore" | "purge";
     success?: boolean;
+    vector_sync?: {
+      ok: boolean;
+      message: string;
+      detail?: string;
+    };
   } | null;
   error?: ApiError | null;
 };
@@ -196,7 +207,8 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
         const response = await fetch("/api/library/import", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
           },
           body: JSON.stringify({ format, content })
         });
@@ -213,7 +225,14 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
-        setMessage(`${copy.imported} ${payload.data.imported_count} ${copy.items}`);
+        setMessage(
+          [
+            `${copy.imported} ${payload.data.imported_count} ${copy.items}`,
+            payload.data.vector_sync?.message ?? ""
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        );
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : copy.importFailed);
       }
@@ -226,7 +245,12 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
     setMessage("");
 
     try {
-      const response = await fetch(`/api/library/${item.id}`, { method: "DELETE" });
+      const response = await fetch(`/api/library/${item.id}`, {
+        method: "DELETE",
+        headers: {
+          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
+        }
+      });
       const payload = (await response.json().catch(() => null)) as DeleteResponse | null;
       if (!response.ok || !payload?.ok || payload.data?.deleted !== true) {
         setError(payload?.error?.message ?? copy.deleteFailed);
@@ -236,7 +260,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
       const deletedAt = new Date().toISOString();
       setItems((current) => current.filter((entry) => entry.id !== item.id));
       setDeletedItems((current) => [{ ...item, deletedAt }, ...current]);
-      setMessage(copy.deleted);
+      setMessage([copy.deleted, payload.data.vector_sync?.message ?? ""].filter(Boolean).join(" · "));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.deleteFailed);
     } finally {
@@ -253,7 +277,8 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
       const response = await fetch(`/api/library/${item.id}`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
         },
         body: JSON.stringify({ action })
       });
@@ -269,7 +294,14 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
       } else {
         setDeletedItems((current) => current.filter((entry) => entry.id !== item.id));
       }
-      setMessage(action === "restore" ? copy.restore : copy.purge);
+      setMessage(
+        [
+          action === "restore" ? copy.restore : copy.purge,
+          payload.data.vector_sync?.message ?? ""
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.deleteFailed);
     } finally {

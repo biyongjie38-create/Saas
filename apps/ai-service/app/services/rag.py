@@ -349,6 +349,29 @@ def _embed_query(text: str, provider_overrides: dict[str, str] | None = None) ->
     return response.data[0].embedding, model, prompt_tokens, 0, total_tokens, provider_request_id
 
 
+def _embed_documents(texts: list[str], provider_overrides: dict[str, str] | None = None) -> tuple[list[list[float]], str]:
+    client = _create_openai_client(provider_overrides)
+    model = (
+        (provider_overrides.get("embedding_model") if provider_overrides else "")
+        or os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip()
+        or "text-embedding-3-small"
+    )
+    response = client.embeddings.create(
+        model=model,
+        input=texts,
+        encoding_format="float",
+    )
+    return [item.embedding for item in response.data], model
+
+
+def _resolve_namespace(provider_overrides: dict[str, str] | None = None) -> str:
+    return (
+        provider_overrides.get("pinecone_namespace")
+        if provider_overrides and provider_overrides.get("pinecone_namespace")
+        else os.getenv("PINECONE_NAMESPACE", "viral-library")
+    )
+
+
 def _build_local_execution(mode: str, data: RagCompareRequest, started: float) -> ModelExecution:
     return ModelExecution(
         payload=build_benchmark_payload(data),
@@ -387,7 +410,7 @@ def run_benchmark_retrieval(
         index = _create_pinecone_index(provider_overrides)
 
         kwargs: dict[str, Any] = {
-            "namespace": provider_overrides.get("pinecone_namespace") if provider_overrides and provider_overrides.get("pinecone_namespace") else os.getenv("PINECONE_NAMESPACE", "viral-library"),
+            "namespace": _resolve_namespace(provider_overrides),
             "vector": vector,
             "top_k": resolved_top_k,
             "include_metadata": True,
@@ -442,5 +465,56 @@ def build_embedding_records(items: list[dict[str, Any]]) -> list[dict[str, Any]]
             }
         )
     return records
+
+
+def upsert_library_index(items: list[dict[str, Any]], provider_overrides: dict[str, str] | None = None) -> dict[str, Any]:
+    records = build_embedding_records(items)
+    if not records:
+        return {"upserted": 0, "namespace": _resolve_namespace(provider_overrides), "model": "none", "provider": "noop"}
+
+    embeddings, model = _embed_documents([record["content"] for record in records], provider_overrides)
+    index = _create_pinecone_index(provider_overrides)
+    namespace = _resolve_namespace(provider_overrides)
+
+    vectors = []
+    for record, embedding in zip(records, embeddings, strict=True):
+        vectors.append(
+            {
+                "id": record["id"],
+                "values": embedding,
+                "metadata": {
+                    "title": record["title"],
+                    "summary": record["summary"],
+                    "source_url": record["source_url"],
+                    "topic": record["topic"],
+                    "hook_type": record["hook_type"],
+                    "duration_bucket": record["duration_bucket"],
+                },
+            }
+        )
+
+    index.upsert(vectors=vectors, namespace=namespace)
+
+    return {
+        "upserted": len(vectors),
+        "namespace": namespace,
+        "model": model,
+        "provider": f"{(provider_overrides.get('llm_provider') if provider_overrides and provider_overrides.get('llm_provider') else 'openai')}+pinecone",
+    }
+
+
+def delete_library_index(ids: list[str], provider_overrides: dict[str, str] | None = None) -> dict[str, Any]:
+    namespace = _resolve_namespace(provider_overrides)
+    resolved_ids = [item for item in ids if item]
+    if not resolved_ids:
+        return {"deleted": 0, "namespace": namespace, "provider": "noop"}
+
+    index = _create_pinecone_index(provider_overrides)
+    index.delete(ids=resolved_ids, namespace=namespace)
+    return {
+        "deleted": len(resolved_ids),
+        "namespace": namespace,
+        "provider": f"{(provider_overrides.get('llm_provider') if provider_overrides and provider_overrides.get('llm_provider') else 'openai')}+pinecone",
+    }
 
 

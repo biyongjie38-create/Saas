@@ -8,20 +8,30 @@ from app.schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
     BenchmarksPayload,
+    RagDeleteRequest,
+    RagDeleteResponse,
     RagCompareRequest,
     RagCompareResponse,
+    RagIndexRequest,
+    RagIndexResponse,
     ScorePayload,
     ScoreRequest,
     ScoreResponse,
 )
 from app.services.analysis import (
     build_analysis_payload,
+    build_analysis_user_content,
     build_analysis_system_prompt,
     build_analysis_user_prompt,
 )
 from app.services.model_router import route_analysis_model, route_score_model
 from app.services.provider import build_provider_overrides, run_json_task
-from app.services.rag import build_rag_provider_overrides, run_benchmark_retrieval
+from app.services.rag import (
+    build_rag_provider_overrides,
+    delete_library_index,
+    run_benchmark_retrieval,
+    upsert_library_index,
+)
 from app.services.scoring import (
     build_score_payload,
     build_score_system_prompt,
@@ -56,12 +66,13 @@ def analyze(
         task_name="analysis",
         model=model,
         system_prompt=build_analysis_system_prompt(),
-        user_prompt=build_analysis_user_prompt(data),
+        user_prompt=build_analysis_user_content(data),
         fallback_factory=lambda: build_analysis_payload(data),
         validator=lambda payload: AnalysisPayload.model_validate(payload),
         temperature=0.4,
         max_retries=1,
         provider_overrides=provider_overrides,
+        text_only_user_prompt=build_analysis_user_prompt(data),
     )
 
     return AnalyzeResponse(
@@ -114,6 +125,58 @@ def rag_compare(
         retries=result.retries,
         latency_ms=result.latency_ms,
     )
+
+
+@app.post("/ai/rag/index", response_model=RagIndexResponse)
+def rag_index(
+    data: RagIndexRequest,
+    x_vb_llm_provider: str | None = Header(default=None),
+    x_vb_openai_api_key: str | None = Header(default=None),
+    x_vb_openai_base_url: str | None = Header(default=None),
+    x_vb_embedding_model: str | None = Header(default=None),
+    x_vb_pinecone_api_key: str | None = Header(default=None),
+    x_vb_pinecone_index_host: str | None = Header(default=None),
+    x_vb_pinecone_index_name: str | None = Header(default=None),
+    x_vb_pinecone_namespace: str | None = Header(default=None),
+) -> RagIndexResponse:
+    provider_overrides = build_rag_provider_overrides(
+        llm_provider=x_vb_llm_provider,
+        openai_api_key=x_vb_openai_api_key,
+        openai_base_url=x_vb_openai_base_url,
+        embedding_model=x_vb_embedding_model,
+        pinecone_api_key=x_vb_pinecone_api_key,
+        pinecone_index_host=x_vb_pinecone_index_host,
+        pinecone_index_name=x_vb_pinecone_index_name,
+        pinecone_namespace=x_vb_pinecone_namespace,
+    )
+    result = upsert_library_index([item.model_dump() for item in data.items], provider_overrides)
+    return RagIndexResponse(**result)
+
+
+@app.post("/ai/rag/delete", response_model=RagDeleteResponse)
+def rag_delete(
+    data: RagDeleteRequest,
+    x_vb_llm_provider: str | None = Header(default=None),
+    x_vb_openai_api_key: str | None = Header(default=None),
+    x_vb_openai_base_url: str | None = Header(default=None),
+    x_vb_embedding_model: str | None = Header(default=None),
+    x_vb_pinecone_api_key: str | None = Header(default=None),
+    x_vb_pinecone_index_host: str | None = Header(default=None),
+    x_vb_pinecone_index_name: str | None = Header(default=None),
+    x_vb_pinecone_namespace: str | None = Header(default=None),
+) -> RagDeleteResponse:
+    provider_overrides = build_rag_provider_overrides(
+        llm_provider=x_vb_llm_provider,
+        openai_api_key=x_vb_openai_api_key,
+        openai_base_url=x_vb_openai_base_url,
+        embedding_model=x_vb_embedding_model,
+        pinecone_api_key=x_vb_pinecone_api_key,
+        pinecone_index_host=x_vb_pinecone_index_host,
+        pinecone_index_name=x_vb_pinecone_index_name,
+        pinecone_namespace=x_vb_pinecone_namespace,
+    )
+    result = delete_library_index(data.ids, provider_overrides)
+    return RagDeleteResponse(**result)
 
 
 @app.post("/ai/score", response_model=ScoreResponse)

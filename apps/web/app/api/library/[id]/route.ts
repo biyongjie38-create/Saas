@@ -1,13 +1,16 @@
 ﻿import { z } from "zod";
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
+import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import {
   getApiAuthUser,
   resolveAuthenticatedAppUser,
   unauthorizedJsonResponse
 } from "@/lib/auth";
+import { deleteLibraryVectors, syncLibraryVectors } from "@/lib/library-vector-sync";
 import { assertPlanFeature } from "@/lib/plan-access";
 import {
   deleteLibraryItem,
+  getLibraryItemById,
   purgeLibraryItem,
   restoreLibraryItem
 } from "@/lib/report-store";
@@ -46,6 +49,7 @@ export const DELETE = withApiRoute<Params>(async (_request, { requestId }, conte
   }
 
   const supabaseClient = await maybeCreateServerSupabaseClient();
+  const existing = await getLibraryItemById(parsedParams.data.id, { supabaseClient });
   const deleted = await deleteLibraryItem(parsedParams.data.id, { supabaseClient });
 
   if (!deleted) {
@@ -59,10 +63,16 @@ export const DELETE = withApiRoute<Params>(async (_request, { requestId }, conte
     );
   }
 
+  const providerConfig = readApiIntegrationConfigFromHeaders(_request.headers);
+  const vectorSync = existing
+    ? await deleteLibraryVectors([existing.id], providerConfig)
+    : { ok: true, message: "No vector deletion was needed." };
+
   return okJsonResponse(
     {
       deleted: true,
-      id: parsedParams.data.id
+      id: parsedParams.data.id,
+      vector_sync: vectorSync
     },
     requestId
   );
@@ -101,6 +111,8 @@ export const POST = withApiRoute<Params>(async (request, { requestId }, context)
   const supabaseClient = await maybeCreateServerSupabaseClient();
   const user = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
   assertPlanFeature(user.plan, "canManageRecycleBin", "Upgrade to Pro to manage the recycle bin.");
+  const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
+  const existing = await getLibraryItemById(parsedParams.data.id, { supabaseClient });
 
   const success = parsedAction.data.action === "restore"
     ? await restoreLibraryItem(parsedParams.data.id, { supabaseClient })
@@ -117,11 +129,19 @@ export const POST = withApiRoute<Params>(async (request, { requestId }, context)
     );
   }
 
+  const restoredItem = parsedAction.data.action === "restore"
+    ? await getLibraryItemById(parsedParams.data.id, { supabaseClient })
+    : null;
+  const vectorSync = parsedAction.data.action === "restore"
+    ? await syncLibraryVectors(restoredItem ? [restoredItem] : [], providerConfig)
+    : await deleteLibraryVectors(existing ? [existing.id] : [], providerConfig);
+
   return okJsonResponse(
     {
       id: parsedParams.data.id,
       action: parsedAction.data.action,
-      success: true
+      success: true,
+      vector_sync: vectorSync
     },
     requestId
   );

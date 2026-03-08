@@ -563,7 +563,7 @@ function normalizeLibraryImportItem(input: LibraryImportInput): LibraryImportInp
   };
 }
 
-function createLibraryEmbeddingKey(input: LibraryImportInput): string {
+export function buildLibraryEmbeddingKey(input: LibraryImportInput): string {
   const normalized = normalizeLibraryImportItem(input);
   const payload = [
     normalized.title.toLowerCase(),
@@ -623,7 +623,7 @@ export async function importLibraryItems(
   }
 
   const deduped = Array.from(
-    new Map(normalizedItems.map((item) => [createLibraryEmbeddingKey(item), item])).entries()
+    new Map(normalizedItems.map((item) => [buildLibraryEmbeddingKey(item), item])).entries()
   );
 
   const client = await getSupabaseUserClient(options);
@@ -655,7 +655,7 @@ export async function importLibraryItems(
   const db = await readDb();
   const existingByKey = new Map(
     db.library.map((item) => [
-      createLibraryEmbeddingKey({
+      buildLibraryEmbeddingKey({
         title: item.title,
         sourceUrl: item.sourceUrl,
         summary: item.summary,
@@ -698,6 +698,26 @@ export async function importLibraryItems(
   db.library.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
   await writeDb(db);
   return db.library.filter((item) => !item.deletedAt);
+}
+
+export async function getLibraryItemById(id: string, options?: QueryOptions): Promise<ViralLibraryItem | null> {
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { data, error } = await client
+      .from("viral_library_items")
+      .select("id,title,source_url,summary,tags,created_at,deleted_at,embedding_key")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`SUPABASE_GET_LIBRARY_ITEM_FAILED:${error.message}`);
+    }
+
+    return data ? toLibraryItem(data as LibraryRow) : null;
+  }
+
+  const db = await readDb();
+  return db.library.find((item) => item.id === id) ?? null;
 }
 
 export async function deleteLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {

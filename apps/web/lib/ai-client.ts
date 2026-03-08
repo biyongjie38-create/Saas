@@ -239,7 +239,8 @@ export async function runAnalysis(video: YoutubeVideo, providerConfig?: ApiInteg
           stats: toAiStats(video.stats)
         },
         comments: video.topComments,
-        thumbnail_url: video.thumbnailUrl
+        thumbnail_url: video.thumbnailUrl,
+        captions_text: video.captionsText ?? null
       },
       providerConfig
     );

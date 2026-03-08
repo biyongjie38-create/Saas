@@ -28,6 +28,7 @@ type ReportTabCopy = {
   views: string;
   likes: string;
   comments: string;
+  captions: string;
   sentiment: string;
   score: string;
   breakdown: string;
@@ -42,6 +43,7 @@ type ReportTabCopy = {
   pacingLabel: string;
   valueLabel: string;
   noVideo: string;
+  noCaptions: string;
   noAnalysis: string;
   noThumbnail: string;
   noAudience: string;
@@ -79,6 +81,7 @@ const copyByLang: Record<Lang, ReportTabCopy> = {
     views: "Views",
     likes: "Likes",
     comments: "Comments",
+    captions: "Captions",
     sentiment: "Sentiment",
     score: "Score",
     breakdown: "Breakdown",
@@ -93,6 +96,7 @@ const copyByLang: Record<Lang, ReportTabCopy> = {
     pacingLabel: "Pacing",
     valueLabel: "Value Density",
     noVideo: "No cached video data found.",
+    noCaptions: "No captions were captured for this video.",
     noAnalysis: "Analysis not ready yet.",
     noThumbnail: "No thumbnail review yet.",
     noAudience: "No comments insight yet.",
@@ -128,6 +132,7 @@ const copyByLang: Record<Lang, ReportTabCopy> = {
     views: "播放",
     likes: "点赞",
     comments: "评论",
+    captions: "字幕",
     sentiment: "情绪",
     score: "评分",
     breakdown: "拆解",
@@ -142,6 +147,7 @@ const copyByLang: Record<Lang, ReportTabCopy> = {
     pacingLabel: "节奏",
     valueLabel: "价值密度",
     noVideo: "未找到缓存视频数据。",
+    noCaptions: "当前视频未抓到字幕。",
     noAnalysis: "分析结果暂未就绪。",
     noThumbnail: "暂无封面评估。",
     noAudience: "暂无评论洞察。",
@@ -278,6 +284,11 @@ export function ReportTabs({ lang, video, analysis, benchmarks, score, trace }: 
                     {copy.views} {video.stats.viewCount.toLocaleString()} - {copy.likes} {video.stats.likeCount.toLocaleString()} - {copy.comments} {video.stats.commentCount.toLocaleString()}
                   </p>
                   <p className="small mono">{copy.source}: {sourceLabelByLang[lang][video.dataSource]}</p>
+                  <p className="small">
+                    <strong>{copy.captions}:</strong>{" "}
+                    {video.captionsText ? video.captionsText.slice(0, 240) : copy.noCaptions}
+                    {video.captionsText && video.captionsText.length > 240 ? "..." : ""}
+                  </p>
                 </>
               ) : (
                 <p className="small">{copy.noVideo}</p>

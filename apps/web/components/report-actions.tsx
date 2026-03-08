@@ -41,6 +41,7 @@ type Copy = {
   share: string;
   rerun: string;
   exportPdf: string;
+  exporting: string;
   sharing: string;
   rerunning: string;
   copied: string;
@@ -57,6 +58,7 @@ const copyByLang: Record<Lang, Copy> = {
     share: "Share Link",
     rerun: "Rerun with Live Data",
     exportPdf: "Export PDF",
+    exporting: "Exporting...",
     sharing: "Creating...",
     rerunning: "Rerunning...",
     copied: "Share link copied.",
@@ -71,6 +73,7 @@ const copyByLang: Record<Lang, Copy> = {
     share: "分享链接",
     rerun: "用真实数据重跑",
     exportPdf: "导出 PDF",
+    exporting: "导出中...",
     sharing: "生成中...",
     rerunning: "重跑中...",
     copied: "分享链接已复制。",
@@ -89,6 +92,7 @@ export function ReportActions({ lang, plan, reportId, compact = false, includePr
   const features = getPlanFeatures(plan);
   const [sharing, setSharing] = useState(false);
   const [rerunning, setRerunning] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -162,14 +166,43 @@ export function ReportActions({ lang, plan, reportId, compact = false, includePr
     }
   }
 
-  function handlePrint() {
+  async function handlePrint() {
     if (!features.canExportReports) {
       setError(copy.upgradeExport);
       setMessage("");
       return;
     }
 
-    window.print();
+    setError("");
+    setMessage("");
+    setExporting(true);
+
+    try {
+      const response = await fetch(`/api/reports/${reportId}/export`, {
+        method: "GET",
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+        setError(payload?.error?.message ?? copy.failed);
+        return;
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = `viral-report-${reportId}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.failed);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -181,8 +214,8 @@ export function ReportActions({ lang, plan, reportId, compact = false, includePr
         {rerunning ? copy.rerunning : copy.rerun}
       </button>
       {includePrint ? (
-        <button type="button" className="btn btn-ghost report-history-action" onClick={handlePrint}>
-          {copy.exportPdf}
+        <button type="button" className="btn btn-ghost report-history-action" onClick={handlePrint} disabled={exporting}>
+          {exporting ? copy.exporting : copy.exportPdf}
         </button>
       ) : null}
       {message ? <p className="small status-done report-actions-note">{message}</p> : null}

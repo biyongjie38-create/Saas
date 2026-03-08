@@ -25,6 +25,7 @@ class AnalyzeRequest(BaseModel):
     metadata: Metadata
     comments: list[str] = Field(default_factory=list)
     thumbnail_url: HttpUrl
+    captions_text: str | None = None
 
 
 class StructureAnalysis(BaseModel):
@@ -70,6 +71,41 @@ class RagCompareRequest(BaseModel):
     structure_summary: str
     topic_hint: str = ""
     top_k: int = Field(default=3, ge=1, le=5)
+
+
+class LibraryVectorTags(BaseModel):
+    hook_type: str = "unknown"
+    topic: str = "general"
+    duration_bucket: str = "5-10m"
+
+
+class LibraryVectorItem(BaseModel):
+    id: str
+    title: str
+    summary: str
+    source_url: str = ""
+    tags: LibraryVectorTags
+
+
+class RagIndexRequest(BaseModel):
+    items: list[LibraryVectorItem] = Field(default_factory=list)
+
+
+class RagIndexResponse(BaseModel):
+    upserted: int
+    namespace: str
+    model: str
+    provider: str
+
+
+class RagDeleteRequest(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+
+
+class RagDeleteResponse(BaseModel):
+    deleted: int
+    namespace: str
+    provider: str
 
 
 class BenchmarkItem(BaseModel):

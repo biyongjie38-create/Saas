@@ -1,8 +1,14 @@
 ﻿import { z } from "zod";
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
+import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
+import { syncLibraryVectors } from "@/lib/library-vector-sync";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
-import { importLibraryItems, type LibraryImportInput } from "@/lib/report-store";
+import {
+  buildLibraryEmbeddingKey,
+  importLibraryItems,
+  type LibraryImportInput
+} from "@/lib/report-store";
 
 export const runtime = "nodejs";
 
@@ -154,12 +160,26 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const supabaseClient = await maybeCreateServerSupabaseClient();
+  const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
   const merged = await importLibraryItems(items, { supabaseClient });
+  const importedKeys = new Set(items.map((item) => buildLibraryEmbeddingKey(item)));
+  const syncedItems = merged.filter((item) =>
+    importedKeys.has(
+      buildLibraryEmbeddingKey({
+        title: item.title,
+        sourceUrl: item.sourceUrl,
+        summary: item.summary,
+        tags: item.tags
+      })
+    )
+  );
+  const vectorSync = await syncLibraryVectors(syncedItems, providerConfig);
 
   return okJsonResponse(
     {
       imported_count: items.length,
-      items: merged
+      items: merged,
+      vector_sync: vectorSync
     },
     requestId
   );
