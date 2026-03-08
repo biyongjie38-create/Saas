@@ -349,7 +349,11 @@ a {
   color: var(--muted);
   border-radius: 999px;
   padding: 10px 14px;
+  min-height: 46px;
   font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  flex: 0 0 auto;
   cursor: pointer;
   transition: transform 0.22s ease, box-shadow 0.22s ease, color 0.22s ease, border-color 0.22s ease, background 0.22s ease;
 }
@@ -549,6 +553,7 @@ a {
 
 .compact-button {
   min-height: 40px;
+  white-space: nowrap;
 }
 
 .membership-intro {
@@ -1874,14 +1879,28 @@ a {
 
 .trends-video-grid {
   display: grid;
-  grid-template-columns: 56px 92px minmax(260px, 1fr) 120px 160px 130px 120px 130px;
+  grid-template-columns: 52px 92px minmax(220px, 1.75fr) 108px minmax(120px, 0.95fr) 96px minmax(96px, 0.82fr) 112px;
   gap: 14px;
 }
 
 .trends-channel-grid {
   display: grid;
-  grid-template-columns: 56px minmax(190px, 1fr) 150px 110px 130px 110px 90px 130px;
+  grid-template-columns: 52px minmax(168px, 1.2fr) minmax(112px, 0.85fr) 84px 108px 92px 72px 112px;
   gap: 14px;
+}
+
+.trends-video-grid > *,
+.trends-channel-grid > * {
+  min-width: 0;
+}
+
+.trends-video-grid > .compact-button,
+.trends-channel-grid > .compact-button {
+  width: 100%;
+  max-width: 112px;
+  justify-self: end;
+  padding-inline: 10px;
+  overflow: hidden;
 }
 
 .trend-row {
@@ -1939,11 +1958,17 @@ a {
 .trend-title-block {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .trend-title-block strong {
   font-size: 16px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.trend-title-block span {
+  overflow-wrap: anywhere;
 }
 
 .trend-topic-grid {
@@ -2160,11 +2185,11 @@ a {
 
 @media (max-width: 1100px) {
   .trends-video-grid {
-    grid-template-columns: 52px 82px minmax(220px, 1fr) 120px 150px 120px 110px 118px;
+    grid-template-columns: 48px 82px minmax(180px, 1.5fr) 96px minmax(104px, 0.9fr) 86px minmax(88px, 0.72fr) 104px;
   }
 
   .trends-channel-grid {
-    grid-template-columns: 52px minmax(160px, 1fr) 136px 100px 120px 100px 82px 118px;
+    grid-template-columns: 48px minmax(148px, 1.12fr) minmax(104px, 0.82fr) 74px 96px 82px 64px 104px;
   }
 }
 
