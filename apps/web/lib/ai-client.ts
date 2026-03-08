@@ -4,6 +4,7 @@
   type ApiIntegrationConfig
 } from "@/lib/api-integrations";
 import { generateLocalAnalysis, generateLocalBenchmarks, generateLocalScore } from "@/lib/local-ai";
+import { isProductionRuntimeMode } from "@/lib/runtime-mode";
 import type {
   AnalysisJson,
   BenchmarksJson,
@@ -126,6 +127,12 @@ function shouldUseLocalAiMode(): boolean {
   return AI_SERVICE_MODE === "local";
 }
 
+function assertLocalModeAllowed() {
+  if (shouldUseLocalAiMode() && isProductionRuntimeMode()) {
+    throw new Error("AI_SERVICE_LOCAL_MODE_DISABLED");
+  }
+}
+
 function createLocalTrace(model: string): ModelTraceStep {
   return {
     model,
@@ -208,6 +215,26 @@ async function postJson<TResponse>(path: string, payload: unknown, providerConfi
     });
 
     if (!response.ok) {
+      const raw = await response.text();
+      if (raw) {
+        try {
+          const payload = JSON.parse(raw) as { detail?: string; error?: { message?: string } };
+          const detail = payload?.detail ?? payload?.error?.message;
+          if (typeof detail === "string" && detail.trim()) {
+            throw new Error(detail.trim());
+          }
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            !(error instanceof SyntaxError) &&
+            error.message &&
+            error.message !== raw
+          ) {
+            throw error;
+          }
+        }
+      }
+
       throw new Error(`AI_SERVICE_${response.status}`);
     }
 
@@ -218,6 +245,7 @@ async function postJson<TResponse>(path: string, payload: unknown, providerConfi
 }
 
 export async function runAnalysis(video: YoutubeVideo, providerConfig?: ApiIntegrationConfig): Promise<AnalysisRunResult> {
+  assertLocalModeAllowed();
   if (shouldUseLocalAiMode()) {
     return {
       analysis: generateLocalAnalysis(video),
@@ -249,7 +277,10 @@ export async function runAnalysis(video: YoutubeVideo, providerConfig?: ApiInteg
       analysis: fromAiAnalysis(res.analysis),
       trace: toTraceMeta(res)
     };
-  } catch {
+  } catch (error) {
+    if (isProductionRuntimeMode()) {
+      throw error instanceof Error ? error : new Error("AI_ANALYSIS_FAILED");
+    }
     return {
       analysis: generateLocalAnalysis(video),
       trace: createLocalTrace("local::analysis-web-fallback")
@@ -263,6 +294,7 @@ export async function runBenchmarks(
   libraryItems: ViralLibraryItem[],
   providerConfig?: ApiIntegrationConfig
 ): Promise<BenchmarksRunResult> {
+  assertLocalModeAllowed();
   if (shouldUseLocalAiMode()) {
     return {
       benchmarks: generateLocalBenchmarks(video, libraryItems),
@@ -286,7 +318,10 @@ export async function runBenchmarks(
       benchmarks: fromAiBenchmarks(res.benchmarks),
       trace: toTraceMeta(res)
     };
-  } catch {
+  } catch (error) {
+    if (isProductionRuntimeMode()) {
+      throw error instanceof Error ? error : new Error("AI_BENCHMARK_FAILED");
+    }
     return {
       benchmarks: generateLocalBenchmarks(video, libraryItems),
       trace: createLocalTrace("local::benchmark-web-fallback")
@@ -300,6 +335,7 @@ export async function runScoring(
   benchmarks: BenchmarksJson,
   providerConfig?: ApiIntegrationConfig
 ): Promise<ScoreRunResult> {
+  assertLocalModeAllowed();
   if (shouldUseLocalAiMode()) {
     return {
       score: generateLocalScore(video, analysis),
@@ -358,7 +394,10 @@ export async function runScoring(
       score: fromAiScore(res.score),
       trace: toTraceMeta(res)
     };
-  } catch {
+  } catch (error) {
+    if (isProductionRuntimeMode()) {
+      throw error instanceof Error ? error : new Error("AI_SCORE_FAILED");
+    }
     return {
       score: generateLocalScore(video, analysis),
       trace: createLocalTrace("local::score-web-fallback")

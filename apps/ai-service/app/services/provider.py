@@ -53,6 +53,21 @@ def get_provider_mode() -> str:
     return "auto"
 
 
+def get_runtime_mode() -> str:
+    value = (os.getenv("AI_RUNTIME_MODE") or os.getenv("APP_RUNTIME_MODE") or "preview").strip().lower()
+    if value == "production":
+        return "production"
+    return "preview"
+
+
+def is_production_runtime_mode() -> bool:
+    return get_runtime_mode() == "production"
+
+
+def allow_local_fallbacks() -> bool:
+    return not is_production_runtime_mode()
+
+
 def _resolve_timeout() -> float:
     raw = os.getenv("OPENAI_TIMEOUT_SEC", "20").strip()
     try:
@@ -187,6 +202,24 @@ def run_json_task(
     last_error: Exception | None = None
     provider_name = _resolve_provider_name(provider_overrides)
 
+    if mode == "local":
+        if not allow_local_fallbacks():
+            raise RuntimeError("AI_PROVIDER_LOCAL_MODE_DISABLED")
+        payload = fallback_factory()
+        validator(payload)
+        return ModelExecution(
+            payload=payload,
+            model=f"local::{task_name}",
+            provider="local",
+            fallback_used=False,
+            retries=0,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            provider_request_id=None,
+        )
+
     if _should_try_openai(provider_overrides):
         for attempt in range(max_retries + 1):
             try:
@@ -241,7 +274,12 @@ def run_json_task(
                 last_error = exc
                 print(f"[ai-service][{task_name}] {provider_name} attempt {attempt + 1} failed: {exc}")
     elif mode == "openai":
-        print(f"[ai-service][{task_name}] {provider_name} requested but SDK/key is unavailable. Falling back to local.")
+        print(f"[ai-service][{task_name}] {provider_name} requested but SDK/key is unavailable.")
+
+    if not allow_local_fallbacks():
+        if last_error is not None:
+            raise RuntimeError("AI_PROVIDER_REQUEST_FAILED") from last_error
+        raise RuntimeError("AI_PROVIDER_CREDENTIALS_MISSING")
 
     payload = fallback_factory()
     validator(payload)

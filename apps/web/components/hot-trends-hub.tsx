@@ -23,6 +23,7 @@ type Props = {
   plan: UserPlan;
   initialTab: TrendTab;
   signedIn: boolean;
+  strictMode?: boolean;
 };
 
 type HotTrendsResponse = {
@@ -206,6 +207,17 @@ function pillClass(active: boolean) {
   return `trend-filter-pill ${active ? "trend-filter-pill-active" : ""}`;
 }
 
+function createEmptyTrendDataset(): HotTrendsDataset {
+  return {
+    source: "live",
+    updatedAt: new Date().toISOString(),
+    videos: [],
+    channels: [],
+    topics: [],
+    message: "Live trend data is not loaded yet.",
+  };
+}
+
 function isVideoRow(row: TrendDetailRow): row is TrendVideoRow {
   return "thumbnailUrl" in row;
 }
@@ -369,14 +381,14 @@ function TrendDetailModal({
   );
 }
 
-export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
+export function HotTrendsHub({ lang, plan, initialTab, signedIn, strictMode = false }: Props) {
   const copy = copyByLang[lang];
   const [tab, setTab] = useState<TrendTab>(initialTab);
   const [videoType, setVideoType] = useState<VideoType>("short");
   const [videoWindow, setVideoWindow] = useState<VideoWindow>("48h");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [detailRow, setDetailRow] = useState<TrendDetailRow | null>(null);
-  const [trendData, setTrendData] = useState<HotTrendsDataset>(() => getFallbackHotTrendsDataset());
+  const [trendData, setTrendData] = useState<HotTrendsDataset>(() => (strictMode ? createEmptyTrendDataset() : getFallbackHotTrendsDataset()));
   const [loading, setLoading] = useState(true);
   const [refreshError, setRefreshError] = useState("");
 
@@ -406,7 +418,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn }: Props) {
         }
 
         startTransition(() => {
-          setTrendData(payload.data ?? getFallbackHotTrendsDataset());
+          setTrendData(payload.data ?? (strictMode ? createEmptyTrendDataset() : getFallbackHotTrendsDataset()));
         });
       } catch (error) {
         if (!ignore) {

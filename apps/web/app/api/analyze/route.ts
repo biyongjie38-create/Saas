@@ -15,6 +15,7 @@ import {
 import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { executeAnalyzeTask } from "@/lib/analysis-runner";
 import { countUsageForDay } from "@/lib/report-store";
+import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { assertPlanAllowsProvider } from "@/lib/plan-access";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
@@ -119,7 +120,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
       return errorJsonResponse(
         {
           code: "ANALYZE_FAILED",
-          message: error instanceof Error ? error.message : "Analyze task failed"
+          message: toUserFacingRuntimeMessage(error)
         },
         requestId,
         500
@@ -131,12 +132,39 @@ export const POST = withApiRoute(async (request, { requestId }) => {
 
   const streamResponse = new ReadableStream({
     start(controller) {
+      let closed = false;
+
+      const closeController = () => {
+        if (closed) {
+          return;
+        }
+
+        closed = true;
+        try {
+          controller.close();
+        } catch {
+          // Ignore duplicate close / disconnected client races.
+        }
+      };
+
+      const enqueueChunk = (chunk: string) => {
+        if (closed) {
+          return;
+        }
+
+        try {
+          controller.enqueue(encoder.encode(chunk));
+        } catch {
+          closed = true;
+        }
+      };
+
       const sendSuccess = (event: string, payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(toSseSuccessEvent(event, payload, requestId)));
+        enqueueChunk(toSseSuccessEvent(event, payload, requestId));
       };
 
       const sendError = (error: { code: string; message: string; details?: Record<string, unknown> }) => {
-        controller.enqueue(encoder.encode(toSseErrorEvent("error", error, requestId)));
+        enqueueChunk(toSseErrorEvent("error", error, requestId));
       };
 
       executeAnalyzeTask({
@@ -162,12 +190,15 @@ export const POST = withApiRoute(async (request, { requestId }) => {
           logApiError(request, requestId, error);
           sendError({
             code: "ANALYZE_FAILED",
-            message: error instanceof Error ? error.message : "Analyze task failed"
+            message: toUserFacingRuntimeMessage(error)
           });
         })
         .finally(() => {
-          controller.close();
+          closeController();
         });
+    },
+    cancel() {
+      // The client disconnected; the next enqueue attempt should be ignored.
     }
   });
 

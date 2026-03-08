@@ -5,6 +5,7 @@ import {
   type TrendTopicRow,
   type TrendVideoRow
 } from "@/lib/hot-trends-data";
+import { allowPreviewFallbacks } from "@/lib/runtime-mode";
 
 type YoutubeApiVideoItem = {
   id: string;
@@ -357,6 +358,9 @@ export async function fetchHotTrendsDataset(options?: FetchOptions): Promise<Hot
   const regionCode = (options?.regionCode ?? "US").trim().toUpperCase() || "US";
 
   if (!apiKey) {
+    if (!allowPreviewFallbacks()) {
+      throw new Error("YOUTUBE_KEY_MISSING");
+    }
     return getFallbackHotTrendsDataset();
   }
 
@@ -365,6 +369,9 @@ export async function fetchHotTrendsDataset(options?: FetchOptions): Promise<Hot
     const videos = filterRecentVideos(buildVideoRows(rawVideos));
 
     if (videos.length === 0) {
+      if (!allowPreviewFallbacks()) {
+        throw new Error("YOUTUBE_TRENDS_EMPTY");
+      }
       return {
         ...getFallbackHotTrendsDataset(),
         message: "Live YouTube results returned no recent trend candidates, so the preview dataset is shown instead."
@@ -385,6 +392,9 @@ export async function fetchHotTrendsDataset(options?: FetchOptions): Promise<Hot
       message: "Live trend data was loaded from the YouTube Data API."
     };
   } catch (error) {
+    if (!allowPreviewFallbacks()) {
+      throw error instanceof Error ? error : new Error("YOUTUBE_TRENDS_FAILED");
+    }
     const fallback = getFallbackHotTrendsDataset();
     return {
       ...fallback,

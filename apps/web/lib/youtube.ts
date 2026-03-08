@@ -2,11 +2,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { demoVideos } from "@/lib/mock-data";
 import { readDb, writeDb } from "@/lib/db";
+import { allowPreviewFallbacks, isProductionRuntimeMode } from "@/lib/runtime-mode";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { useSupabaseBackend } from "@/lib/supabase";
 import type { CollectedViralItem, VideoDataSource, YoutubeVideo } from "@/lib/types";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const YOUTUBE_REQUEST_TIMEOUT_MS = Math.max(5000, Number.parseInt(process.env.YOUTUBE_REQUEST_TIMEOUT_MS ?? "12000", 10) || 12000);
 
 type FetchMode = "auto" | "live" | "mock";
 
@@ -395,8 +397,27 @@ function normalizeCaptionLine(value: string): string {
     .trim();
 }
 
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), YOUTUBE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("YT_REQUEST_TIMEOUT");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetchWithTimeout(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`YT_HTTP_${response.status}`);
   }
@@ -421,7 +442,7 @@ async function fetchCaptionText(trackBaseUrl: string): Promise<string | null> {
 }
 
 async function fetchCaptionsFromWatchPage(videoId: string): Promise<string | null> {
-  const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+  const response = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
     headers: {
       "user-agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -511,6 +532,9 @@ async function fetchFromYoutubeApi(videoId: string, url: string, apiKey: string)
 }
 
 function resolveFetchMode(): FetchMode {
+  if (isProductionRuntimeMode()) {
+    return "live";
+  }
   const mode = (process.env.YOUTUBE_FETCH_MODE ?? "auto").toLowerCase();
   if (mode === "live" || mode === "mock" || mode === "auto") {
     return mode;
@@ -553,6 +577,10 @@ export async function fetchYoutubeData(url: string, options?: QueryOptions): Pro
         }
       }
     }
+  }
+
+  if (!record && !allowPreviewFallbacks()) {
+    throw new Error(apiKey ? "YT_API_FAILED" : "YOUTUBE_KEY_MISSING");
   }
 
   if (!record) {
@@ -641,6 +669,9 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
   const apiKey = (options.apiKeyOverride || process.env.YOUTUBE_API_KEY || "").trim();
 
   if (!apiKey) {
+    if (!allowPreviewFallbacks()) {
+      throw new Error("YOUTUBE_KEY_MISSING");
+    }
     return buildMockCollectedItems({ hoursWithin, minViews, maxResults });
   }
 
@@ -685,6 +716,10 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
     if (mode === "live") {
       throw error;
     }
+  }
+
+  if (!allowPreviewFallbacks()) {
+    throw new Error("YOUTUBE_COLLECT_EMPTY");
   }
 
   return buildMockCollectedItems({ hoursWithin, minViews, maxResults });

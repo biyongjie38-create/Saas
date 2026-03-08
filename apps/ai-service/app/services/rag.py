@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from app.schemas import RagCompareRequest
-from app.services.provider import ModelExecution, get_provider_mode
+from app.services.provider import ModelExecution, allow_local_fallbacks, get_provider_mode
 
 try:
     from openai import OpenAI
@@ -397,6 +397,8 @@ def run_benchmark_retrieval(
     resolved_top_k = max(1, int(top_k or data.top_k or 3))
 
     if mode == "local":
+        if not allow_local_fallbacks():
+            raise RuntimeError("AI_PROVIDER_LOCAL_MODE_DISABLED")
         return _build_local_execution(mode, data, started)
 
     query_text = f"{data.structure_summary}\nTopic hint: {data.topic_hint}".strip()
@@ -444,6 +446,8 @@ def run_benchmark_retrieval(
             provider_request_id=provider_request_id,
         )
     except Exception as exc:
+        if not allow_local_fallbacks():
+            raise RuntimeError("RAG_PROVIDER_REQUEST_FAILED") from exc
         print(f"[ai-service][rag] Pinecone retrieval failed, falling back to local similarity: {exc}")
         return _build_local_execution(mode, data, started)
 

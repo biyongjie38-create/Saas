@@ -9,6 +9,7 @@ import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { assertPlanFeature } from "@/lib/plan-access";
 import { getPlanFeatures } from "@/lib/plan-features";
 import { importLibraryItems } from "@/lib/report-store";
+import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { collectViralYoutubeItems } from "@/lib/youtube";
 
@@ -48,14 +49,26 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
   const maxResults = Math.min(parsed.data.maxResults, features.maxCollectionResults);
 
-  const collected = await collectViralYoutubeItems({
-    supabaseClient,
-    apiKeyOverride: providerConfig.youtubeApiKey,
-    hoursWithin: parsed.data.hoursWithin,
-    minViews: parsed.data.minViews,
-    maxResults,
-    regionCode: parsed.data.regionCode
-  });
+  let collected;
+  try {
+    collected = await collectViralYoutubeItems({
+      supabaseClient,
+      apiKeyOverride: providerConfig.youtubeApiKey,
+      hoursWithin: parsed.data.hoursWithin,
+      minViews: parsed.data.minViews,
+      maxResults,
+      regionCode: parsed.data.regionCode
+    });
+  } catch (error) {
+    return errorJsonResponse(
+      {
+        code: "VIRAL_COLLECT_FAILED",
+        message: toUserFacingRuntimeMessage(error)
+      },
+      requestId,
+      503
+    );
+  }
 
   let libraryItems = null;
   if (parsed.data.autoImport) {

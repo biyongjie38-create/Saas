@@ -1,32 +1,34 @@
-# ViralBrain.ai MVP
+# ViralBrain.ai
 
-This build uses Supabase Auth users (Google + Email Magic Link) and stores data with RLS-scoped user sessions.
+这是一个面向 YouTube 内容操盘手的 SaaS 项目。当前仓库包含：
 
-## Implemented
+- Next.js Web 应用
+- FastAPI AI Service
+- Supabase Auth + 数据存储
+- Stripe 会员支付
+- YouTube 数据抓取、趋势页、爆款采集、报告分析、爆款库管理
 
-- YouTube-only analysis workflow
-- Next.js App Router + FastAPI AI service
-- Streaming analyze flow and report detail pages
-- Report detail page upgraded to 5 tabs (Snapshot / Structure / Thumbnail / Audience / Playbook)
-- Real YouTube Data API with mock fallback
-- AI service with real-model priority and local fallback
-- Pinecone-backed benchmark retrieval with local fallback
-- Optional mock/supabase data backend switch
-- Supabase Auth login:
-  - Google OAuth
-  - Email Magic Link
-- `demo-user` replaced with authenticated Supabase user ID
-- Server writes now use user session + RLS (no service role dependency)
-- Bilingual UI switch (English/Chinese) via navbar toggle
-- Viral Library search + JSON/CSV import workflow
-- Stripe hosted membership checkout + webhook reconciliation
+## 当前已实现
 
-## Project Structure
+- YouTube 单链接分析工作流
+- 报告流式生成
+- 报告详情页 5 个标签页
+- 字幕抓取与报告入参透传
+- 缩略图多模态分析链路
+- 热门趋势页真实 YouTube 接入
+- 爆款作品采集
+- 爆款库导入、删除、恢复、自动向量同步
+- Pinecone 对标检索
+- Stripe Checkout + webhook 回写
+- 中文 PDF 导出字体嵌入
+- 中英文界面切换
+
+## 项目结构
 
 ```txt
 apps/
-  web/          # Next.js frontend + API routes + auth
-  ai-service/   # FastAPI AI service
+  web/          # Next.js 前端 + API 路由 + 鉴权
+  ai-service/   # FastAPI AI 服务
 supabase/
   schema.sql
 docs/
@@ -34,41 +36,72 @@ docs/
   deployment-vercel.md
 ```
 
-## Environment
+## 运行模式
 
-Create `apps/web/.env.local`:
+项目现在支持两种运行模式：
+
+### 1. preview
+
+适合本地开发、演示和 QA。
+
+- 允许 mock / fallback / 本地兜底
+- 适合没有全部第三方配置时继续开发页面
+
+### 2. production
+
+适合真实上线。
+
+- 不再静默回退到 mock YouTube 数据
+- 不再静默回退到本地 AI 结果
+- 趋势、采集、分析都要求真实服务可用
+- 服务不可用时直接返回明确错误，便于运营排查
+
+生产环境建议同时设置：
+
+```bash
+APP_RUNTIME_MODE=production
+NEXT_PUBLIC_APP_RUNTIME_MODE=production
+```
+
+## 环境变量
+
+### Web：`apps/web/.env.local`
 
 ```bash
 NEXT_PUBLIC_APP_URL=
 AI_SERVICE_URL=http://127.0.0.1:8000
 
+APP_RUNTIME_MODE=preview
+NEXT_PUBLIC_APP_RUNTIME_MODE=preview
+
 YOUTUBE_API_KEY=
 YOUTUBE_FETCH_MODE=auto
+YOUTUBE_REQUEST_TIMEOUT_MS=12000
 ENABLE_E2E_AUTH_BYPASS=false
 
+# 数据后端：mock | supabase | auto
 DATA_BACKEND=supabase
 
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
-# Optional server aliases (fallback)
+# 可选服务端别名
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 
+# Stripe
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
-
-# Optional: reuse Stripe recurring prices instead of inline price_data
 STRIPE_PRO_MONTHLY_PRICE_ID=
 STRIPE_PRO_YEARLY_PRICE_ID=
 STRIPE_CURRENCY=cny
 
-# Optional CJK fonts for report PDF export
+# PDF 中文字体
 PDF_CJK_FONT_PATH=
 PDF_CJK_BOLD_FONT_PATH=
 ```
 
-Create `apps/ai-service/.env` or export these vars before running FastAPI:
+### AI Service：`apps/ai-service/.env`
 
 ```bash
 AI_PROVIDER=auto
@@ -84,58 +117,67 @@ PINECONE_INDEX_NAME=
 PINECONE_NAMESPACE=viral-library
 ```
 
-Notes:
-- Browser auth requires `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-- `NEXT_PUBLIC_APP_URL` is optional. Leave empty to auto-use the current browser origin.
-- Set `NEXT_PUBLIC_APP_URL` only when you need to override localhost callback (for example, tunnel URL).
-- `SUPABASE_SERVICE_ROLE_KEY` is no longer required for current report/usage writes.
-- `SUPABASE_SERVICE_ROLE_KEY` becomes required when you want Stripe webhooks to reconcile paid subscriptions back into Supabase.
-- `DATA_BACKEND=supabase` is recommended.
-- `AI_PROVIDER=auto` means: try OpenAI first, then fall back to local deterministic logic.
-- `AI_PROVIDER=local` forces local fallback mode for analysis, benchmark retrieval, and score.
-- Benchmark retrieval tries OpenAI embeddings + Pinecone first. If either side is unavailable, it falls back to local similarity ranking.
-- `ENABLE_E2E_AUTH_BYPASS=true` enables the local test-auth bypass route at `/api/test-auth/login`.
-- On Windows development machines, PDF export will also auto-detect common Chinese fonts such as Noto Sans SC and SimHei.
-- In cloud deployment, set `PDF_CJK_FONT_PATH` explicitly if you need stable Chinese PDF output.
+## 环境变量说明
 
-## Auth Redirect Strategy (for real users)
+- `NEXT_PUBLIC_SUPABASE_URL` 与 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 是浏览器登录必需项
+- `DATA_BACKEND=supabase` 是上线推荐值
+- `APP_RUNTIME_MODE=production` 会关闭静默 mock / fallback
+- `YOUTUBE_REQUEST_TIMEOUT_MS` 用于限制 YouTube 外部请求超时，避免线上长时间卡死
+- `AI_PROVIDER=auto` 表示优先调用真实模型，失败时只有在 preview 模式下才允许本地兜底；production 下会直接报错
+- `ENABLE_E2E_AUTH_BYPASS=true` 只建议本地 QA 用
+- Windows 开发机上，PDF 导出会自动探测常见中文字体
+- 云端部署建议显式设置 `PDF_CJK_FONT_PATH`
 
-To allow external users to log in, you must use a public HTTPS domain.
+## 上线所需的真实依赖
 
-1. Deploy web app to a public URL (for example Vercel domain or your own domain).
-2. In Supabase `Auth -> URL Configuration`:
-   - Site URL: `https://your-domain.com`
-   - Redirect URLs include: `https://your-domain.com/auth/callback`
-3. In deployed env, set:
-   - `NEXT_PUBLIC_APP_URL=https://your-domain.com` (optional but recommended)
+要让产品可以真实运营，至少需要下面这些配置：
 
-Localhost/LAN (`localhost`, `192.168.x.x`) only works on same device/network and is not suitable for public users.
+### 必需
 
-## Supabase Auth Setup
+- Supabase Auth 与数据库
+- YouTube Data API Key
+- AI Service 可访问
+- 模型供应商 Key
 
-1. In Supabase dashboard, enable providers:
-   - Auth -> Providers -> Google
-   - Auth -> Providers -> Email
-2. Set Site URL and redirect URLs (Auth -> URL Configuration).
-3. For production, add your deployed domain callback URL.
+### 推荐
 
-## Database Setup
+- Pinecone
+- Stripe 支付
 
-1. Open SQL Editor in Supabase.
-2. Run `supabase/schema.sql`.
-3. Ensure tables exist: `videos`, `reports`, `usage_logs`, `viral_library_items`.
-4. Confirm trigger `usage_logs_daily_limit_guard` exists on `usage_logs` (hard quota intercept).
-5. Confirm RLS is enabled on these tables and policies are created.
-6. Re-run `supabase/schema.sql` after pulling latest changes so:
-   - `viral_library_items` gets:
-   - `embedding_key` unique index
-   - authenticated insert/update policies for library import
-   - `membership_orders` gets Stripe columns (`provider_session_id`, `provider_subscription_id`, etc.)
-   - `membership_orders_update_own` policy exists for post-checkout reconciliation
+### 说明
 
-## Run
+- Pinecone 不配时，对标检索仍可运行，但只能走弱化的本地相似度路径
+- Stripe 不配时，会员支付页会明确报错，不能正式售卖
 
-### Web
+## 鉴权与公网回调
+
+如果要让真实用户登录，你必须使用公网 HTTPS 域名。
+
+1. 把 Web 部署到公网域名
+2. 在 Supabase `Auth -> URL Configuration` 配置：
+   - `Site URL=https://your-domain.com`
+   - `Redirect URLs` 包含 `https://your-domain.com/auth/callback`
+3. 部署环境建议设置：
+   - `NEXT_PUBLIC_APP_URL=https://your-domain.com`
+
+`localhost` 或局域网地址只适合同设备调试，不适合正式对外。
+
+## Supabase 初始化
+
+1. 打开 Supabase SQL Editor
+2. 执行 `supabase/schema.sql`
+3. 确认下列表已存在：
+   - `videos`
+   - `reports`
+   - `usage_logs`
+   - `viral_library_items`
+   - `user_profiles`
+   - `membership_orders`
+4. 确认 RLS 与相关策略已创建
+
+## 启动方式
+
+### 启动 Web
 
 ```bash
 cd apps/web
@@ -143,7 +185,7 @@ npm install
 npm run dev
 ```
 
-### AI service
+### 启动 AI Service
 
 ```bash
 cd apps/ai-service
@@ -154,159 +196,185 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Index viral library into Pinecone
+### 建立 Pinecone 索引
 
-Create a Pinecone cosine index whose dimension matches your embedding model. If you keep the default `text-embedding-3-small`, use dimension `1536`.
+如果继续使用默认 `text-embedding-3-small`，Pinecone 索引维度要设为 `1536`。
 
-Then run:
+然后执行：
 
 ```bash
 cd apps/ai-service
 python scripts/index_viral_library.py
 ```
 
-Optional flags:
+可选参数：
 
 ```bash
 python scripts/index_viral_library.py --index-host=... --namespace=viral-library --batch-size=50
 ```
 
-## Pages
+## 页面
 
 - `/`
 - `/login`
-- `/auth/callback` (legacy + server exchange)
-- `/auth/confirm` (mobile/email callback compatibility)
+- `/auth/callback`
+- `/auth/confirm`
 - `/dashboard`
+- `/dashboard/trends`
+- `/dashboard/collector`
+- `/dashboard/reports`
 - `/report/[id]`
 - `/library`
+- `/membership`
 - `/settings`
+- `/support`
 
-## Membership Control
+## 会员状态控制
 
-There are 3 practical ways to switch your own account between `free` and `pro`:
+你可以通过 3 种方式切换自己是免费还是会员：
 
-1. Production Supabase
-   - Edit your row in `user_profiles`
-   - Set `plan` to `free` or `pro`
-   - Set `subscription_status` to `none` or `active`
-2. Local mock backend
-   - Edit `data/mock-db.json`
-   - Update the current user row's `plan` and `subscriptionStatus`
-3. Local test-auth bypass
-   - Set `ENABLE_E2E_AUTH_BYPASS=true` in `apps/web/.env.local`
-   - Restart Next.js
-   - Switch to Pro: `/api/test-auth/login?plan=pro&next=/dashboard`
-   - Switch to Free: `/api/test-auth/login?plan=free&next=/dashboard`
+### 1. 线上 Supabase
 
-For production billing, Stripe checkout and webhook reconciliation should remain the source of truth.
+直接修改 `user_profiles` 里的当前用户记录：
 
-## Testing Captions And Thumbnail Multimodal
+- `plan=free` 或 `pro`
+- `subscription_status=none` 或 `active`
 
-To test these two live chains, the machine running the app must be able to reach:
+### 2. 本地 mock 数据
+
+修改：
+
+```txt
+data/mock-db.json
+```
+
+### 3. 本地测试登录旁路
+
+在 `apps/web/.env.local` 中设置：
+
+```bash
+ENABLE_E2E_AUTH_BYPASS=true
+```
+
+然后重启 Next.js。
+
+切到会员：
+
+```txt
+/api/test-auth/login?plan=pro&next=/dashboard
+```
+
+切到免费：
+
+```txt
+/api/test-auth/login?plan=free&next=/dashboard
+```
+
+正式环境下，仍建议以 Stripe 支付和 webhook 回写作为会员状态真源。
+
+## 如何测试字幕抓取与缩略图多模态
+
+机器必须能访问：
 
 - `www.youtube.com`
 - `i.ytimg.com`
 - `www.googleapis.com`
-- your model provider endpoint
+- 模型供应商接口域名
 
-Suggested test flow:
+测试步骤：
 
-1. Set `YOUTUBE_API_KEY` in `apps/web/.env.local`
-2. Set `OPENAI_API_KEY` or another compatible provider in `apps/ai-service/.env`
-3. Start both services
-4. Call `POST /api/youtube/fetch` with a public YouTube URL that definitely has captions
-5. Confirm the response includes `captionsText`
-6. Run the same URL through `/dashboard`
-7. Confirm the generated report snapshot shows transcript content
-8. Check `apps/ai-service` logs:
-   - if thumbnail download succeeds, analysis should try image input first
-   - if image fetch fails, it should fall back to text-only input
-9. Repeat with a video that has no captions to verify graceful fallback
+1. 在 `apps/web/.env.local` 配置 `YOUTUBE_API_KEY`
+2. 在 `apps/ai-service/.env` 配置 `OPENAI_API_KEY` 或兼容模型供应商
+3. 启动 Web 和 AI Service
+4. 调用 `POST /api/youtube/fetch`
+5. 确认返回里有 `captionsText`
+6. 用同一个链接进入 `/dashboard` 跑分析
+7. 确认报告快照页出现字幕内容
+8. 查看 AI Service 日志：
+   - 缩略图下载成功时，先走图片输入
+   - 缩略图下载失败时，回退到纯文本输入
+9. 再用一个没有字幕的视频验证回退路径
 
-If your current network cannot reach YouTube from the server, move this test to a machine or deployment target that can.
+如果当前机器无法出海访问 YouTube，这一项必须换到能正常访问外网的机器或服务器上测试。
 
 ## API
 
-- Unified JSON envelope for all `/api/*` JSON routes: `ok/data/error/request_id` + `x-request-id` header
-- `/api/analyze` SSE events also use the same envelope shape inside `data:` payloads
-- `POST /api/analyze` enforces daily quota and returns `429 USAGE_LIMIT_EXCEEDED` when exceeded
-- Quota is hard-enforced in DB trigger (`usage_logs_daily_limit_guard`) to prevent concurrent bypass
-- `POST /api/analyze` (requires auth)
-- `POST /api/library/import` (requires auth, JSON/CSV import)
-- `GET /api/reports` (requires auth)
-- `GET /api/reports/{id}` (requires auth, owner only)
-- `GET /api/me` (requires auth)
-- `POST /api/usage/consume` (requires auth)
-- `POST /api/youtube/fetch` (requires auth)
-- `POST /api/benchmarks` (requires auth)
-- `POST /api/membership/checkout` (requires auth, creates Stripe Checkout session)
-- `POST /api/membership/checkout/confirm` (requires auth, verifies a completed Stripe session)
-- `POST /api/membership/webhook/stripe` (Stripe webhook endpoint)
+- 所有 JSON API 都统一返回 `ok/data/error/request_id`
+- `POST /api/analyze`
+- `POST /api/youtube/fetch`
+- `POST /api/benchmarks`
+- `GET /api/reports`
+- `GET /api/reports/{id}`
+- `POST /api/library/import`
+- `POST /api/library/collect`
+- `GET /api/me`
+- `POST /api/usage/consume`
+- `POST /api/membership/checkout`
+- `POST /api/membership/checkout/confirm`
+- `POST /api/membership/webhook/stripe`
 
-## Release QA
+## Playwright QA
 
-Item 7 adds a release-gate QA harness focused on the core path:
-
-- Login
-- Analyze a YouTube URL
-- Open the generated report
-- Verify fallback/degradation notices are visible when mock or local fallback paths are used
-
-Run the smoke suite locally:
+### 现有 QA 冒烟
 
 ```bash
 cd apps/web
 npm run qa:release
 ```
 
-Run the 20-cycle stability gate:
+这套用例主要验证：
+
+- 登录
+- 输入 YouTube 链接
+- 生成报告
+- 打开报告页
+
+注意：现有 `qa:release` 默认是 QA mock 模式。
+
+### 真实模式测试建议
+
+如果你要验证上线态，建议在本地或测试环境里同时满足：
+
+- `APP_RUNTIME_MODE=production`
+- `NEXT_PUBLIC_APP_RUNTIME_MODE=production`
+- Supabase 已配置
+- YouTube API 已配置
+- AI Service 已启动
+- 模型供应商 Key 已配置
+
+否则测试出来的问题更多会是环境缺项，而不是代码问题。
+
+### 新增真实链路冒烟
 
 ```bash
 cd apps/web
-npm run qa:release:20
+npm run qa:live
 ```
 
-The QA harness starts Next.js in a deterministic release-check mode with:
+这套用例会：
+
+- 启动 AI Service
+- 以 `production` 运行模式启动 Next.js
+- 禁用 mock YouTube / 本地 AI 兜底
+- 保留测试专用的 mock 数据后端与测试登录旁路，避免 Supabase RLS 阻塞自动化
+
+也就是说，它重点验证的是“真实 YouTube + 真实 AI 提供商链路是否被正确调用”，而不是验证真实登录会话本身。
+
+## 当前上线建议
+
+如果你要正式上线，建议使用下面这组配置：
 
 ```bash
-DATA_BACKEND=mock
-ENABLE_E2E_AUTH_BYPASS=true
-YOUTUBE_FETCH_MODE=mock
-AI_SERVICE_MODE=local
+APP_RUNTIME_MODE=production
+NEXT_PUBLIC_APP_RUNTIME_MODE=production
+DATA_BACKEND=supabase
+YOUTUBE_FETCH_MODE=live
+AI_PROVIDER=auto
 ```
 
-This avoids external auth/API dependence and verifies the release candidate can repeatedly complete the main product flow without interruption.
+这样系统就会进入真实模式：
 
-## RLS Smoke Test
-
-Use the SQL smoke script before release to verify Supabase RLS behavior:
-
-```bash
-supabase/rls-smoke.sql
-```
-
-What it checks:
-
-- a user can read their own `reports`
-- a user can read their own `usage_logs`
-- another user cannot read or update those rows
-- authenticated users can read shared `videos`
-- authenticated users can read and update shared `viral_library_items`
-
-The script is wrapped in a transaction and ends with `rollback`, so it does not leave QA rows behind.
-
-## Fault Degradation UX
-
-The dashboard and report pages now surface explicit fallback notices when:
-
-- mock YouTube data is used
-- local AI fallback is used because the remote AI path is unavailable
-
-These notices are part of the release smoke flow so degraded behavior is visible to users instead of silently changing output quality.
-
-## Current Preview Limits
-
-- `/` is intentionally a product overview page, not a live data dashboard.
-- `/dashboard/trends` now prefers live YouTube data and falls back to expanded preview rows when no usable key is available.
-- Real/provider-backed paths currently exist in single-video fetch, viral collection, BYOK testing, and membership checkout.
+- 不再偷偷回退到 mock 数据
+- 不再偷偷回退到本地 AI
+- 服务缺失时直接报明确错误
+- 更适合真实运营和排障

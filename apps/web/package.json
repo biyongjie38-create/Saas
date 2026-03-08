@@ -11,6 +11,7 @@
     "qa:server": "node scripts/qa-dev.mjs",
     "test:e2e": "playwright test",
     "qa:release": "playwright test e2e/release-smoke.spec.ts",
+    "qa:live": "playwright test -c playwright.live.config.ts e2e/live-production.spec.ts",
     "qa:release:20": "playwright test e2e/release-smoke.spec.ts --repeat-each=20"
   },
   "dependencies": {

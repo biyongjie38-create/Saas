@@ -1,5 +1,17 @@
 import { expect, test } from "@playwright/test";
 
+async function loginWithBypass(page: import("@playwright/test").Page, href: string) {
+  await page.goto("/login?next=%2Fdashboard");
+  await page.evaluate(async (target) => {
+    await fetch(target, {
+      method: "GET",
+      credentials: "include",
+      redirect: "follow"
+    });
+  }, href);
+  await page.goto("/dashboard");
+}
+
 test.beforeEach(async ({ request }) => {
   const response = await request.get("/api/test-auth/reset");
   expect(response.ok()).toBeTruthy();
@@ -14,7 +26,7 @@ test("login -> analyze -> open report", async ({ page }) => {
   await page.goto("/login?next=%2Fdashboard");
   await expect(page.getByTestId("qa-login-button")).toBeVisible();
 
-  await page.goto("/api/test-auth/login?next=%2Fdashboard");
+  await loginWithBypass(page, "/api/test-auth/login?next=%2Fdashboard");
 
   await expect(page).toHaveURL(/\/dashboard/);
   await expect(page.getByTestId("analyze-url-input")).toBeVisible();

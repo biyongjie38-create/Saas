@@ -1,4 +1,6 @@
-﻿type BackendMode = "mock" | "supabase" | "auto";
+import { isProductionRuntimeMode } from "@/lib/runtime-mode";
+
+type BackendMode = "mock" | "supabase" | "auto";
 
 function normalizeEnv(value: string | undefined): string | null {
   if (!value) {
@@ -20,7 +22,7 @@ function getServerSupabaseAnonKey(): string | null {
 export function getBrowserSupabaseAuthConfig(): { url: string | null; anonKey: string | null } {
   return {
     url: normalizeEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    anonKey: normalizeEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    anonKey: normalizeEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   };
 }
 
@@ -45,13 +47,15 @@ export function hasSupabaseAuthConfig(): boolean {
 }
 
 export function getBackendMode(): BackendMode {
-  const mode = (process.env.DATA_BACKEND ?? "mock").toLowerCase();
+  const defaultMode: BackendMode = isProductionRuntimeMode() ? "supabase" : "mock";
+  const mode = (process.env.DATA_BACKEND ?? defaultMode).toLowerCase();
   if (mode === "supabase" || mode === "auto" || mode === "mock") {
     return mode;
   }
-  return "mock";
+  return defaultMode;
 }
 
 export function isValidUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
+

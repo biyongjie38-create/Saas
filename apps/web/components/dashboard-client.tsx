@@ -30,6 +30,7 @@ type StreamStage = {
 
 type Props = {
   lang: Lang;
+  strictMode?: boolean;
 };
 
 type DashboardCopy = {
@@ -37,6 +38,7 @@ type DashboardCopy = {
   run: string;
   running: string;
   demoHint: string;
+  strictHint: string;
   streaming: string;
   viewReport: string;
   analysisFailed: string;
@@ -53,6 +55,7 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     run: "Run Analysis",
     running: "Analyzing...",
     demoHint: "If you configure your model provider below, this workspace will prefer your own API quota. Unknown links or unavailable providers still fall back to stable demo data.",
+    strictHint: "This workspace is running in production mode. It requires real YouTube and AI providers, and it will return explicit errors instead of mock or local fallback output.",
     streaming: "Streaming Progress",
     viewReport: "View Report",
     analysisFailed: "Analysis failed",
@@ -77,6 +80,7 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     run: "开始分析",
     running: "分析中...",
     demoHint: "如果你在下方配置了自己的模型供应商，这里会优先走你的 API 额度。未知链接或供应商不可用时，仍会回退到稳定演示数据。",
+    strictHint: "当前是生产模式。这里要求真实的 YouTube 和 AI 服务可用，不再回退到 mock 或本地兜底结果，失败会直接报错。",
     streaming: "实时进度",
     viewReport: "查看报告",
     analysisFailed: "分析失败",
@@ -137,7 +141,7 @@ async function parseResponseError(response: Response, copy: DashboardCopy): Prom
   return message;
 }
 
-export function DashboardClient({ lang }: Props) {
+export function DashboardClient({ lang, strictMode = false }: Props) {
   const [url, setUrl] = useState("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   const [loading, setLoading] = useState(false);
   const [stages, setStages] = useState<StreamStage[]>([]);
@@ -271,7 +275,7 @@ export function DashboardClient({ lang }: Props) {
           {loading ? copy.running : copy.run}
         </button>
       </div>
-      <p className="small">{copy.demoHint}</p>
+      <p className="small">{strictMode ? copy.strictHint : copy.demoHint}</p>
 
       {notices.length > 0 ? (
         <div className="qa-banner" data-testid="analysis-notices">

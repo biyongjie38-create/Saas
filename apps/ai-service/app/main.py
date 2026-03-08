@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, HTTPException
 
 from app.runtime_env import load_runtime_env
 from app.schemas import (
@@ -42,6 +42,20 @@ load_runtime_env()
 
 app = FastAPI(title="ViralBrain AI Service", version="0.4.0")
 
+SERVICE_RUNTIME_ERRORS = {
+    "AI_PROVIDER_LOCAL_MODE_DISABLED",
+    "AI_PROVIDER_CREDENTIALS_MISSING",
+    "AI_PROVIDER_REQUEST_FAILED",
+    "RAG_PROVIDER_REQUEST_FAILED",
+}
+
+
+def raise_service_error(error: Exception) -> None:
+    message = str(error).strip() or "AI_SERVICE_FAILED"
+    if message in SERVICE_RUNTIME_ERRORS:
+        raise HTTPException(status_code=503, detail=message) from error
+    raise error
+
 
 @app.get("/health")
 def health() -> dict:
@@ -62,18 +76,21 @@ def analyze(
         base_url=x_vb_openai_base_url,
         provider_name=x_vb_llm_provider,
     )
-    result = run_json_task(
-        task_name="analysis",
-        model=model,
-        system_prompt=build_analysis_system_prompt(),
-        user_prompt=build_analysis_user_content(data),
-        fallback_factory=lambda: build_analysis_payload(data),
-        validator=lambda payload: AnalysisPayload.model_validate(payload),
-        temperature=0.4,
-        max_retries=1,
-        provider_overrides=provider_overrides,
-        text_only_user_prompt=build_analysis_user_prompt(data),
-    )
+    try:
+        result = run_json_task(
+            task_name="analysis",
+            model=model,
+            system_prompt=build_analysis_system_prompt(),
+            user_prompt=build_analysis_user_content(data),
+            fallback_factory=lambda: build_analysis_payload(data),
+            validator=lambda payload: AnalysisPayload.model_validate(payload),
+            temperature=0.4,
+            max_retries=1,
+            provider_overrides=provider_overrides,
+            text_only_user_prompt=build_analysis_user_prompt(data),
+        )
+    except Exception as error:
+        raise_service_error(error)
 
     return AnalyzeResponse(
         analysis=AnalysisPayload.model_validate(result.payload),
@@ -111,7 +128,10 @@ def rag_compare(
         pinecone_index_name=x_vb_pinecone_index_name,
         pinecone_namespace=x_vb_pinecone_namespace,
     )
-    result = run_benchmark_retrieval(data, data.top_k, provider_overrides)
+    try:
+        result = run_benchmark_retrieval(data, data.top_k, provider_overrides)
+    except Exception as error:
+        raise_service_error(error)
 
     return RagCompareResponse(
         benchmarks=BenchmarksPayload.model_validate(result.payload),
@@ -193,17 +213,20 @@ def score(
         base_url=x_vb_openai_base_url,
         provider_name=x_vb_llm_provider,
     )
-    result = run_json_task(
-        task_name="score",
-        model=model,
-        system_prompt=build_score_system_prompt(),
-        user_prompt=build_score_user_prompt(data),
-        fallback_factory=lambda: build_score_payload(data),
-        validator=lambda payload: ScorePayload.model_validate(payload),
-        temperature=0.2,
-        max_retries=1,
-        provider_overrides=provider_overrides,
-    )
+    try:
+        result = run_json_task(
+            task_name="score",
+            model=model,
+            system_prompt=build_score_system_prompt(),
+            user_prompt=build_score_user_prompt(data),
+            fallback_factory=lambda: build_score_payload(data),
+            validator=lambda payload: ScorePayload.model_validate(payload),
+            temperature=0.2,
+            max_retries=1,
+            provider_overrides=provider_overrides,
+        )
+    except Exception as error:
+        raise_service_error(error)
 
     return ScoreResponse(
         score=ScorePayload.model_validate(result.payload),

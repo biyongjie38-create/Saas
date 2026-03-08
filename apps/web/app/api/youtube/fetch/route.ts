@@ -2,6 +2,7 @@
 import { errorJsonResponse, logApiError, okJsonResponse, withApiRoute } from "@/lib/api-response";
 import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
 import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
+import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { fetchYoutubeData } from "@/lib/youtube";
 
@@ -57,22 +58,11 @@ export const POST = withApiRoute(async (request, { requestId }) => {
       );
     }
 
-    if (error instanceof Error && error.message === "YOUTUBE_KEY_MISSING") {
-      return errorJsonResponse(
-        {
-          code: "YOUTUBE_KEY_MISSING",
-          message: "YOUTUBE_API_KEY is required when YOUTUBE_FETCH_MODE=live."
-        },
-        requestId,
-        400
-      );
-    }
-
     logApiError(request, requestId, error);
     return errorJsonResponse(
       {
         code: "YT_API_FAILED",
-        message: "Failed to fetch YouTube data."
+        message: toUserFacingRuntimeMessage(error)
       },
       requestId,
       502

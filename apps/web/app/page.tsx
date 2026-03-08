@@ -2,9 +2,11 @@
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { getServerLang, text } from "@/lib/i18n";
+import { isProductionRuntimeMode } from "@/lib/runtime-mode";
 
 export default async function HomePage() {
   const lang = await getServerLang();
+  const strictMode = isProductionRuntimeMode();
 
   const workflowCards = [
     {
@@ -96,13 +98,19 @@ export default async function HomePage() {
           )}
         </p>
         <div className="qa-banner landing-demo-banner">
-          <strong>{text(lang, "Product preview mode", "产品预览模式")}</strong>
+          <strong>{strictMode ? text(lang, "Production mode", "生产模式") : text(lang, "Product preview mode", "产品预览模式")}</strong>
           <p>
-            {text(
-              lang,
-              "The homepage is intentionally a marketing overview. It does not bind to live provider data. Real data paths now exist in single-video analysis, Hot Trends, viral collection, and BYOK connection tests.",
-              "首页本身是产品能力展示页，并不直接绑定实时数据源。当前真实接入已经覆盖单视频分析、热门趋势、爆款采集，以及用户自带 Key 的连接测试。"
-            )}
+            {strictMode
+              ? text(
+                  lang,
+                  "This deployment is configured for production use. Real provider paths are required for analysis, hot trends, collection, and report generation.",
+                  "当前部署按生产模式运行。分析、热门趋势、作品采集和报告生成都要求真实服务可用。"
+                )
+              : text(
+                  lang,
+                  "The homepage is intentionally a marketing overview. It does not bind to live provider data. Real data paths now exist in single-video analysis, Hot Trends, viral collection, and BYOK connection tests.",
+                  "首页本身是产品能力展示页，并不直接绑定实时数据源。当前真实接入已经覆盖单视频分析、热门趋势、爆款采集，以及用户自带 Key 的连接测试。"
+                )}
           </p>
         </div>
         <div className="hero-actions">

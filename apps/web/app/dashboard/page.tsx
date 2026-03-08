@@ -6,6 +6,7 @@ import { SiteNav } from "@/components/site-nav";
 import { requirePageAuthUser, resolveAuthenticatedAppUser } from "@/lib/auth";
 import { getServerLang, text } from "@/lib/i18n";
 import { getDailyLimitByPlan } from "@/lib/quota";
+import { isProductionRuntimeMode } from "@/lib/runtime-mode";
 import { countUsageForDay, listReports } from "@/lib/report-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -21,6 +22,7 @@ export default async function DashboardPage() {
   });
   const dailyLimit = getDailyLimitByPlan(user.plan);
   const remaining = Math.max(0, dailyLimit - usedToday);
+  const strictMode = isProductionRuntimeMode();
 
   return (
     <main>
@@ -35,7 +37,7 @@ export default async function DashboardPage() {
           )}
         </p>
         <div className="content-stack">
-          <DashboardClient lang={lang} />
+          <DashboardClient lang={lang} strictMode={strictMode} />
           <div className="grid-3">
             <article className="card panel profile-card">
               <p className="card-kicker">{text(lang, "Usage", "用量")}</p>
