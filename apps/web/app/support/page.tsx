@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { getServerLang, text } from "@/lib/i18n";
+import { SUPPORT_EMAIL, buildSupportMailto } from "@/lib/support-contact";
 
 type GuideCard = {
   key: string;
@@ -386,8 +387,8 @@ export default async function SupportPage() {
             </p>
           </div>
           <div className="support-contact-actions">
-            <a className="btn btn-primary" href="mailto:support@viralbrain.ai">
-              support@viralbrain.ai
+            <a className="btn btn-primary" href={buildSupportMailto("ViralBrain.ai Support")}>
+              {SUPPORT_EMAIL}
             </a>
             <a className="btn btn-ghost" href="https://github.com/biyongjie38-create/Saas" target="_blank" rel="noreferrer">
               {text(lang, "Open Repository", "查看仓库")}

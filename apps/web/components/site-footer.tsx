@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import Link from "next/link";
+import { SupportEmailTrigger } from "@/components/support-email-trigger";
 import type { Lang } from "@/lib/i18n-shared";
 import { text } from "@/lib/i18n-shared";
 
@@ -50,13 +51,15 @@ export function SiteFooter({ lang }: { lang: Lang }) {
             <h4>{text(lang, "Support", "支持")}</h4>
             <Link href="/support#manual">{text(lang, "User Manual", "用户手册")}</Link>
             <Link href="/support#faq">{text(lang, "FAQ", "常见问题")}</Link>
-            <Link href="/support#contact">{text(lang, "Contact Us", "联系我们")}</Link>
+            <SupportEmailTrigger lang={lang} label={text(lang, "Contact Us", "联系我们")} />
           </div>
           <div>
             <h4>{text(lang, "Company", "公司")}</h4>
             <Link href="/settings">{text(lang, "Personal Center", "个人中心")}</Link>
-            <Link href="/support#contact">{text(lang, "Get in touch", "获取支持")}</Link>
-            <a href="https://github.com/biyongjie38-create/Saas" target="_blank" rel="noreferrer">GitHub</a>
+            <SupportEmailTrigger lang={lang} label={text(lang, "Get in touch", "获取支持")} />
+            <a href="https://github.com/biyongjie38-create/Saas" target="_blank" rel="noreferrer">
+              GitHub
+            </a>
           </div>
         </div>
       </div>

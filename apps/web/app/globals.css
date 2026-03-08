@@ -2183,6 +2183,55 @@ a {
   transform: translateX(2px);
 }
 
+.footer-link-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.footer-link-button:hover {
+  color: var(--text);
+  transform: translateX(2px);
+}
+
+.support-email-modal {
+  width: min(560px, 94vw);
+}
+
+.support-email-modal-body {
+  display: grid;
+  gap: 18px;
+  padding: 12px 22px 22px;
+}
+
+.support-email-box {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(76, 198, 255, 0.22);
+  background: linear-gradient(135deg, rgba(76, 198, 255, 0.12), rgba(50, 214, 160, 0.08));
+}
+
+.support-email-box strong {
+  font-size: 26px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.support-email-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 1100px) {
   .trends-video-grid {
     grid-template-columns: 48px 82px minmax(180px, 1.5fr) 96px minmax(104px, 0.9fr) 86px minmax(88px, 0.72fr) 104px;
@@ -2275,7 +2324,8 @@ a {
 
   .support-contact-actions,
   .upgrade-footer-actions,
-  .site-footer-input-row {
+  .site-footer-input-row,
+  .support-email-actions {
     flex-direction: column;
     align-items: stretch;
   }
