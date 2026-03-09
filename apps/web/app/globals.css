@@ -2243,8 +2243,6 @@ a {
 }
 
 @media (max-width: 980px) {
-  .nav-inner-rich,
-  .nav-client-shell,
   .trends-hero,
   .landing-showcase,
   .landing-showcase-reverse,
@@ -2260,13 +2258,34 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .nav-inner-rich {
+    align-items: stretch;
+  }
+
   .nav-client-shell {
+    flex-direction: column;
     align-items: flex-start;
+    width: 100%;
   }
 
   .nav-main-links,
   .nav-utilities-rich {
     width: 100%;
+  }
+
+  .nav-main-links {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .nav-menu-group {
+    width: 100%;
+  }
+
+  .nav-menu-trigger {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .support-quick-actions {
@@ -2280,6 +2299,8 @@ a {
 
   .nav-utilities-rich {
     justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .nav-menu-panel,
