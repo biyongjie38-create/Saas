@@ -203,7 +203,7 @@ function persistVisibleConfig(config: ApiIntegrationConfig) {
 }
 
 function clearSections(config: ApiIntegrationConfig, sections: ApiSection[]) {
-  let next = { ...config };
+  const next = { ...config };
 
   if (sections.includes("youtube")) {
     next.youtubeApiKey = "";

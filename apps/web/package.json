@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
+    "prebuild": "node scripts/clean-build-cache.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "deploy:check": "node scripts/deploy-check.mjs",
     "qa:server": "node scripts/qa-dev.mjs",
     "test:e2e": "playwright test",
@@ -34,6 +35,8 @@
     "@types/node": "22.13.8",
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.1.6",
     "typescript": "5.7.3"
   }
 }

@@ -3,7 +3,7 @@
 export { isValidUuid };
 
 export function normalizeUserIdForBackend(userId: string): string {
-  if (!useSupabaseBackend()) {
+  if (!isSupabaseBackendEnabled()) {
     return userId;
   }
 
@@ -14,7 +14,7 @@ export function normalizeUserIdForBackend(userId: string): string {
   return userId;
 }
 
-export function useSupabaseBackend(): boolean {
+export function isSupabaseBackendEnabled(): boolean {
   const mode = getBackendMode();
 
   if (mode === "mock") {

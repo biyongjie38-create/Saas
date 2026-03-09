@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readDb, writeDb } from "@/lib/db";
 import { PRO_MONTHLY_PRICE_CNY, PRO_YEARLY_PRICE_CNY } from "@/lib/membership-pricing";
-import { normalizeUserIdForBackend, useSupabaseBackend } from "@/lib/supabase";
+import { isSupabaseBackendEnabled, normalizeUserIdForBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type {
   BillingCycle,
@@ -131,7 +131,7 @@ function createFallbackUser(input: Pick<User, "id" | "email"> & { fallbackPlan?:
 }
 
 async function getSupabaseClient(options?: MembershipQueryOptions): Promise<SupabaseClient | null> {
-  if (!useSupabaseBackend()) {
+  if (!isSupabaseBackendEnabled()) {
     return null;
   }
 

@@ -1,10 +1,13 @@
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 
 const webDir = process.cwd();
 const repoRoot = path.resolve(webDir, "..");
 const aiDir = path.join(repoRoot, "ai-service");
 const nextBin = path.join(webDir, "node_modules", "next", "dist", "bin", "next");
+const aiPython = path.join(aiDir, ".venv", "Scripts", "python.exe");
+const pythonCommand = existsSync(aiPython) ? aiPython : "python";
 
 const children = [];
 let closing = false;
@@ -48,7 +51,7 @@ function spawnManaged(command, args, options) {
   return child;
 }
 
-spawnManaged("python", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], {
+spawnManaged(pythonCommand, ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], {
   cwd: aiDir,
   env: {
     ...process.env,

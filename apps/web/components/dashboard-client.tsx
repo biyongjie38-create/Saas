@@ -199,7 +199,7 @@ export function DashboardClient({ lang, plan = "free", strictMode = false }: Pro
     setNotices([]);
 
     const providerConfig = readApiIntegrationConfigFromStorage();
-    const missingConfig = getAnalyzeConfigMissingFields(providerConfig);
+    const missingConfig = strictMode ? getAnalyzeConfigMissingFields(providerConfig) : [];
     if (missingConfig.length > 0) {
       setError(copy.byokMissing);
       trackFailure("byok_config_missing");

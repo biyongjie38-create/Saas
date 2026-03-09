@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import type { Lang } from "@/lib/i18n-shared";
@@ -26,6 +26,13 @@ type Props = {
 };
 
 type ThemeMode = "dark" | "light";
+type OpenMenuState = {
+  pathname: string;
+  key: string | null;
+};
+
+const THEME_STORAGE_KEY = "vb_theme";
+const THEME_CHANGE_EVENT = "vb-theme-change";
 
 type Copy = {
   trends: string;
@@ -155,34 +162,58 @@ function isConsoleRoute(pathname: string) {
   );
 }
 
+function readStoredTheme(): ThemeMode {
+  if (typeof window === "undefined") {
+    return "dark";
+  }
+
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+}
+
+function subscribeToTheme(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handleStorageChange = (event: Event) => {
+    if (event instanceof StorageEvent && event.key && event.key !== THEME_STORAGE_KEY) {
+      return;
+    }
+
+    onStoreChange();
+  };
+
+  window.addEventListener("storage", handleStorageChange);
+  window.addEventListener(THEME_CHANGE_EVENT, handleStorageChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorageChange);
+    window.removeEventListener(THEME_CHANGE_EVENT, handleStorageChange);
+  };
+}
+
 export function SiteNavClient({ lang, user }: Props) {
   const copy = copyByLang[lang];
   const pathname = usePathname() ?? "/";
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [theme, setTheme] = useState<ThemeMode>("dark");
+  const [openMenuState, setOpenMenuState] = useState<OpenMenuState>({ pathname, key: null });
+  const openMenu = openMenuState.pathname === pathname ? openMenuState.key : null;
+  const theme = useSyncExternalStore(subscribeToTheme, readStoredTheme, () => "dark");
   const shellRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("vb_theme");
-    const nextTheme = stored === "light" ? "light" : "dark";
-    setTheme(nextTheme);
-    document.documentElement.dataset.theme = nextTheme;
-  }, []);
-
-  useEffect(() => {
-    setOpenMenu(null);
-  }, [pathname]);
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (!shellRef.current?.contains(event.target as Node)) {
-        setOpenMenu(null);
+        setOpenMenuState({ pathname, key: null });
       }
     }
 
     window.addEventListener("mousedown", handlePointerDown);
     return () => window.removeEventListener("mousedown", handlePointerDown);
-  }, []);
+  }, [pathname]);
 
   const trendsLinks: MenuLink[] = [
     { href: "/dashboard/trends?tab=videos", label: copy.hotVideos, desc: copy.trendVideoDesc },
@@ -210,17 +241,23 @@ export function SiteNavClient({ lang, user }: Props) {
   const membershipHref = `/membership?next=${encodeURIComponent(pathname)}`;
 
   function toggleMenu(key: string) {
-    setOpenMenu((current) => (current === key ? null : key));
+    setOpenMenuState((current) => {
+      const currentKey = current.pathname === pathname ? current.key : null;
+      return {
+        pathname,
+        key: currentKey === key ? null : key
+      };
+    });
   }
 
   function closeMenus() {
-    setOpenMenu(null);
+    setOpenMenuState({ pathname, key: null });
   }
 
   function applyTheme(nextTheme: ThemeMode) {
-    setTheme(nextTheme);
     document.documentElement.dataset.theme = nextTheme;
-    window.localStorage.setItem("vb_theme", nextTheme);
+    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }
 
   function renderMenu(key: string, label: string, links: MenuLink[]) {

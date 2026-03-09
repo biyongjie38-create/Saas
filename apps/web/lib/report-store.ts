@@ -7,7 +7,7 @@ import {
   toUsageLimitDetails,
   UsageLimitExceededError
 } from "@/lib/quota";
-import { normalizeUserIdForBackend, useSupabaseBackend } from "@/lib/supabase";
+import { isSupabaseBackendEnabled, normalizeUserIdForBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type {
   Report,
@@ -148,7 +148,7 @@ function toUsage(row: {
 }
 
 async function getSupabaseUserClient(options?: QueryOptions): Promise<SupabaseClient | null> {
-  if (!useSupabaseBackend()) {
+  if (!isSupabaseBackendEnabled()) {
     return null;
   }
 
@@ -412,7 +412,7 @@ export async function recordReportShareAccess(
     supabaseClient?: SupabaseClient | null;
   }
 ): Promise<void> {
-  if (useSupabaseBackend()) {
+  if (isSupabaseBackendEnabled()) {
     const client = metadata?.supabaseClient;
     if (!client) {
       return;

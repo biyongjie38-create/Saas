@@ -42,7 +42,7 @@ export default async function ReportPage({ params }: Props) {
   const localizedScore = localizeScoreJson(lang, report.scoreJson);
   const shareStatus = report.shareRevokedAt
     ? text(lang, "Revoked", "已撤销")
-    : report.shareExpiresAt && new Date(report.shareExpiresAt).getTime() <= Date.now()
+    : report.shareExpiresAt && new Date(report.shareExpiresAt).getTime() <= Date.now() // eslint-disable-line react-hooks/purity
       ? text(lang, "Expired", "已过期")
       : report.shareEnabledAt && report.shareExpiresAt
         ? text(lang, "Active", "生效中")

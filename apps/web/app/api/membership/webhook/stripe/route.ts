@@ -5,7 +5,7 @@ import {
   syncMembershipSubscriptionState,
   updateMembershipOrder
 } from "@/lib/membership-store";
-import { useSupabaseBackend } from "@/lib/supabase";
+import { isSupabaseBackendEnabled } from "@/lib/supabase";
 import { maybeCreateAdminSupabaseClient } from "@/lib/supabase-server";
 import {
   extractStripeCurrentPeriodEnd,
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   const adminSupabaseClient = maybeCreateAdminSupabaseClient();
-  if (useSupabaseBackend() && !adminSupabaseClient) {
+  if (isSupabaseBackendEnabled() && !adminSupabaseClient) {
     return new Response("Supabase admin client is required for Stripe webhooks.", { status: 503 });
   }
 

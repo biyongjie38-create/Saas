@@ -27,9 +27,7 @@ type LocalBucket = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var __viralbrainRateLimitStore: Map<string, LocalBucket> | undefined;
-  // eslint-disable-next-line no-var
   var __viralbrainRateLimiters: Map<string, Ratelimit> | undefined;
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { MembershipUpgradeModal } from "@/components/membership-upgrade-modal";
 import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
@@ -435,7 +436,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn, strictMode = fa
     return () => {
       ignore = true;
     };
-  }, [copy.refreshFailed]);
+  }, [copy.refreshFailed, strictMode]);
 
   const visibleVideos = useMemo(
     () =>
@@ -551,7 +552,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn, strictMode = fa
                 <div key={row.id} className={`trends-video-grid trend-row ${!isPro ? "trend-row-locked" : ""}`}>
                   <span className="trend-rank">{index + 1}</span>
                   <div className="trend-thumb">
-                    <img className="trend-thumb-image" src={row.thumbnailUrl} alt={row.title} />
+                    <Image className="trend-thumb-image" src={row.thumbnailUrl} alt={row.title} width={160} height={90} />
                   </div>
                   <div className="trend-title-block">
                     <strong>{row.title}</strong>

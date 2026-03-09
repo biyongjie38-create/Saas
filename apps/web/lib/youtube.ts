@@ -4,7 +4,7 @@ import { demoVideos } from "@/lib/mock-data";
 import { readDb, writeDb } from "@/lib/db";
 import { allowPreviewFallbacks, isProductionRuntimeMode } from "@/lib/runtime-mode";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { useSupabaseBackend } from "@/lib/supabase";
+import { isSupabaseBackendEnabled } from "@/lib/supabase";
 import type { CollectedViralItem, VideoDataSource, YoutubeVideo } from "@/lib/types";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -146,7 +146,7 @@ function toVideoRow(video: YoutubeVideo, includeDataSource = true): Record<strin
 }
 
 async function getSupabaseUserClient(options?: QueryOptions): Promise<SupabaseClient | null> {
-  if (!useSupabaseBackend()) {
+  if (!isSupabaseBackendEnabled()) {
     return null;
   }
 
@@ -410,7 +410,16 @@ async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Respon
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("YT_REQUEST_TIMEOUT");
     }
-    throw error;
+
+    const cause = error instanceof Error ? (error as Error & { cause?: unknown }).cause : null;
+    const causeCode =
+      cause && typeof cause === "object" && "code" in cause ? String((cause as { code?: unknown }).code ?? "") : "";
+
+    if (causeCode === "UND_ERR_CONNECT_TIMEOUT") {
+      throw new Error("YT_REQUEST_TIMEOUT");
+    }
+
+    throw new Error("YT_API_FAILED");
   } finally {
     clearTimeout(timeout);
   }

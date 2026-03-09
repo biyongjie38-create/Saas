@@ -16,6 +16,7 @@ import { getAnalyzeConfigMissingFields, readApiIntegrationConfigFromHeaders } fr
 import { executeAnalyzeTask } from "@/lib/analysis-runner";
 import { countUsageForDay } from "@/lib/report-store";
 import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
+import { isProductionRuntimeMode } from "@/lib/runtime-mode";
 import { assertUsageWithinLimit, UsageLimitExceededError } from "@/lib/quota";
 import { assertPlanAllowsProvider } from "@/lib/plan-access";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
@@ -58,19 +59,21 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
-  const missingFields = getAnalyzeConfigMissingFields(providerConfig);
-  if (missingFields.length > 0) {
-    return errorJsonResponse(
-      {
-        code: "BYOK_CONFIG_MISSING",
-        message: "Connect your own YouTube API key and LLM provider credentials before running analysis.",
-        details: {
-          missing_fields: missingFields
-        }
-      },
-      requestId,
-      422
-    );
+  if (isProductionRuntimeMode()) {
+    const missingFields = getAnalyzeConfigMissingFields(providerConfig);
+    if (missingFields.length > 0) {
+      return errorJsonResponse(
+        {
+          code: "BYOK_CONFIG_MISSING",
+          message: "Connect your own YouTube API key and LLM provider credentials before running analysis.",
+          details: {
+            missing_fields: missingFields
+          }
+        },
+        requestId,
+        422
+      );
+    }
   }
   assertPlanAllowsProvider(auth.appUser.plan, providerConfig);
 

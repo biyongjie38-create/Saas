@@ -12,6 +12,15 @@ const labels: Record<Lang, string> = {
   zh: "中文"
 };
 
+function persistLanguageCookie(nextLang: Lang) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const oneYear = 60 * 60 * 24 * 365;
+  document.cookie = `${LANG_COOKIE_NAME}=${nextLang}; Path=/; Max-Age=${oneYear}; SameSite=Lax`;
+}
+
 export function LanguageSwitcher({ currentLang }: Props) {
   const [isPending, startTransition] = useTransition();
 
@@ -20,8 +29,7 @@ export function LanguageSwitcher({ currentLang }: Props) {
       return;
     }
 
-    const oneYear = 60 * 60 * 24 * 365;
-    document.cookie = `${LANG_COOKIE_NAME}=${nextLang}; Path=/; Max-Age=${oneYear}; SameSite=Lax`;
+    persistLanguageCookie(nextLang);
 
     startTransition(() => {
       window.location.reload();
