@@ -90,15 +90,14 @@ export function listProviderPresets(): ProviderPreset[] {
 }
 
 export function createEmptyApiIntegrationConfig(): ApiIntegrationConfig {
-  const preset = getProviderPreset("openai");
   return {
     youtubeApiKey: "",
-    llmProvider: preset.id,
+    llmProvider: "openai",
     openaiApiKey: "",
-    openaiBaseUrl: preset.baseUrl,
-    analysisModel: preset.analysisModel,
-    scoreModel: preset.scoreModel,
-    embeddingModel: preset.embeddingModel,
+    openaiBaseUrl: "",
+    analysisModel: "",
+    scoreModel: "",
+    embeddingModel: "",
     pineconeApiKey: "",
     pineconeIndexHost: "",
     pineconeIndexName: "",

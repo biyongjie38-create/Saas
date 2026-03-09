@@ -210,8 +210,12 @@ function clearSections(config: ApiIntegrationConfig, sections: ApiSection[]) {
   }
 
   if (sections.includes("llm")) {
-    next = applyProviderPreset(next, "openai");
+    next.llmProvider = "openai";
     next.openaiApiKey = "";
+    next.openaiBaseUrl = "";
+    next.analysisModel = "";
+    next.scoreModel = "";
+    next.embeddingModel = "";
   }
 
   if (sections.includes("pinecone")) {
