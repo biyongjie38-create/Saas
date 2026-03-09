@@ -190,7 +190,8 @@ def _call_openai_json(
         temperature=temperature,
         response_format={"type": "json_object"},
         messages=[
-            {"role": "developer", "content": system_prompt},
+            # Use "system" for broader OpenAI-compatible provider support.
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
     )
