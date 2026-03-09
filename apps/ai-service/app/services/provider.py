@@ -41,7 +41,10 @@ def build_provider_overrides(
     resolved_key = (api_key or "").strip() or None
     resolved_base_url = (base_url or "").strip() or None
     resolved_provider = (provider_name or "").strip() or None
-    if not resolved_key and not resolved_base_url and not resolved_provider:
+    # Only allow browser/provider overrides when the caller also supplies its own
+    # provider credential. This prevents stale local UI config from overriding
+    # the server-managed hybrid provider endpoint.
+    if not resolved_key:
         return None
     return ProviderOverrides(api_key=resolved_key, base_url=resolved_base_url, provider_name=resolved_provider)
 
