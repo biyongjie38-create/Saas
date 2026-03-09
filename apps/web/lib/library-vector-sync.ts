@@ -1,6 +1,7 @@
 import {
   buildApiIntegrationHeaders,
   createEmptyApiIntegrationConfig,
+  hasPineconeByokConfig,
   type ApiIntegrationConfig
 } from "@/lib/api-integrations";
 import type { ViralLibraryItem } from "@/lib/types";
@@ -23,6 +24,9 @@ export async function syncLibraryVectors(
 ): Promise<SyncResult> {
   if (!items.length) {
     return { ok: true, message: "No vector updates were needed." };
+  }
+  if (!hasPineconeByokConfig(providerConfig)) {
+    return { ok: true, message: "Vector sync skipped because Pinecone BYOK is not configured." };
   }
 
   try {
@@ -84,6 +88,9 @@ export async function deleteLibraryVectors(
   const resolvedIds = ids.filter(Boolean);
   if (!resolvedIds.length) {
     return { ok: true, message: "No vector deletions were needed." };
+  }
+  if (!hasPineconeByokConfig(providerConfig)) {
+    return { ok: true, message: "Vector deletion skipped because Pinecone BYOK is not configured." };
   }
 
   try {

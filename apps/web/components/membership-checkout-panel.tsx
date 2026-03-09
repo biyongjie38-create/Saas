@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { captureAnalyticsEvent } from "@/lib/analytics";
+import {
+  formatMembershipPriceLabel,
+  getMembershipMarketingCopy,
+  resolveMembershipPriceCny,
+} from "@/lib/membership-pricing";
 import type { BillingCycle, MembershipOrder, User } from "@/lib/types";
 import type { Lang } from "@/lib/i18n-shared";
 
@@ -37,139 +42,20 @@ type ConfirmResponse = {
   } | null;
 };
 
-type Copy = {
-  badge: string;
-  title: string;
-  subtitle: string;
-  checkoutNote: string;
-  monthly: string;
-  yearly: string;
-  currentPlan: string;
-  freeName: string;
-  proName: string;
-  freeDesc: string;
-  proDesc: string;
-  month: string;
-  year: string;
-  freeFeatures: string[];
-  proFeatures: string[];
-  activate: string;
-  activating: string;
-  active: string;
-  activated: string;
-  verifying: string;
-  cancelled: string;
-  history: string;
-  noOrders: string;
-  orderStatus: string;
-  orderAmount: string;
-  orderCycle: string;
-  orderTime: string;
-  orderProvider: string;
-  returnToPrevious: string;
-};
-
-const copyByLang: Record<Lang, Copy> = {
-  en: {
-    badge: "Membership",
-    title: "Open membership and unlock advanced workflow limits",
-    subtitle: "Pro checkout now uses a real Stripe hosted payment flow and syncs subscription state back into your account.",
-    checkoutNote: "You will be redirected to Stripe Checkout. Access changes only after the payment session is verified.",
-    monthly: "Monthly",
-    yearly: "Yearly",
-    currentPlan: "Current plan",
-    freeName: "Free",
-    proName: "Professional",
-    freeDesc: "Best for demos, early validation, and low-frequency analysis.",
-    proDesc: "Built for BYOK, real reruns, share links, recycle-bin management, and heavier analysis volume.",
-    month: "month",
-    year: "year",
-    freeFeatures: [
-      "5 analyses per day",
-      "Basic viral collection and manual import",
-      "Report preview and core tabs",
-      "OpenAI default / local fallback path"
-    ],
-    proFeatures: [
-      "200 analyses per day",
-      "Share links, rerun, and PDF export",
-      "Bailian / Yunwu / custom OpenAI-compatible providers",
-      "Recycle bin recovery and higher collection limits"
-    ],
-    activate: "Continue to secure checkout",
-    activating: "Redirecting...",
-    active: "Active",
-    activated: "Payment confirmed. Pro membership is now active.",
-    verifying: "Verifying payment...",
-    cancelled: "Checkout was cancelled before payment confirmation.",
-    history: "Membership orders",
-    noOrders: "No membership orders yet.",
-    orderStatus: "Status",
-    orderAmount: "Amount",
-    orderCycle: "Billing cycle",
-    orderTime: "Created",
-    orderProvider: "Provider",
-    returnToPrevious: "Return to previous page"
-  },
-  zh: {
-    badge: "订阅会员",
-    title: "开通会员并解锁更高阶的工作流能力",
-    subtitle: "专业版现在走真实 Stripe 托管支付流程，支付完成后会把订阅状态回写到你的账号。",
-    checkoutNote: "点击后会跳转到 Stripe Checkout。只有支付会话校验成功后，权限才会正式切换。",
-    monthly: "月付",
-    yearly: "年付",
-    currentPlan: "当前套餐",
-    freeName: "免费版",
-    proName: "专业版",
-    freeDesc: "适合演示、早期验证和低频分析。",
-    proDesc: "面向自带 Key、真实重跑、分享链接、回收站管理和更高频率分析。",
-    month: "月",
-    year: "年",
-    freeFeatures: [
-      "每天 5 次分析",
-      "基础爆款采集与手动导入",
-      "报告预览和核心分析标签页",
-      "OpenAI 默认链路 / 本地兜底"
-    ],
-    proFeatures: [
-      "每天 200 次分析",
-      "分享链接、重跑报告、导出 PDF",
-      "阿里云百炼 / 云雾 / 自定义兼容供应商",
-      "回收站恢复与更高采集上限"
-    ],
-    activate: "前往安全支付",
-    activating: "跳转中...",
-    active: "已生效",
-    activated: "支付已确认，专业版会员已生效。",
-    verifying: "正在校验支付结果...",
-    cancelled: "你已取消本次支付，尚未扣款。",
-    history: "会员订单",
-    noOrders: "还没有会员订单。",
-    orderStatus: "状态",
-    orderAmount: "金额",
-    orderCycle: "计费周期",
-    orderTime: "创建时间",
-    orderProvider: "支付渠道",
-    returnToPrevious: "返回上一页"
-  }
-};
-
-function formatPrice(lang: Lang, cycle: BillingCycle) {
-  return cycle === "yearly"
-    ? lang === "zh"
-      ? "CNY 999 / 年"
-      : "CNY 999 / year"
-    : lang === "zh"
-      ? "CNY 99 / 月"
-      : "CNY 99 / month";
-}
-
 function mergeOrder(nextOrder: MembershipOrder, orders: MembershipOrder[]) {
   return [nextOrder, ...orders.filter((item) => item.id !== nextOrder.id)];
 }
 
+function formatSubscriptionBadge(lang: Lang, value: User["subscriptionStatus"]) {
+  if (value === "active") {
+    return lang === "zh" ? "已生效" : "Active";
+  }
+
+  return lang === "zh" ? "未生效" : "Inactive";
+}
+
 export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
-  const copy = copyByLang[lang];
+  const copy = getMembershipMarketingCopy(lang);
   const router = useRouter();
   const searchParams = useSearchParams();
   const confirmedSessionRef = useRef<string | null>(null);
@@ -181,7 +67,8 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const currentPrice = useMemo(() => formatPrice(lang, billingCycle), [billingCycle, lang]);
+  const currentPriceLabel = useMemo(() => formatMembershipPriceLabel(lang, billingCycle), [billingCycle, lang]);
+  const currentPrice = useMemo(() => resolveMembershipPriceCny(billingCycle), [billingCycle]);
   const checkoutState = searchParams.get("checkout");
   const sessionId = searchParams.get("session_id");
   const nextPath = searchParams.get("next");
@@ -205,7 +92,7 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
       captureAnalyticsEvent("membership_checkout_cancelled", {
         entry_point: "membership_page",
         lang,
-        billing_cycle: billingCycle
+        billing_cycle: billingCycle,
       });
     }
   }, [billingCycle, checkoutState, copy.activated, copy.cancelled, lang]);
@@ -227,24 +114,24 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         const response = await fetch("/api/membership/checkout/confirm", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            sessionId
-          })
+            sessionId,
+          }),
         });
         const payload = (await response.json().catch(() => null)) as ConfirmResponse | null;
         if (!response.ok || !payload?.ok || !payload.data) {
           if (!ignore) {
-            setMessage("");
             const failureMessage = payload?.error?.message ?? "Payment confirmation failed.";
+            setMessage("");
             setError(failureMessage);
             captureAnalyticsEvent("membership_checkout_failed", {
               entry_point: "membership_page",
               stage: "confirm",
               lang,
               billing_cycle: billingCycle,
-              reason: failureMessage
+              reason: failureMessage,
             });
           }
           return;
@@ -257,8 +144,7 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         const confirmedData = payload.data;
         setCurrentUser(confirmedData.user);
         if (confirmedData.order) {
-          const nextOrder = confirmedData.order;
-          setOrders((current) => mergeOrder(nextOrder, current));
+          setOrders((current) => mergeOrder(confirmedData.order as MembershipOrder, current));
         }
         setError("");
         setMessage(copy.activated);
@@ -267,7 +153,7 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
           lang,
           billing_cycle: confirmedData.order?.billingCycle ?? billingCycle,
           order_id: confirmedData.order?.id ?? null,
-          plan: confirmedData.user.plan
+          plan: confirmedData.user.plan,
         });
         router.refresh();
 
@@ -279,15 +165,15 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         router.replace(`/membership?${params.toString()}`);
       } catch (cause) {
         if (!ignore) {
-          setMessage("");
           const failureMessage = cause instanceof Error ? cause.message : "Payment confirmation failed.";
+          setMessage("");
           setError(failureMessage);
           captureAnalyticsEvent("membership_checkout_failed", {
             entry_point: "membership_page",
             stage: "confirm",
             lang,
             billing_cycle: billingCycle,
-            reason: failureMessage
+            reason: failureMessage,
           });
         }
       } finally {
@@ -302,7 +188,7 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
     return () => {
       ignore = true;
     };
-  }, [checkoutState, copy.activated, copy.verifying, nextPath, router, sessionId]);
+  }, [billingCycle, checkoutState, copy.activated, copy.verifying, lang, nextPath, router, sessionId]);
 
   async function openMembership() {
     setSubmitting(true);
@@ -312,19 +198,19 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
       entry_point: "membership_page",
       lang,
       billing_cycle: billingCycle,
-      current_plan: currentUser.plan
+      current_plan: currentUser.plan,
     });
 
     try {
       const response = await fetch("/api/membership/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           plan: "pro",
-          billingCycle
-        })
+          billingCycle,
+        }),
       });
       const payload = (await response.json().catch(() => null)) as CheckoutResponse | null;
       if (!response.ok || !payload?.ok || !payload.data) {
@@ -335,15 +221,14 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
           stage: "create",
           lang,
           billing_cycle: billingCycle,
-          reason: failureMessage
+          reason: failureMessage,
         });
         return;
       }
 
       const checkoutData = payload.data;
       if (checkoutData.order) {
-        const nextOrder = checkoutData.order;
-        setOrders((current) => mergeOrder(nextOrder, current));
+        setOrders((current) => mergeOrder(checkoutData.order as MembershipOrder, current));
       }
 
       if (checkoutData.checkoutUrl) {
@@ -358,7 +243,7 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         lang,
         billing_cycle: billingCycle,
         order_id: checkoutData.order?.id ?? null,
-        plan: checkoutData.user.plan
+        plan: checkoutData.user.plan,
       });
       router.refresh();
     } catch (cause) {
@@ -369,7 +254,7 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
         stage: "create",
         lang,
         billing_cycle: billingCycle,
-        reason: failureMessage
+        reason: failureMessage,
       });
     } finally {
       setSubmitting(false);
@@ -388,9 +273,17 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
       </div>
 
       <div className="membership-summary-row">
-        <span className="badge">{copy.currentPlan}: {currentUser.plan}</span>
-        <span className="badge">{currentUser.subscriptionStatus === "active" ? copy.active : currentUser.subscriptionStatus ?? "none"}</span>
-        {currentUser.planExpiresAt ? <span className="badge">{lang === "zh" ? `到期：${new Date(currentUser.planExpiresAt).toLocaleDateString("zh-CN")}` : `Expires: ${new Date(currentUser.planExpiresAt).toLocaleDateString("en-US")}`}</span> : null}
+        <span className="badge">
+          {copy.currentPlan}: {currentUser.plan}
+        </span>
+        <span className="badge">{formatSubscriptionBadge(lang, currentUser.subscriptionStatus)}</span>
+        {currentUser.planExpiresAt ? (
+          <span className="badge">
+            {lang === "zh"
+              ? `到期：${new Date(currentUser.planExpiresAt).toLocaleDateString("zh-CN")}`
+              : `Expires: ${new Date(currentUser.planExpiresAt).toLocaleDateString("en-US")}`}
+          </span>
+        ) : null}
         {nextPath ? (
           <a className="btn btn-ghost compact-button" href={nextPath}>
             {copy.returnToPrevious}
@@ -425,20 +318,35 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
               <p className="card-kicker">{copy.proName}</p>
               <h2>{copy.proName}</h2>
             </div>
-            {currentUser.plan === "pro" ? <span className="plan-pill">{copy.active}</span> : null}
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              {billingCycle === "yearly" ? <span className="badge">{copy.yearlyBadge}</span> : null}
+              {currentUser.plan === "pro" ? <span className="plan-pill">{copy.active}</span> : null}
+            </div>
           </div>
 
           <div className="pricing-toggle">
-            <button type="button" className={`tab-button ${billingCycle === "monthly" ? "tab-button-active" : ""}`} onClick={() => setBillingCycle("monthly")}>{copy.monthly}</button>
-            <button type="button" className={`tab-button ${billingCycle === "yearly" ? "tab-button-active" : ""}`} onClick={() => setBillingCycle("yearly")}>{copy.yearly}</button>
+            <button
+              type="button"
+              className={`tab-button ${billingCycle === "monthly" ? "tab-button-active" : ""}`}
+              onClick={() => setBillingCycle("monthly")}
+            >
+              {copy.monthly}
+            </button>
+            <button
+              type="button"
+              className={`tab-button ${billingCycle === "yearly" ? "tab-button-active" : ""}`}
+              onClick={() => setBillingCycle("yearly")}
+            >
+              {copy.yearly}
+            </button>
           </div>
 
           <div className="plan-price-row">
-            <span className="plan-price">{billingCycle === "yearly" ? "999" : "99"}</span>
+            <span className="plan-price">{currentPrice}</span>
             <span className="plan-cycle">CNY / {billingCycle === "yearly" ? copy.year : copy.month}</span>
           </div>
           <p className="small plan-desc">{copy.proDesc}</p>
-          <p className="small membership-price-hint">{currentPrice}</p>
+          <p className="small membership-price-hint">{currentPriceLabel}</p>
           <ul className="plan-feature-list">
             {copy.proFeatures.map((feature) => (
               <li key={feature}>{feature}</li>
@@ -475,11 +383,21 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
                   <span className="badge">{order.status}</span>
                 </div>
                 <p className="small mono">order_id: {order.id}</p>
-                <p className="small">{copy.orderProvider}: {order.paymentProvider}</p>
-                <p className="small">{copy.orderAmount}: CNY {order.amountCny}</p>
-                <p className="small">{copy.orderCycle}: {order.billingCycle}</p>
-                <p className="small">{copy.orderStatus}: {order.status}</p>
-                <p className="small">{copy.orderTime}: {new Date(order.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}</p>
+                <p className="small">
+                  {copy.orderProvider}: {order.paymentProvider}
+                </p>
+                <p className="small">
+                  {copy.orderAmount}: CNY {order.amountCny}
+                </p>
+                <p className="small">
+                  {copy.orderCycle}: {order.billingCycle}
+                </p>
+                <p className="small">
+                  {copy.orderStatus}: {order.status}
+                </p>
+                <p className="small">
+                  {copy.orderTime}: {new Date(order.createdAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}
+                </p>
               </article>
             ))}
           </div>

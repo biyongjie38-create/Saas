@@ -2,7 +2,7 @@ export function toUserFacingRuntimeMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "UNKNOWN_ERROR");
 
   if (message === "YOUTUBE_KEY_MISSING") {
-    return "Missing YouTube Data API key. Configure it on the collector page or on the server before running live workflows.";
+    return "Missing YouTube Data API key. Connect your own YouTube key in the API panel before running live workflows.";
   }
 
   if (message === "YT_API_FAILED") {
@@ -26,15 +26,15 @@ export function toUserFacingRuntimeMessage(error: unknown): string {
   }
 
   if (message === "AI_PROVIDER_LOCAL_MODE_DISABLED") {
-    return "Production mode requires a real model provider. Disable AI_PROVIDER=local and configure OpenAI-compatible credentials.";
+    return "Production mode requires a real model provider. Connect your own OpenAI-compatible credentials before running analysis.";
   }
 
   if (message === "AI_PROVIDER_CREDENTIALS_MISSING") {
-    return "Missing model provider credentials. In BYOK mode, connect your own OpenAI-compatible key in the browser. In hybrid mode, set OPENAI_API_KEY on apps/ai-service.";
+    return "Missing model provider credentials. Connect your own OpenAI-compatible key, base URL, and model names in the API panel.";
   }
 
   if (message === "RAG_PROVIDER_CREDENTIALS_MISSING") {
-    return "Missing embedding or Pinecone credentials. In BYOK mode, connect your own OpenAI-compatible embedding key and Pinecone key in the browser. In hybrid mode, set them on apps/ai-service.";
+    return "Missing embedding or Pinecone credentials. Connect your own embedding model and Pinecone settings to enable benchmark retrieval.";
   }
 
   if (message === "AI_PROVIDER_REQUEST_FAILED") {

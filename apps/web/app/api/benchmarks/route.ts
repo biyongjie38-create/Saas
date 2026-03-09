@@ -1,7 +1,9 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { errorJsonResponse, okJsonResponse, withApiRoute } from "@/lib/api-response";
-import { getApiAuthUser, unauthorizedJsonResponse } from "@/lib/auth";
+import { getApiAuthUser, resolveAuthenticatedAppUser, unauthorizedJsonResponse } from "@/lib/auth";
+import { getPineconeConfigMissingFields, readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { runBenchmarks } from "@/lib/ai-client";
+import { assertPlanFeature } from "@/lib/plan-access";
 import { listLibraryItems } from "@/lib/report-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 import { getVideoByVideoId } from "@/lib/youtube";
@@ -32,6 +34,24 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const supabaseClient = await maybeCreateServerSupabaseClient();
+  const user = await resolveAuthenticatedAppUser(authUser, { supabaseClient });
+  assertPlanFeature(user.plan, "canUseBenchmarkRetrieval", "Upgrade to Pro to run benchmark retrieval.");
+  const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
+  const missingFields = getPineconeConfigMissingFields(providerConfig);
+  if (missingFields.length > 0) {
+    return errorJsonResponse(
+      {
+        code: "BYOK_PINECONE_CONFIG_MISSING",
+        message: "Connect your embedding model and Pinecone credentials before running benchmark retrieval.",
+        details: {
+          missing_fields: missingFields
+        }
+      },
+      requestId,
+      422
+    );
+  }
+
   const video = await getVideoByVideoId(body.data.videoId, { supabaseClient });
 
   if (!video) {
@@ -46,7 +66,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const libraryItems = await listLibraryItems({ supabaseClient });
-  const result = await runBenchmarks(video, body.data.structureSummary, libraryItems);
+  const result = await runBenchmarks(video, body.data.structureSummary, libraryItems, providerConfig);
 
   return okJsonResponse(
     {

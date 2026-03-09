@@ -12,7 +12,7 @@ import {
   resolveAuthenticatedAppUser,
   unauthorizedJsonResponse
 } from "@/lib/auth";
-import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
+import { getAnalyzeConfigMissingFields, readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
 import { executeAnalyzeTask } from "@/lib/analysis-runner";
 import { countUsageForDay } from "@/lib/report-store";
 import { toUserFacingRuntimeMessage } from "@/lib/runtime-errors";
@@ -58,6 +58,20 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   }
 
   const providerConfig = readApiIntegrationConfigFromHeaders(request.headers);
+  const missingFields = getAnalyzeConfigMissingFields(providerConfig);
+  if (missingFields.length > 0) {
+    return errorJsonResponse(
+      {
+        code: "BYOK_CONFIG_MISSING",
+        message: "Connect your own YouTube API key and LLM provider credentials before running analysis.",
+        details: {
+          missing_fields: missingFields
+        }
+      },
+      requestId,
+      422
+    );
+  }
   assertPlanAllowsProvider(auth.appUser.plan, providerConfig);
 
   const usedToday = await countUsageForDay(auth.appUser.id, {

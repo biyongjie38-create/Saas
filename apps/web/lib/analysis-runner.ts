@@ -1,6 +1,7 @@
-﻿import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ApiIntegrationConfig } from "@/lib/api-integrations";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasPineconeByokConfig, type ApiIntegrationConfig } from "@/lib/api-integrations";
 import { runAnalysis, runBenchmarks, runScoring } from "@/lib/ai-client";
+import { getPlanFeatures } from "@/lib/plan-features";
 import { consumeUsage, createReport, listLibraryItems, updateReport } from "@/lib/report-store";
 import type { ModelTrace } from "@/lib/types";
 import { fetchYoutubeData } from "@/lib/youtube";
@@ -9,6 +10,25 @@ type AnalyzeExecutionResult = {
   reportId: string;
   scoreTotal: number;
 };
+
+function createSkippedBenchmarkResult(): Awaited<ReturnType<typeof runBenchmarks>> {
+  return {
+    benchmarks: {
+      topMatches: []
+    },
+    trace: {
+      model: "rag::disabled",
+      provider: "disabled",
+      fallbackUsed: false,
+      retries: 0,
+      latencyMs: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      providerRequestId: null
+    }
+  };
+}
 
 function buildModelTrace(input: {
   analysis: Awaited<ReturnType<typeof runAnalysis>>["trace"];
@@ -46,8 +66,15 @@ export async function executeAnalyzeTask(input: {
 }): Promise<AnalyzeExecutionResult> {
   const startedAt = Date.now();
   let reportId: string | null = null;
+  const features = getPlanFeatures(input.plan);
 
   try {
+    input.onStage?.("fetching_youtube", { message: "Fetching video metadata and comments" });
+    const video = await fetchYoutubeData(input.url, {
+      supabaseClient: input.supabaseClient,
+      apiKeyOverride: input.providerConfig?.youtubeApiKey
+    });
+
     await consumeUsage(
       {
         userId: input.userId,
@@ -58,12 +85,6 @@ export async function executeAnalyzeTask(input: {
       },
       { supabaseClient: input.supabaseClient }
     );
-
-    input.onStage?.("fetching_youtube", { message: "Fetching video metadata and comments" });
-    const video = await fetchYoutubeData(input.url, {
-      supabaseClient: input.supabaseClient,
-      apiKeyOverride: input.providerConfig?.youtubeApiKey
-    });
 
     const report = await createReport(
       {
@@ -84,14 +105,21 @@ export async function executeAnalyzeTask(input: {
     input.onStage?.("analysis", {});
     const analysisResult = await runAnalysis(video, input.providerConfig);
 
-    input.onStage?.("benchmark", {});
-    const libraryItems = await listLibraryItems({ supabaseClient: input.supabaseClient });
-    const benchmarkResult = await runBenchmarks(
-      video,
-      analysisResult.analysis.structure.hookAnalysis,
-      libraryItems,
-      input.providerConfig
-    );
+    const benchmarkEnabledByPlan = features.canUseBenchmarkRetrieval;
+    const hasBenchmarkConfig = hasPineconeByokConfig(input.providerConfig);
+    const shouldRunBenchmark = benchmarkEnabledByPlan && hasBenchmarkConfig;
+    input.onStage?.("benchmark", {
+      skipped: !shouldRunBenchmark,
+      reason: !benchmarkEnabledByPlan ? "plan_locked" : !hasBenchmarkConfig ? "missing_config" : undefined
+    });
+    const benchmarkResult = shouldRunBenchmark
+      ? await runBenchmarks(
+          video,
+          analysisResult.analysis.structure.hookAnalysis,
+          await listLibraryItems({ supabaseClient: input.supabaseClient }),
+          input.providerConfig
+        )
+      : createSkippedBenchmarkResult();
 
     input.onStage?.("score", {});
     const scoreResult = await runScoring(video, analysisResult.analysis, benchmarkResult.benchmarks, input.providerConfig);
@@ -147,4 +175,3 @@ export async function executeAnalyzeTask(input: {
     throw error;
   }
 }
-

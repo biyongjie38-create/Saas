@@ -19,12 +19,7 @@ export function assertPlanFeature(plan: UserPlan, feature: keyof ReturnType<type
 }
 
 export function assertPlanAllowsProvider(plan: UserPlan, config?: ApiIntegrationConfig) {
-  if (!config || !config.openaiApiKey) {
-    return;
-  }
-
-  if (config.llmProvider !== "openai") {
-    assertPlanFeature(plan, "canUseAdvancedProviders", "Upgrade to Pro to use non-OpenAI model providers.");
-  }
+  void plan;
+  void config;
 }
 

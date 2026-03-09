@@ -87,7 +87,7 @@ const copyByLang: Record<Lang, Copy> = {
   en: {
     title: "Bring Your Own API Keys",
     subtitle:
-      "Users connect their own platform credentials so data and model costs are billed to their own provider accounts. This commercial build defaults to BYOK.",
+      "Users connect their own platform credentials so data and model costs are billed to their own provider accounts. This build runs in BYOK-only mode.",
     storageHint:
       "Keys are stored only in the current browser and attached to requests on demand. Secrets are not written into your database unless you explicitly redesign for server-managed billing.",
     liveNow: "Live now",
@@ -96,7 +96,7 @@ const copyByLang: Record<Lang, Copy> = {
     youtubeTitle: "YouTube Data API",
     youtubeDesc: "Used to fetch live video metadata, comments, and viral collection candidates.",
     llmTitle: "LLM Provider",
-    llmDesc: "Supports OpenAI and OpenAI-compatible domestic providers such as Bailian or Yunwu.",
+    llmDesc: "Both Free and Pro support OpenAI-compatible providers such as OpenAI, Bailian, Yunwu, or your own gateway.",
     pineconeTitle: "Pinecone",
     pineconeDesc: "Optional for real benchmark retrieval when vector search is enabled.",
     provider: "Provider",
@@ -118,8 +118,8 @@ const copyByLang: Record<Lang, Copy> = {
     saved: "API configuration saved in this browser.",
     cleared: "Selected API fields were cleared from this browser.",
     empty: "No keys have been entered yet.",
-    activeNotice: "In BYOK mode, requests use only your connected APIs. Hybrid server-paid fallback must be enabled explicitly on apps/ai-service.",
-    advancedLocked: "Domestic/custom LLM providers are available in Pro.",
+    activeNotice: "Requests use only your connected APIs. YouTube and LLM credentials are required for analysis. Pinecone stays optional and enables benchmark retrieval.",
+    advancedLocked: "",
     providerNote: "Provider note",
     testSummary: "Connection summary",
     providerHint: "Click to open the provider picker and auto-fill the recommended defaults.",
@@ -160,8 +160,8 @@ const copyByLang: Record<Lang, Copy> = {
     saved: "API 配置已保存到当前浏览器。",
     cleared: "当前页面涉及的 API 配置已清空。",
     empty: "还没有填写任何 Key。",
-    activeNotice: "当你填写了自己的 API 后，请求会优先走你自己的平台额度。",
-    advancedLocked: "国产 / 自定义模型供应商属于专业版能力。",
+    activeNotice: "当你填写了自己的 API 后，请求会优先走你自己的平台额度。Pinecone 仍然是可选项，用于开启对标检索。",
+    advancedLocked: "",
     providerNote: "供应商说明",
     testSummary: "连接结果",
     providerHint: "点击后会展开清晰的供应商选择面板，并自动带入推荐配置。",
@@ -230,7 +230,6 @@ function clearSections(config: ApiIntegrationConfig, sections: ApiSection[]) {
 
 export function ApiConnectionPanel({
   lang,
-  plan,
   sections,
   title,
   subtitle,
@@ -400,7 +399,6 @@ export function ApiConnectionPanel({
           <h2 style={{ marginTop: 0 }}>{title ?? copy.title}</h2>
           <p>{subtitle ?? copy.subtitle}</p>
           <p className="small">{storageHint ?? copy.storageHint}</p>
-          {plan === "free" && visibleSections.includes("llm") ? <div className="upgrade-hint">{copy.advancedLocked}</div> : null}
         </div>
         <div className="integration-status-stack">
           {providerCards.map((item) => (

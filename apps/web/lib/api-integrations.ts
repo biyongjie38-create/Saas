@@ -105,6 +105,10 @@ export function createEmptyApiIntegrationConfig(): ApiIntegrationConfig {
   };
 }
 
+function hasValue(value: string | undefined): boolean {
+  return Boolean(value?.trim());
+}
+
 function normalizeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -150,6 +154,77 @@ export function normalizeApiIntegrationConfig(input: unknown): ApiIntegrationCon
   };
 }
 
+export function hasYoutubeByokConfig(config?: ApiIntegrationConfig): boolean {
+  const normalized = normalizeApiIntegrationConfig(config);
+  return hasValue(normalized.youtubeApiKey);
+}
+
+export function hasLlmByokConfig(config?: ApiIntegrationConfig): boolean {
+  const normalized = normalizeApiIntegrationConfig(config);
+  return (
+    hasValue(normalized.openaiApiKey) &&
+    hasValue(normalized.openaiBaseUrl) &&
+    hasValue(normalized.analysisModel) &&
+    hasValue(normalized.scoreModel)
+  );
+}
+
+export function hasPineconeByokConfig(config?: ApiIntegrationConfig): boolean {
+  const normalized = normalizeApiIntegrationConfig(config);
+  return (
+    hasLlmByokConfig(normalized) &&
+    hasValue(normalized.embeddingModel) &&
+    hasValue(normalized.pineconeApiKey) &&
+    (hasValue(normalized.pineconeIndexHost) || hasValue(normalized.pineconeIndexName))
+  );
+}
+
+export function getAnalyzeConfigMissingFields(config?: ApiIntegrationConfig): string[] {
+  const normalized = normalizeApiIntegrationConfig(config);
+  const missing: string[] = [];
+
+  if (!hasValue(normalized.youtubeApiKey)) {
+    missing.push("youtubeApiKey");
+  }
+  if (!hasValue(normalized.openaiApiKey)) {
+    missing.push("openaiApiKey");
+  }
+  if (!hasValue(normalized.openaiBaseUrl)) {
+    missing.push("openaiBaseUrl");
+  }
+  if (!hasValue(normalized.analysisModel)) {
+    missing.push("analysisModel");
+  }
+  if (!hasValue(normalized.scoreModel)) {
+    missing.push("scoreModel");
+  }
+
+  return missing;
+}
+
+export function getPineconeConfigMissingFields(config?: ApiIntegrationConfig): string[] {
+  const normalized = normalizeApiIntegrationConfig(config);
+  const missing: string[] = [];
+
+  if (!hasValue(normalized.openaiApiKey)) {
+    missing.push("openaiApiKey");
+  }
+  if (!hasValue(normalized.openaiBaseUrl)) {
+    missing.push("openaiBaseUrl");
+  }
+  if (!hasValue(normalized.embeddingModel)) {
+    missing.push("embeddingModel");
+  }
+  if (!hasValue(normalized.pineconeApiKey)) {
+    missing.push("pineconeApiKey");
+  }
+  if (!hasValue(normalized.pineconeIndexHost) && !hasValue(normalized.pineconeIndexName)) {
+    missing.push("pineconeIndexHost");
+  }
+
+  return missing;
+}
+
 export function readApiIntegrationConfigFromStorage(): ApiIntegrationConfig {
   if (typeof window === "undefined") {
     return createEmptyApiIntegrationConfig();
@@ -187,6 +262,7 @@ export function buildApiIntegrationHeaders(config: ApiIntegrationConfig): Record
   const normalized = normalizeApiIntegrationConfig(config);
   const headers: Record<string, string> = {};
   const hasLlmOverride = Boolean(normalized.openaiApiKey);
+  const hasPineconeOverride = Boolean(normalized.pineconeApiKey);
 
   if (normalized.youtubeApiKey) {
     headers[API_INTEGRATION_HEADERS.youtubeApiKey] = normalized.youtubeApiKey;
@@ -209,16 +285,16 @@ export function buildApiIntegrationHeaders(config: ApiIntegrationConfig): Record
   if (hasLlmOverride && normalized.embeddingModel) {
     headers[API_INTEGRATION_HEADERS.embeddingModel] = normalized.embeddingModel;
   }
-  if (normalized.pineconeApiKey) {
+  if (hasPineconeOverride && normalized.pineconeApiKey) {
     headers[API_INTEGRATION_HEADERS.pineconeApiKey] = normalized.pineconeApiKey;
   }
-  if (normalized.pineconeIndexHost) {
+  if (hasPineconeOverride && normalized.pineconeIndexHost) {
     headers[API_INTEGRATION_HEADERS.pineconeIndexHost] = normalized.pineconeIndexHost;
   }
-  if (normalized.pineconeIndexName) {
+  if (hasPineconeOverride && normalized.pineconeIndexName) {
     headers[API_INTEGRATION_HEADERS.pineconeIndexName] = normalized.pineconeIndexName;
   }
-  if (normalized.pineconeNamespace) {
+  if (hasPineconeOverride && normalized.pineconeNamespace) {
     headers[API_INTEGRATION_HEADERS.pineconeNamespace] = normalized.pineconeNamespace;
   }
 

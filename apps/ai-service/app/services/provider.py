@@ -64,9 +64,6 @@ def get_provider_mode() -> str:
 
 
 def get_billing_mode() -> str:
-    value = os.getenv("AI_BILLING_MODE", "byok").strip().lower()
-    if value == "hybrid":
-        return "hybrid"
     return "byok"
 
 
@@ -86,7 +83,7 @@ def allow_local_fallbacks() -> bool:
 
 
 def allow_server_provider_fallback() -> bool:
-    return get_billing_mode() == "hybrid"
+    return False
 
 
 def _resolve_timeout() -> float:

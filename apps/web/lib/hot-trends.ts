@@ -356,8 +356,7 @@ function buildVideoRows(items: YoutubeApiVideoItem[]): TrendVideoRow[] {
 
 export async function fetchHotTrendsDataset(options?: FetchOptions): Promise<HotTrendsDataset> {
   const apiKeyOverride = (options?.apiKeyOverride || "").trim();
-  const serverApiKey = options?.allowServerKeyFallback === false ? "" : (process.env.YOUTUBE_API_KEY || "").trim();
-  const apiKey = apiKeyOverride || serverApiKey;
+  const apiKey = apiKeyOverride;
   const regionCode = (options?.regionCode ?? "US").trim().toUpperCase() || "US";
 
   if (!apiKey) {

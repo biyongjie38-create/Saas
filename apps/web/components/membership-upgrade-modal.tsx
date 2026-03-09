@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { captureAnalyticsEvent } from "@/lib/analytics";
+import {
+  getMembershipMarketingCopy,
+  resolveMembershipPriceCny,
+} from "@/lib/membership-pricing";
 import type { BillingCycle, UserPlan } from "@/lib/types";
 import type { Lang } from "@/lib/i18n-shared";
 
@@ -29,138 +33,6 @@ type CheckoutResponse = {
   } | null;
 };
 
-type Copy = {
-  title: string;
-  subtitle: string;
-  freeName: string;
-  freeDesc: string;
-  freePrice: string;
-  freeCycle: string;
-  proMonthly: string;
-  proYearly: string;
-  monthlyDesc: string;
-  yearlyDesc: string;
-  monthlyPrice: string;
-  yearlyPrice: string;
-  monthlyCycle: string;
-  yearlyCycle: string;
-  billingHint: string;
-  freeFeatures: string[];
-  proFeatures: string[];
-  yearlyFeatures: string[];
-  current: string;
-  activate: string;
-  active: string;
-  activating: string;
-  close: string;
-  checkoutNote: string;
-  success: string;
-  failed: string;
-  loginToUpgrade: string;
-  loginHint: string;
-};
-
-const copyByLang: Record<Lang, Copy> = {
-  en: {
-    title: "Flexible plans for your growth",
-    subtitle:
-      "ViralBrain.ai sells workflow, reporting, and trend analysis. Third-party API costs are paid by the user to their chosen provider.",
-    freeName: "Free",
-    freeDesc: "Best for validation and light experimentation.",
-    freePrice: "0",
-    freeCycle: "free forever",
-    proMonthly: "Pro (Monthly)",
-    proYearly: "Pro (Yearly)",
-    monthlyDesc: "Unlock full trend detail access and higher daily limits.",
-    yearlyDesc: "Best value for teams running continuous content research.",
-    monthlyPrice: "99",
-    yearlyPrice: "999",
-    monthlyCycle: "CNY / month",
-    yearlyCycle: "CNY / year",
-    billingHint: "API costs are not bundled. Users bring their own third-party keys.",
-    freeFeatures: [
-      "5 analyses per day",
-      "Basic viral library import and manual maintenance",
-      "Preview-level report review",
-      "Community support"
-    ],
-    proFeatures: [
-      "200 analyses per day",
-      "Hot trend detail access",
-      "Share link, rerun, and PDF export",
-      "Advanced providers and BYOK integrations"
-    ],
-    yearlyFeatures: [
-      "Everything in Pro Monthly",
-      "Priority support",
-      "Long-cycle research workflow",
-      "Best annual price"
-    ],
-    current: "Current plan",
-    activate: "Continue to secure checkout",
-    active: "Already Pro",
-    activating: "Redirecting...",
-    close: "Close",
-    checkoutNote:
-      "This upgrade now opens a real Stripe Checkout session. Access changes only after the payment session is verified.",
-    success: "Stripe checkout session created.",
-    failed: "Membership checkout failed.",
-    loginToUpgrade: "Sign in to upgrade",
-    loginHint: "Sign in first to activate a plan and save membership history."
-  },
-  zh: {
-    title: "灵活的定价方案，支撑你的增长工作流",
-    subtitle:
-      "ViralBrain.ai 收费的是工作流、报告能力和趋势洞察。第三方 API 成本由用户自行向对应供应商支付。",
-    freeName: "免费版",
-    freeDesc: "适合验证需求和轻量体验。",
-    freePrice: "0",
-    freeCycle: "永久免费",
-    proMonthly: "专业会员（月付）",
-    proYearly: "专业会员（年付）",
-    monthlyDesc: "解锁完整趋势详情、更高分析额度和更强工作流能力。",
-    yearlyDesc: "适合长期内容研究和持续化运营团队。",
-    monthlyPrice: "99",
-    yearlyPrice: "999",
-    monthlyCycle: "CNY / 月",
-    yearlyCycle: "CNY / 年",
-    billingHint: "本平台不代付 API 成本，用户自行使用第三方 Key。",
-    freeFeatures: [
-      "每天 5 次分析",
-      "基础爆款库导入与手动维护",
-      "报告预览级查看",
-      "社区支持"
-    ],
-    proFeatures: [
-      "每天 200 次分析",
-      "完整热门趋势详情",
-      "分享链接、重跑报告、导出 PDF",
-      "高级供应商与 BYOK 接入"
-    ],
-    yearlyFeatures: [
-      "包含专业版月付全部能力",
-      "优先支持",
-      "长期研究型工作流",
-      "更优年度价格"
-    ],
-    current: "当前套餐",
-    activate: "前往安全支付",
-    active: "当前已是 Pro",
-    activating: "跳转中...",
-    close: "关闭",
-    checkoutNote: "这里现在会创建真实 Stripe Checkout 支付会话。只有支付校验成功后，权限才会切换。",
-    success: "已创建 Stripe 支付会话。",
-    failed: "会员开通失败。",
-    loginToUpgrade: "登录后升级",
-    loginHint: "先登录，再开通会员并保存你的套餐和订单记录。"
-  }
-};
-
-const kickerByLang: Record<Lang, string> = {
-  en: "Membership Plans",
-  zh: "会员方案"
-};
-
 function PlanCard({
   name,
   desc,
@@ -171,29 +43,38 @@ function PlanCard({
   primary,
   onPrimary,
   primaryLabel,
+  badge,
 }: {
   name: string;
   desc: string;
-  price: string;
+  price: number | string;
   cycle: string;
   features: string[];
   active?: boolean;
   primary?: boolean;
   onPrimary?: () => void;
   primaryLabel?: string;
+  badge?: string | null;
 }) {
   return (
-    <article className={`card panel upgrade-plan-card ${primary ? "upgrade-plan-card-primary" : ""} ${active ? "upgrade-plan-card-current" : ""}`}>
+    <article
+      className={`card panel upgrade-plan-card ${primary ? "upgrade-plan-card-primary" : ""} ${
+        active ? "upgrade-plan-card-current" : ""
+      }`}
+    >
       <div className="upgrade-plan-head">
         <div>
           <p className="card-kicker">{name}</p>
           <h3>{name}</h3>
         </div>
-        {active ? <span className="plan-pill">{primaryLabel}</span> : null}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {badge ? <span className="badge">{badge}</span> : null}
+          {active ? <span className="plan-pill">{primaryLabel}</span> : null}
+        </div>
       </div>
       <p className="small upgrade-plan-desc">{desc}</p>
       <div className="upgrade-plan-price-row">
-        <span className="upgrade-plan-price">￥{price}</span>
+        <span className="upgrade-plan-price">{typeof price === "number" ? `￥${price}` : price}</span>
         <span className="upgrade-plan-cycle">{cycle}</span>
       </div>
       <ul className="plan-feature-list">
@@ -202,7 +83,11 @@ function PlanCard({
         ))}
       </ul>
       {onPrimary ? (
-        <button type="button" className={`btn ${primary ? "btn-primary" : "btn-ghost"} upgrade-plan-button`} onClick={onPrimary}>
+        <button
+          type="button"
+          className={`btn ${primary ? "btn-primary" : "btn-ghost"} upgrade-plan-button`}
+          onClick={onPrimary}
+        >
           {primaryLabel}
         </button>
       ) : null}
@@ -210,11 +95,18 @@ function PlanCard({
   );
 }
 
-export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subtitle, signedIn = true, nextPath = "/dashboard/trends" }: Props) {
-  const copy = copyByLang[lang];
-  const kicker = kickerByLang[lang];
+export function MembershipUpgradeModal({
+  open,
+  onClose,
+  lang,
+  plan,
+  title,
+  subtitle,
+  signedIn = true,
+  nextPath = "/dashboard/trends",
+}: Props) {
+  const copy = getMembershipMarketingCopy(lang);
   const router = useRouter();
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -246,7 +138,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
       return copy.active;
     }
     return submitting ? copy.activating : copy.activate;
-  }, [copy, plan, signedIn, submitting]);
+  }, [copy.activate, copy.active, copy.activating, copy.loginToUpgrade, plan, signedIn, submitting]);
 
   if (!open) {
     return null;
@@ -262,7 +154,6 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
       return;
     }
 
-    setBillingCycle(nextCycle);
     setSubmitting(true);
     setError("");
     setMessage("");
@@ -270,20 +161,20 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
       entry_point: "upgrade_modal",
       lang,
       billing_cycle: nextCycle,
-      current_plan: plan
+      current_plan: plan,
     });
 
     try {
       const response = await fetch("/api/membership/checkout", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           plan: "pro",
           billingCycle: nextCycle,
-          nextPath
-        })
+          nextPath,
+        }),
       });
 
       const payload = (await response.json().catch(() => null)) as CheckoutResponse | null;
@@ -295,7 +186,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
           stage: "create",
           lang,
           billing_cycle: nextCycle,
-          reason: failureMessage
+          reason: failureMessage,
         });
         return;
       }
@@ -310,7 +201,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
         entry_point: "upgrade_modal",
         lang,
         billing_cycle: nextCycle,
-        plan: "pro"
+        plan: "pro",
       });
       router.refresh();
       setTimeout(() => {
@@ -324,7 +215,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
         stage: "create",
         lang,
         billing_cycle: nextCycle,
-        reason: failureMessage
+        reason: failureMessage,
       });
     } finally {
       setSubmitting(false);
@@ -336,7 +227,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
       <div className="modal-shell upgrade-modal-shell" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <p className="card-kicker">{kicker}</p>
+            <p className="card-kicker">{copy.badge}</p>
             <h2 style={{ margin: "6px 0 0" }}>{title ?? copy.title}</h2>
           </div>
           <button type="button" className="btn btn-ghost compact-button" onClick={onClose}>
@@ -350,38 +241,41 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
             <strong>{copy.current}</strong>
             <span>{signedIn ? (plan === "pro" ? copy.active : copy.freeName) : copy.loginHint}</span>
           </div>
+
           <div className="plan-grid upgrade-modal-grid">
             <PlanCard
               name={copy.freeName}
               desc={copy.freeDesc}
-              price={copy.freePrice}
+              price="CNY 0"
               cycle={copy.freeCycle}
               features={copy.freeFeatures}
               active={signedIn ? plan === "free" : false}
               primaryLabel={signedIn && plan === "free" ? copy.current : undefined}
             />
             <PlanCard
-              name={copy.proMonthly}
+              name={copy.monthlyPlanName}
               desc={copy.monthlyDesc}
-              price={copy.monthlyPrice}
-              cycle={copy.monthlyCycle}
+              price={resolveMembershipPriceCny("monthly")}
+              cycle={lang === "zh" ? "CNY / 月" : "CNY / month"}
               features={copy.proFeatures}
               primary
-              active={signedIn && plan === "pro" && billingCycle === "monthly"}
+              active={signedIn && plan === "pro"}
               onPrimary={() => activate("monthly")}
               primaryLabel={currentPrimaryLabel}
             />
             <PlanCard
-              name={copy.proYearly}
+              name={copy.yearlyPlanName}
               desc={copy.yearlyDesc}
-              price={copy.yearlyPrice}
-              cycle={copy.yearlyCycle}
+              price={resolveMembershipPriceCny("yearly")}
+              cycle={lang === "zh" ? "CNY / 年" : "CNY / year"}
               features={copy.yearlyFeatures}
-              active={signedIn && plan === "pro" && billingCycle === "yearly"}
+              active={signedIn && plan === "pro"}
               onPrimary={() => activate("yearly")}
               primaryLabel={currentPrimaryLabel}
+              badge={copy.yearlyBadge}
             />
           </div>
+
           {!signedIn ? (
             <div className="upgrade-footer-actions">
               <Link href={`/login?next=${encodeURIComponent(nextPath)}`} className="btn btn-primary">
@@ -389,6 +283,7 @@ export function MembershipUpgradeModal({ open, onClose, lang, plan, title, subti
               </Link>
             </div>
           ) : null}
+
           <div className="upgrade-footer-copy">
             <p className="small">{copy.billingHint}</p>
             <p className="small">{copy.checkoutNote}</p>

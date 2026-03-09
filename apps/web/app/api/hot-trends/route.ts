@@ -46,7 +46,7 @@ export const GET = withApiRoute(async (request, { requestId }) => {
     const dataset = await fetchHotTrendsDataset({
       apiKeyOverride: providerConfig.youtubeApiKey,
       regionCode,
-      allowServerKeyFallback: Boolean(authUser)
+      allowServerKeyFallback: false
     });
 
     return okJsonResponse(dataset, requestId);

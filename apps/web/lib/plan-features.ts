@@ -2,6 +2,7 @@ import type { UserPlan } from "@/lib/types";
 
 export type PlanFeatures = {
   canUseAdvancedProviders: boolean;
+  canUseBenchmarkRetrieval: boolean;
   canUseShareLinks: boolean;
   canRerunReports: boolean;
   canManageRecycleBin: boolean;
@@ -13,17 +14,19 @@ export type PlanFeatures = {
 
 const FEATURES: Record<UserPlan, PlanFeatures> = {
   free: {
-    canUseAdvancedProviders: false,
+    canUseAdvancedProviders: true,
+    canUseBenchmarkRetrieval: false,
     canUseShareLinks: false,
     canRerunReports: false,
     canManageRecycleBin: false,
     canCollectVirals: true,
     canExportReports: false,
     canViewTrendDetails: false,
-    maxCollectionResults: 10,
+    maxCollectionResults: 5,
   },
   pro: {
     canUseAdvancedProviders: true,
+    canUseBenchmarkRetrieval: true,
     canUseShareLinks: true,
     canRerunReports: true,
     canManageRecycleBin: true,

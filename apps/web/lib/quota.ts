@@ -1,7 +1,7 @@
 import type { User } from "@/lib/types";
 
-export const FREE_DAILY_LIMIT = 5;
-export const PRO_DAILY_LIMIT = 200;
+export const FREE_DAILY_LIMIT = 3;
+export const PRO_DAILY_LIMIT = 50;
 
 export type UsageLimitDetails = {
   plan: User["plan"];

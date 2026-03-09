@@ -37,7 +37,7 @@ export default async function DashboardPage() {
           )}
         </p>
         <div className="content-stack">
-          <DashboardClient lang={lang} strictMode={strictMode} />
+          <DashboardClient lang={lang} plan={user.plan} strictMode={strictMode} />
           <div className="grid-3">
             <article className="card panel profile-card">
               <p className="card-kicker">{text(lang, "Usage", "用量")}</p>

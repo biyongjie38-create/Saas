@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readDb, writeDb } from "@/lib/db";
+import { PRO_MONTHLY_PRICE_CNY, PRO_YEARLY_PRICE_CNY } from "@/lib/membership-pricing";
 import { normalizeUserIdForBackend, useSupabaseBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type {
@@ -192,7 +193,7 @@ export function resolveMembershipAmountCny(plan: UserPlan, cycle: BillingCycle):
   if (plan === "free") {
     return 0;
   }
-  return cycle === "yearly" ? 999 : 99;
+  return cycle === "yearly" ? PRO_YEARLY_PRICE_CNY : PRO_MONTHLY_PRICE_CNY;
 }
 
 function mapOrderRowPayload(order: MembershipOrder): MembershipOrderRow {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
+import { buildApiIntegrationHeaders, getAnalyzeConfigMissingFields, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import { captureAnalyticsEvent } from "@/lib/analytics";
 import type { Lang } from "@/lib/i18n-shared";
 
@@ -31,6 +31,7 @@ type StreamStage = {
 
 type Props = {
   lang: Lang;
+  plan?: "free" | "pro";
   strictMode?: boolean;
 };
 
@@ -47,6 +48,9 @@ type DashboardCopy = {
   requestFailed: string;
   mockHint: string;
   fallbackHint: string;
+  byokMissing: string;
+  benchmarkLocked: string;
+  benchmarkSkipped: string;
   stageText: Record<string, string>;
 };
 
@@ -56,9 +60,9 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     run: "Run Analysis",
     running: "Analyzing...",
     demoHint:
-      "If you configure your model provider below, this workspace will prefer your own API quota. Unknown links or unavailable providers still fall back to stable demo data.",
+      "Connect your own YouTube and model APIs below. Free is for lightweight validation, while Pro unlocks benchmark retrieval, export, reruns, and higher throughput.",
     strictHint:
-      "This workspace is running in production mode. It requires real YouTube and AI providers, and it will return explicit errors instead of mock or local fallback output.",
+      "This workspace is running in production mode. It requires real YouTube and AI providers, and it returns explicit errors instead of mock or local fallback output.",
     streaming: "Streaming Progress",
     viewReport: "View Report",
     analysisFailed: "Analysis failed",
@@ -68,6 +72,12 @@ const copyByLang: Record<Lang, DashboardCopy> = {
       "This run used mock YouTube data. Verify the final recommendations against live video metrics before making release decisions.",
     fallbackHint:
       "This run used local fallback analysis because the external AI service was unavailable or intentionally disabled for QA.",
+    byokMissing:
+      "Connect your own YouTube key, model key, base URL, analysis model, and score model in the API panel below first.",
+    benchmarkLocked:
+      "Free includes the core analysis and score only. Benchmark retrieval and similarity comparison are unlocked in Pro.",
+    benchmarkSkipped:
+      "Pinecone BYOK is not configured, so benchmark retrieval was skipped. This report includes the core analysis and score only.",
     stageText: {
       fetching_youtube: "Fetching YouTube metadata",
       report_created: "Report record created",
@@ -82,15 +92,20 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     title: "通过 YouTube 链接生成爆款分析报告",
     run: "开始分析",
     running: "分析中...",
-    demoHint: "如果你在下方配置了自己的模型供应商，这里会优先走你的 API 额度。未知链接或供应商不可用时，仍会回退到稳定演示数据。",
-    strictHint: "当前是生产模式。这里要求真实的 YouTube 和 AI 服务可用，不再回退到 mock 或本地兜底结果，失败会直接报错。",
+    demoHint:
+      "请先在下方接入你自己的 YouTube 与模型 API。免费版适合轻量验证，专业版开放对标检索、导出、重跑和更高频率分析。",
+    strictHint:
+      "当前是生产模式。这里要求真实的 YouTube 和 AI 服务可用，不再回退到 mock 或本地兜底结果，失败会直接报错。",
     streaming: "实时进度",
     viewReport: "查看报告",
     analysisFailed: "分析失败",
     serviceUnavailable: "无法连接分析服务",
     requestFailed: "分析请求失败",
-    mockHint: "本次分析使用了 mock YouTube 数据。正式发布前，请再用真实视频指标复核建议。",
-    fallbackHint: "本次分析使用了本地兜底结果，说明外部 AI 服务当前不可用，或已为 QA 显式关闭。",
+    mockHint: "本次分析使用了 mock YouTube 数据。正式决策前，请再用真实视频指标复核建议。",
+    fallbackHint: "本次分析使用了本地兜底结果，说明外部 AI 服务当前不可用，或已被 QA 显式关闭。",
+    byokMissing: "请先在下方 API 面板填写你自己的 YouTube Key、模型 Key、Base URL、分析模型和评分模型。",
+    benchmarkLocked: "免费版仅提供基础分析与评分。对标检索、相似案例召回和基准比较仅对专业版开放。",
+    benchmarkSkipped: "未配置 Pinecone 与向量模型，已跳过对标检索，报告将仅包含基础分析与评分。",
     stageText: {
       fetching_youtube: "正在获取 YouTube 元数据",
       report_created: "已创建报告记录",
@@ -144,7 +159,7 @@ async function parseResponseError(response: Response, copy: DashboardCopy): Prom
   return message;
 }
 
-export function DashboardClient({ lang, strictMode = false }: Props) {
+export function DashboardClient({ lang, plan = "free", strictMode = false }: Props) {
   const [url, setUrl] = useState("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   const [loading, setLoading] = useState(false);
   const [stages, setStages] = useState<StreamStage[]>([]);
@@ -172,7 +187,8 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
       captureAnalyticsEvent("analysis_failed", {
         reason,
         lang,
-        strict_mode: strictMode
+        strict_mode: strictMode,
+        plan
       });
     };
 
@@ -183,9 +199,18 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
     setNotices([]);
 
     const providerConfig = readApiIntegrationConfigFromStorage();
+    const missingConfig = getAnalyzeConfigMissingFields(providerConfig);
+    if (missingConfig.length > 0) {
+      setError(copy.byokMissing);
+      trackFailure("byok_config_missing");
+      setLoading(false);
+      return;
+    }
+
     captureAnalyticsEvent("analysis_started", {
       lang,
       strict_mode: strictMode,
+      plan,
       has_llm_key: Boolean(providerConfig.openaiApiKey),
       has_pinecone_key: Boolean(providerConfig.pineconeApiKey),
       has_youtube_key: Boolean(providerConfig.youtubeApiKey)
@@ -250,6 +275,11 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
             }
           }
 
+          if (event.stage === "benchmark" && event.envelope.data?.skipped === true) {
+            const skipReason = typeof event.envelope.data?.reason === "string" ? event.envelope.data.reason : null;
+            pushNotice(skipReason === "plan_locked" ? copy.benchmarkLocked : copy.benchmarkSkipped);
+          }
+
           if (event.stage === "done") {
             const id = event.envelope.data?.reportId;
             const source = typeof event.envelope.data?.source === "string" ? event.envelope.data.source : null;
@@ -270,6 +300,7 @@ export function DashboardClient({ lang, strictMode = false }: Props) {
               source,
               lang,
               strict_mode: strictMode,
+              plan,
               fallback_used: modelTrace?.fallback_used === true,
               total_latency_ms:
                 typeof modelTrace?.totalLatencyMs === "number"
