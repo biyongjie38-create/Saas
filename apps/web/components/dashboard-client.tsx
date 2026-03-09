@@ -60,7 +60,7 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     run: "Run Analysis",
     running: "Analyzing...",
     demoHint:
-      "Connect your own YouTube and model APIs below. Free is for lightweight validation, while Pro unlocks benchmark retrieval, export, reruns, and higher throughput.",
+      "Connect your own YouTube and model APIs below. Free covers core report validation, while Pro adds benchmark retrieval, full deliverables, and higher daily throughput.",
     strictHint:
       "This workspace is running in production mode. It requires real YouTube and AI providers, and it returns explicit errors instead of mock or local fallback output.",
     streaming: "Streaming Progress",
@@ -75,7 +75,7 @@ const copyByLang: Record<Lang, DashboardCopy> = {
     byokMissing:
       "Connect your own YouTube key, model key, base URL, analysis model, and score model in the API panel below first.",
     benchmarkLocked:
-      "Free includes the core analysis and score only. Benchmark retrieval and similarity comparison are unlocked in Pro.",
+      "Free covers the core report and score. Upgrade to Pro for Pinecone benchmark retrieval, similarity comparison, and repeatable research workflows.",
     benchmarkSkipped:
       "Pinecone BYOK is not configured, so benchmark retrieval was skipped. This report includes the core analysis and score only.",
     stageText: {

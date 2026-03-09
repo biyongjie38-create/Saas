@@ -1544,6 +1544,24 @@ a {
   gap: 18px;
 }
 
+.landing-pricing-grid {
+  align-items: stretch;
+}
+
+.landing-plan-card {
+  min-height: auto;
+}
+
+.landing-plan-card .plan-desc {
+  margin: 14px 0 0;
+}
+
+.landing-plan-note {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+}
+
 .landing-mini-card,
 .landing-capability-card {
   min-height: 220px;

@@ -88,9 +88,9 @@ const copyByLang: Record<Lang, Copy> = {
     shareRevoked: "Share link revoked.",
     shareActiveUntil: "Active until",
     rerunDone: "A new report has been created.",
-    upgradeShare: "Upgrade to Pro to create share links.",
-    upgradeRerun: "Upgrade to Pro to rerun reports.",
-    upgradeExport: "Upgrade to Pro to export reports.",
+    upgradeShare: "Upgrade to Pro to create share links for teammates or clients.",
+    upgradeRerun: "Upgrade to Pro to rerun reports with fresh live data.",
+    upgradeExport: "Upgrade to Pro to export PDF deliverables.",
     failed: "Action failed."
   },
   zh: {

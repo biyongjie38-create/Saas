@@ -2,11 +2,18 @@
 import { SiteFooter } from "@/components/site-footer";
 import { SiteNav } from "@/components/site-nav";
 import { getServerLang, text } from "@/lib/i18n";
+import {
+  getMembershipMarketingCopy,
+  PRO_MONTHLY_PRICE_CNY,
+  PRO_YEARLY_PRICE_CNY,
+  PRO_YEARLY_SAVINGS_PERCENT,
+} from "@/lib/membership-pricing";
 import { isProductionRuntimeMode } from "@/lib/runtime-mode";
 
 export default async function HomePage() {
   const lang = await getServerLang();
   const strictMode = isProductionRuntimeMode();
+  const membershipCopy = getMembershipMarketingCopy(lang);
 
   const workflowCards = [
     {
@@ -80,6 +87,35 @@ export default async function HomePage() {
         "Hot trends helps you watch videos, channels, and topics, then pull the strongest candidates back into analysis and benchmarking.",
         "热门趋势会帮你监控视频、频道和主题，再把最强样本拉回分析和对标流程。"
       )
+    }
+  ];
+
+  const pricingHighlights = [
+    {
+      name: membershipCopy.freeName,
+      desc: membershipCopy.freeDesc,
+      price: "CNY 0",
+      cycle: text(lang, "/ month", "/ 月"),
+      features: membershipCopy.freeFeatures,
+      cta: text(lang, "Start Free", "免费开始"),
+      href: "/dashboard",
+      secondary: text(lang, "No payment setup required", "无需先接支付"),
+      tone: "free" as const,
+    },
+    {
+      name: membershipCopy.proName,
+      desc: membershipCopy.proDesc,
+      price: `CNY ${PRO_MONTHLY_PRICE_CNY}`,
+      cycle: text(lang, "/ month", "/ 月"),
+      features: membershipCopy.proFeatures,
+      cta: text(lang, "See Pro Plan", "查看专业版"),
+      href: "/membership",
+      secondary: text(
+        lang,
+        `Or CNY ${PRO_YEARLY_PRICE_CNY} / year, save ${PRO_YEARLY_SAVINGS_PERCENT}%`,
+        `或 CNY ${PRO_YEARLY_PRICE_CNY} / 年，立省 ${PRO_YEARLY_SAVINGS_PERCENT}%`
+      ),
+      tone: "pro" as const,
     }
   ];
 
@@ -195,6 +231,48 @@ export default async function HomePage() {
             <article className="card panel landing-capability-card" key={item.title}>
               <h3>{item.title}</h3>
               <p>{item.desc}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="shell section">
+        <div className="section-intro">
+          <span className="badge">{text(lang, "Pricing", "定价方案")}</span>
+          <h2>{text(lang, "Start free, then upgrade when you need deeper research ops", "先免费验证，再在需要更深研究工作流时升级")}</h2>
+          <p>{membershipCopy.billingHint}</p>
+        </div>
+        <div className="plan-grid landing-pricing-grid">
+          {pricingHighlights.map((plan) => (
+            <article
+              key={plan.name}
+              className={`card panel plan-card landing-plan-card ${
+                plan.tone === "pro" ? "plan-card-pro" : "plan-card-free"
+              }`}
+            >
+              <div className="plan-card-head">
+                <div>
+                  <p className="card-kicker">{plan.name}</p>
+                  <h3>{plan.name}</h3>
+                </div>
+                {plan.tone === "pro" ? <span className="badge">{membershipCopy.yearlyBadge}</span> : null}
+              </div>
+              <p className="plan-desc">{plan.desc}</p>
+              <div className="plan-price-row">
+                <span className="price price-large">{plan.price}</span>
+                <span className="price-cycle">{plan.cycle}</span>
+              </div>
+              <p className="small landing-plan-note">{plan.secondary}</p>
+              <ul className="plan-feature-list">
+                {plan.features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+              <div className="plan-actions">
+                <Link href={plan.href} className={`btn ${plan.tone === "pro" ? "btn-primary" : "btn-ghost"}`}>
+                  {plan.cta}
+                </Link>
+              </div>
             </article>
           ))}
         </div>
