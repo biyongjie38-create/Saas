@@ -46,6 +46,13 @@ def build_provider_overrides(
     # the server-managed hybrid provider endpoint.
     if not resolved_key:
         return None
+    if allow_server_provider_fallback():
+        server_base_url = (os.getenv("OPENAI_BASE_URL") or "").strip()
+        uses_default_openai_target = resolved_provider in {None, "openai"} and (
+            not resolved_base_url or resolved_base_url.rstrip("/") == "https://api.openai.com/v1"
+        )
+        if server_base_url and server_base_url.rstrip("/") != "https://api.openai.com/v1" and uses_default_openai_target:
+            return None
     return ProviderOverrides(api_key=resolved_key, base_url=resolved_base_url, provider_name=resolved_provider)
 
 

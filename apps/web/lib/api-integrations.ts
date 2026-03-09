@@ -186,26 +186,27 @@ export function clearApiIntegrationConfig() {
 export function buildApiIntegrationHeaders(config: ApiIntegrationConfig): Record<string, string> {
   const normalized = normalizeApiIntegrationConfig(config);
   const headers: Record<string, string> = {};
+  const hasLlmOverride = Boolean(normalized.openaiApiKey);
 
   if (normalized.youtubeApiKey) {
     headers[API_INTEGRATION_HEADERS.youtubeApiKey] = normalized.youtubeApiKey;
   }
-  if (normalized.llmProvider) {
+  if (hasLlmOverride && normalized.llmProvider) {
     headers[API_INTEGRATION_HEADERS.llmProvider] = normalized.llmProvider;
   }
-  if (normalized.openaiApiKey) {
+  if (hasLlmOverride && normalized.openaiApiKey) {
     headers[API_INTEGRATION_HEADERS.openaiApiKey] = normalized.openaiApiKey;
   }
-  if (normalized.openaiBaseUrl) {
+  if (hasLlmOverride && normalized.openaiBaseUrl) {
     headers[API_INTEGRATION_HEADERS.openaiBaseUrl] = normalized.openaiBaseUrl;
   }
-  if (normalized.analysisModel) {
+  if (hasLlmOverride && normalized.analysisModel) {
     headers[API_INTEGRATION_HEADERS.analysisModel] = normalized.analysisModel;
   }
-  if (normalized.scoreModel) {
+  if (hasLlmOverride && normalized.scoreModel) {
     headers[API_INTEGRATION_HEADERS.scoreModel] = normalized.scoreModel;
   }
-  if (normalized.embeddingModel) {
+  if (hasLlmOverride && normalized.embeddingModel) {
     headers[API_INTEGRATION_HEADERS.embeddingModel] = normalized.embeddingModel;
   }
   if (normalized.pineconeApiKey) {
