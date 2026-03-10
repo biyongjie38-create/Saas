@@ -8,7 +8,7 @@ import {
   getLibraryItemById,
   purgeLibraryItem,
   restoreLibraryItem,
-  updateLibraryItemFolder
+  updateLibraryItem
 } from "@/lib/report-store";
 import { maybeCreateServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -27,8 +27,29 @@ const actionSchema = z.object({
 });
 
 const patchSchema = z.object({
-  folder: z.string().trim().max(60).nullable()
-});
+  folder: z.string().trim().max(60).nullable().optional(),
+  channelName: z.string().trim().max(200).nullable().optional(),
+  publishedAt: z.string().trim().max(80).nullable().optional(),
+  durationSec: z.coerce.number().int().positive().nullable().optional(),
+  stats: z
+    .object({
+      viewCount: z.coerce.number().int().min(0),
+      likeCount: z.coerce.number().int().min(0),
+      commentCount: z.coerce.number().int().min(0)
+    })
+    .nullable()
+    .optional()
+}).refine(
+  (value) =>
+    value.folder !== undefined ||
+    value.channelName !== undefined ||
+    value.publishedAt !== undefined ||
+    value.durationSec !== undefined ||
+    value.stats !== undefined,
+  {
+    message: "At least one library field must be provided."
+  }
+);
 
 export const DELETE = withApiRoute<Params>(async (request, { requestId }, context) => {
   const authUser = await getApiAuthUser();
@@ -176,9 +197,7 @@ export const PATCH = withApiRoute<Params>(async (request, { requestId }, context
   }
 
   const supabaseClient = await maybeCreateServerSupabaseClient();
-  const updated = await updateLibraryItemFolder(parsedParams.data.id, parsedBody.data.folder, {
-    supabaseClient
-  });
+  const updated = await updateLibraryItem(parsedParams.data.id, parsedBody.data, { supabaseClient });
 
   if (!updated) {
     return errorJsonResponse(

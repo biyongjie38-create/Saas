@@ -540,8 +540,9 @@ a {
 
 .library-link {
   display: inline-flex;
-  margin-top: 6px;
+  margin-top: 0;
   color: var(--accent-soft-text);
+  text-decoration: none;
 }
 
 .textarea {
@@ -851,9 +852,22 @@ a {
 .library-card-actions {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.library-card-action-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.library-action-button {
+  min-height: 46px;
+  justify-content: center;
 }
 
 .library-delete-button {

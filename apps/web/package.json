@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3000",
     "prebuild": "node scripts/clean-build-cache.mjs",
-    "build": "next build",
+    "build": "node --trace-uncaught ./node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "eslint .",
     "deploy:check": "node scripts/deploy-check.mjs",

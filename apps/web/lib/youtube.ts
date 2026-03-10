@@ -707,7 +707,7 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
     const fetchLimit =
       durationPreset === DEFAULT_COLLECT_DURATION_PRESET ? Math.max(maxResults, 20) : 50;
     const items = await fetchMostPopularVideos(apiKey, regionCode, fetchLimit);
-    const collected = items
+    const candidates = items
       .map((item) => {
         const videoId = item.id;
         const url = `https://www.youtube.com/watch?v=${videoId}`;
@@ -740,8 +740,10 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
           video.stats.viewCount >= minViews &&
           matchesCollectDurationPreset(video.durationSec, durationPreset)
       )
-      .slice(0, maxResults)
-      .map(buildCollectedItem);
+      .slice(0, maxResults);
+
+    const savedVideos = await Promise.all(candidates.map((video) => saveVideo(video, options)));
+    const collected = savedVideos.map(buildCollectedItem);
 
     if (collected.length > 0) {
       return collected;

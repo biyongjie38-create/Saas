@@ -729,6 +729,10 @@ function normalizeDurationSec(value: unknown): number | null {
   return Math.floor(numeric);
 }
 
+function normalizeTitleKey(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
 function toTagObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -825,6 +829,7 @@ function needsLibraryHydration(item: ViralLibraryItem) {
 function mergeLibraryItemSupplement(
   item: ViralLibraryItem,
   supplement?: {
+    sourceUrl?: string | null;
     channelName?: string | null;
     publishedAt?: string | null;
     durationSec?: number | null;
@@ -837,6 +842,7 @@ function mergeLibraryItemSupplement(
 
   return {
     ...item,
+    sourceUrl: item.sourceUrl || supplement.sourceUrl || "",
     channelName: item.channelName || supplement.channelName || null,
     publishedAt: item.publishedAt || supplement.publishedAt || null,
     durationSec: item.durationSec || supplement.durationSec || null,
@@ -857,66 +863,97 @@ async function hydrateLibraryItems(items: ViralLibraryItem[], options?: QueryOpt
         .filter((value): value is string => Boolean(value))
     )
   );
+  const candidateTitles = Array.from(
+    new Set(candidates.map((item) => normalizeTitleKey(item.title)).filter(Boolean))
+  );
 
-  if (videoIds.length === 0) {
+  if (videoIds.length === 0 && candidateTitles.length === 0) {
     return items;
   }
 
   const supplementByVideoId = new Map<
     string,
     {
+      sourceUrl?: string | null;
       channelName?: string | null;
       publishedAt?: string | null;
       durationSec?: number | null;
       stats?: ViralLibraryItem["stats"];
     }
   >();
-
+  const supplementByTitle = new Map<
+    string,
+    {
+      sourceUrl?: string | null;
+      channelName?: string | null;
+      publishedAt?: string | null;
+      durationSec?: number | null;
+      stats?: ViralLibraryItem["stats"];
+    }
+  >();
   const client = await getSupabaseUserClient(options);
   if (client) {
-    const { data, error } = await client
-      .from("videos")
-      .select("video_id,channel_name,published_at,duration_sec,stats")
-      .in("video_id", videoIds);
+    const videoQueries = [
+      videoIds.length > 0
+        ? client.from("videos").select("video_id,url,title,channel_name,published_at,duration_sec,stats").in("video_id", videoIds)
+        : Promise.resolve({ data: [], error: null }),
+      candidateTitles.length > 0
+        ? client.from("videos").select("video_id,url,title,channel_name,published_at,duration_sec,stats").in("title", candidates.map((item) => item.title))
+        : Promise.resolve({ data: [], error: null })
+    ];
+    const [videoIdResult, titleResult] = await Promise.all(videoQueries);
 
-    if (error) {
-      throw new Error(`SUPABASE_LIST_LIBRARY_VIDEOS_FAILED:${error.message}`);
+    if (videoIdResult.error) {
+      throw new Error(`SUPABASE_LIST_LIBRARY_VIDEOS_FAILED:${videoIdResult.error.message}`);
     }
 
-    for (const row of data ?? []) {
+    if (titleResult.error) {
+      throw new Error(`SUPABASE_LIST_LIBRARY_VIDEOS_FAILED:${titleResult.error.message}`);
+    }
+
+    for (const row of [...(videoIdResult.data ?? []), ...(titleResult.data ?? [])]) {
       const candidate = row as Record<string, unknown>;
-      supplementByVideoId.set(String(candidate.video_id ?? ""), {
+      const supplement = {
+        sourceUrl: candidate.url ? String(candidate.url) : null,
         channelName: candidate.channel_name ? String(candidate.channel_name) : null,
         publishedAt: candidate.published_at ? String(candidate.published_at) : null,
         durationSec: normalizeDurationSec(candidate.duration_sec),
         stats: normalizeStats(candidate.stats)
-      });
+      };
+      supplementByVideoId.set(String(candidate.video_id ?? ""), supplement);
+      const titleKey = normalizeTitleKey(String(candidate.title ?? ""));
+      if (titleKey) {
+        supplementByTitle.set(titleKey, supplement);
+      }
     }
   } else {
     const db = await readDb();
     for (const video of db.videos) {
-      if (!videoIds.includes(video.videoId)) {
+      if (!videoIds.includes(video.videoId) && !candidateTitles.includes(normalizeTitleKey(video.title))) {
         continue;
       }
-      supplementByVideoId.set(video.videoId, {
+      const supplement = {
+        sourceUrl: video.url,
         channelName: video.channelName,
         publishedAt: video.publishedAt,
         durationSec: video.durationSec,
         stats: video.stats
-      });
+      };
+      supplementByVideoId.set(video.videoId, supplement);
+      supplementByTitle.set(normalizeTitleKey(video.title), supplement);
     }
   }
 
-  if (supplementByVideoId.size === 0) {
+  if (supplementByVideoId.size === 0 && supplementByTitle.size === 0) {
     return items;
   }
 
   return items.map((item) => {
     const videoId = extractVideoId(item.sourceUrl);
-    if (!videoId) {
-      return item;
-    }
-    return mergeLibraryItemSupplement(item, supplementByVideoId.get(videoId));
+    const supplement =
+      (videoId ? supplementByVideoId.get(videoId) : null) ??
+      supplementByTitle.get(normalizeTitleKey(item.title));
+    return mergeLibraryItemSupplement(item, supplement);
   });
 }
 
@@ -1177,12 +1214,26 @@ export async function getLibraryItemById(id: string, options?: QueryOptions): Pr
   return hydrated ?? null;
 }
 
-export async function updateLibraryItemFolder(
+export type LibraryItemPatch = {
+  folder?: string | null;
+  channelName?: string | null;
+  publishedAt?: string | null;
+  durationSec?: number | null;
+  stats?: ViralLibraryItem["stats"];
+};
+
+export async function updateLibraryItem(
   id: string,
-  folder: string | null,
+  patch: LibraryItemPatch,
   options?: QueryOptions
 ): Promise<ViralLibraryItem | null> {
-  const normalizedFolder = normalizeLibraryFolder(folder);
+  const normalizedPatch = {
+    folder: patch.folder === undefined ? undefined : normalizeLibraryFolder(patch.folder),
+    channelName: patch.channelName === undefined ? undefined : (patch.channelName ?? "").trim() || null,
+    publishedAt: patch.publishedAt === undefined ? undefined : (patch.publishedAt ?? "").trim() || null,
+    durationSec: patch.durationSec === undefined ? undefined : normalizeDurationSec(patch.durationSec),
+    stats: patch.stats === undefined ? undefined : normalizeStats(patch.stats)
+  };
   const client = await getSupabaseUserClient(options);
   if (client) {
     const { data: existingRow, error: existingError } = await client
@@ -1206,11 +1257,14 @@ export async function updateLibraryItemFolder(
         tags: serializeLibraryTags(
           {
             tags: existingItem.tags,
-            channelName: existingItem.channelName,
-            publishedAt: existingItem.publishedAt,
-            durationSec: existingItem.durationSec,
-            stats: existingItem.stats,
-            folder: normalizedFolder
+            channelName:
+              normalizedPatch.channelName === undefined ? existingItem.channelName : normalizedPatch.channelName,
+            publishedAt:
+              normalizedPatch.publishedAt === undefined ? existingItem.publishedAt : normalizedPatch.publishedAt,
+            durationSec:
+              normalizedPatch.durationSec === undefined ? existingItem.durationSec : normalizedPatch.durationSec,
+            stats: normalizedPatch.stats === undefined ? existingItem.stats : normalizedPatch.stats,
+            folder: normalizedPatch.folder === undefined ? existingItem.folder : normalizedPatch.folder
           },
           (existingRow as LibraryRow).tags
         )
@@ -1232,9 +1286,37 @@ export async function updateLibraryItemFolder(
     return null;
   }
 
-  item.folder = normalizedFolder;
+  if (normalizedPatch.folder !== undefined) {
+    item.folder = normalizedPatch.folder;
+  }
+  if (normalizedPatch.channelName !== undefined) {
+    item.channelName = normalizedPatch.channelName;
+  }
+  if (normalizedPatch.publishedAt !== undefined) {
+    item.publishedAt = normalizedPatch.publishedAt;
+  }
+  if (normalizedPatch.durationSec !== undefined) {
+    item.durationSec = normalizedPatch.durationSec;
+  }
+  if (normalizedPatch.stats !== undefined) {
+    item.stats = normalizedPatch.stats;
+  }
   await writeDb(db);
   return item;
+}
+
+export async function updateLibraryItemFolder(
+  id: string,
+  folder: string | null,
+  options?: QueryOptions
+): Promise<ViralLibraryItem | null> {
+  return updateLibraryItem(
+    id,
+    {
+      folder
+    },
+    options
+  );
 }
 
 export async function deleteLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {

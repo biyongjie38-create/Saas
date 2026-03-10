@@ -69,9 +69,9 @@ export function MembershipCheckoutPanel({ lang, user, initialOrders }: Props) {
 
   const currentPriceLabel = useMemo(() => formatMembershipPriceLabel(lang, billingCycle), [billingCycle, lang]);
   const currentPrice = useMemo(() => resolveMembershipPriceCny(billingCycle), [billingCycle]);
-  const checkoutState = searchParams.get("checkout");
-  const sessionId = searchParams.get("session_id");
-  const nextPath = searchParams.get("next");
+  const checkoutState = searchParams?.get("checkout") ?? null;
+  const sessionId = searchParams?.get("session_id") ?? null;
+  const nextPath = searchParams?.get("next") ?? null;
 
   useEffect(() => {
     setCurrentUser(user);

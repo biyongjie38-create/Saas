@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
 import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
 import {
   ALL_LIBRARY_FOLDERS,
@@ -67,6 +67,26 @@ type ErrorEnvelope = {
   ok: false;
   data: null;
   error?: ApiError | null;
+};
+
+type YoutubeFetchResponse = {
+  ok: boolean;
+  data: {
+    video: {
+      channelName?: string | null;
+      publishedAt?: string | null;
+      durationSec?: number | null;
+      stats?: ViralLibraryItem["stats"] | null;
+    };
+  } | null;
+  error?: ApiError | null;
+};
+
+type LibraryItemMetadataPatch = {
+  channelName?: string | null;
+  publishedAt?: string | null;
+  durationSec?: number | null;
+  stats?: ViralLibraryItem["stats"] | null;
 };
 
 const copyByLang = {
@@ -230,11 +250,11 @@ const csvPlaceholder = `title,sourceUrl,summary,channelName,publishedAt,duration
 Hook teardown,https://youtube.com/watch?v=demo,"Outcome first, then conflict.",Demo Channel,2026-03-01T08:00:00.000Z,420,182000,9200,610,Education,result-first,education,5-10m`;
 
 function formatCount(value: number | undefined | null, lang: Lang) {
-  if (!value || value <= 0) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
     return "--";
   }
 
-  return new Intl.NumberFormat(lang === "zh" ? "zh-CN" : "en-US").format(value);
+  return new Intl.NumberFormat(lang === "zh" ? "zh-CN" : "en-US").format(Math.max(0, value));
 }
 
 function formatDuration(durationSec: number | undefined | null) {
@@ -273,9 +293,28 @@ function inferFilenameFromDisposition(disposition: string | null, fallbackTitle:
   return match?.[1] ?? `${fallbackTitle}.xlsx`;
 }
 
+function needsMetadataBackfill(item: ViralLibraryItem) {
+  return Boolean(item.sourceUrl) && (!item.channelName || !item.publishedAt || !item.durationSec || !item.stats);
+}
+
+function mergeLibraryItemMetadata(
+  item: ViralLibraryItem,
+  patch: LibraryItemMetadataPatch
+): ViralLibraryItem {
+  return {
+    ...item,
+    channelName: item.channelName || patch.channelName || null,
+    publishedAt: item.publishedAt || patch.publishedAt || null,
+    durationSec: item.durationSec || patch.durationSec || null,
+    stats: item.stats || patch.stats || null
+  };
+}
+
 export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }: Props) {
   const copy = copyByLang[lang];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const backfilledItemIdsRef = useRef(new Set<string>());
+  const isBackfillingRef = useRef(false);
   const [query, setQuery] = useState("");
   const [folderFilter, setFolderFilter] = useState(ALL_LIBRARY_FOLDERS);
   const [format, setFormat] = useState<ImportFormat>("json");
@@ -302,6 +341,87 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
 
   const folderOptions = useMemo(() => listLibraryFolders(items), [items]);
   const hasActiveFilters = query.trim().length > 0 || folderFilter !== ALL_LIBRARY_FOLDERS;
+
+  useEffect(() => {
+    const providerConfig = readApiIntegrationConfigFromStorage();
+    if (!providerConfig.youtubeApiKey || isBackfillingRef.current) {
+      return;
+    }
+
+    const candidates = items
+      .filter((item) => needsMetadataBackfill(item) && !backfilledItemIdsRef.current.has(item.id))
+      .slice(0, 6);
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    isBackfillingRef.current = true;
+
+    void (async () => {
+      try {
+        for (const item of candidates) {
+          if (cancelled) {
+            return;
+          }
+
+          backfilledItemIdsRef.current.add(item.id);
+
+          const fetchResponse = await fetch("/api/youtube/fetch", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...buildApiIntegrationHeaders(providerConfig)
+            },
+            body: JSON.stringify({ url: item.sourceUrl }),
+            cache: "no-store"
+          });
+
+          const fetchPayload = (await fetchResponse.json().catch(() => null)) as YoutubeFetchResponse | null;
+          if (!fetchResponse.ok || !fetchPayload?.ok || !fetchPayload.data?.video) {
+            continue;
+          }
+
+          const metadataPatch: LibraryItemMetadataPatch = {
+            channelName: fetchPayload.data.video.channelName ?? null,
+            publishedAt: fetchPayload.data.video.publishedAt ?? null,
+            durationSec: fetchPayload.data.video.durationSec ?? null,
+            stats: fetchPayload.data.video.stats ?? null
+          };
+
+          setItems((current) =>
+            current.map((entry) => (entry.id === item.id ? mergeLibraryItemMetadata(entry, metadataPatch) : entry))
+          );
+
+          const updateResponse = await fetch(`/api/library/${item.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              ...buildApiIntegrationHeaders(providerConfig)
+            },
+            body: JSON.stringify(metadataPatch)
+          });
+
+          const updatePayload = (await updateResponse.json().catch(() => null)) as UpdateFolderResponse | null;
+          const updatedItem = updatePayload?.data?.item;
+          if (!updateResponse.ok || !updatePayload?.ok || !updatedItem || cancelled) {
+            continue;
+          }
+
+          setItems((current) =>
+            current.map((entry) => (entry.id === item.id ? updatedItem : entry))
+          );
+        }
+      } finally {
+        isBackfillingRef.current = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   function getFolderDraft(item: ViralLibraryItem) {
     return folderDrafts[item.id] ?? item.folder ?? "";
@@ -673,7 +793,12 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
                   <div className="library-card-actions">
                     <div className="library-card-action-group">
                       {item.sourceUrl ? (
-                        <a href={item.sourceUrl} className="small library-link" target="_blank" rel="noreferrer">
+                        <a
+                          href={item.sourceUrl}
+                          className="btn btn-ghost library-link library-action-button"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
                           {copy.open}
                         </a>
                       ) : (
@@ -681,7 +806,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
                       )}
                       <button
                         type="button"
-                        className="btn btn-ghost library-export-inline"
+                        className="btn btn-ghost library-export-inline library-action-button"
                         onClick={() => handleExportItem(item)}
                         disabled={exportingId === item.id}
                       >
