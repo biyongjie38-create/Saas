@@ -43,11 +43,11 @@ export default async function SupportPage({
 
   const faqItems = [
     {
-      q: text(lang, "Do I need to pay third-party API fees through ViralBrain.ai?", "第三方 API 费用需要通过 ViralBrain.ai 支付吗？"),
+      q: text(lang, "Do I need to pay third-party API fees through viralbrainxc.ai?", "第三方 API 费用需要通过 viralbrainxc.ai 支付吗？"),
       a: text(
         lang,
-        "No. ViralBrain.ai sells the workflow and analysis product. Users pay YouTube, model providers, and vector services directly with their own keys.",
-        "不需要。ViralBrain.ai 收费的是工作流和分析产品，用户通过自己的 Key 直接向 YouTube、模型供应商和向量服务商付费。",
+        "No. viralbrainxc.ai sells the workflow and analysis product. Users pay YouTube, model providers, and vector services directly with their own keys.",
+        "不需要。viralbrainxc.ai 收费的是工作流和分析产品，用户通过自己的 Key 直接向 YouTube、模型供应商和向量服务商付费。",
       ),
     },
     {
@@ -369,7 +369,7 @@ export default async function SupportPage({
                 </div>
 
                 <div className="support-step-block">
-                  <strong>{text(lang, "How to configure or verify it in ViralBrain.ai", "在 ViralBrain.ai 里怎么配置或验证")}</strong>
+                  <strong>{text(lang, "How to configure or verify it in viralbrainxc.ai", "在 viralbrainxc.ai 里怎么配置或验证")}</strong>
                   <ul className="list">
                     {card.fillSteps.map((step, index) => (
                       <li key={`${card.key}-fill-${index}`}>{step}</li>
@@ -396,7 +396,7 @@ export default async function SupportPage({
             </p>
           </div>
           <div className="support-contact-actions">
-            <SupportEmailLink className="btn btn-primary" subject="ViralBrain.ai Support" initialEmail={supportEmail} />
+            <SupportEmailLink className="btn btn-primary" subject="viralbrainxc.ai Support" initialEmail={supportEmail} />
             <a className="btn btn-ghost" href="https://github.com/biyongjie38-create/Saas" target="_blank" rel="noreferrer">
               {text(lang, "Open Repository", "查看仓库")}
             </a>

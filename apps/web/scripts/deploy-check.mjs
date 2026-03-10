@@ -125,7 +125,7 @@ const supabaseConfigured = Boolean(readEnv("NEXT_PUBLIC_SUPABASE_URL") && readEn
 const usesSupabaseBackend = dataBackendMode === "supabase" || (dataBackendMode !== "mock" && supabaseConfigured);
 const stripeEnabled = Boolean(stripeSecretKey);
 
-console.log("ViralBrain deploy check");
+console.log("viralbrainxc.ai deploy check");
 console.log("======================");
 
 if (missingRequired.length > 0) {

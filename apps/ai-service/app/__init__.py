@@ -1,1 +1,1 @@
-"""ViralBrain.ai AI microservice package."""
+"""viralbrainxc.ai AI microservice package."""

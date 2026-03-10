@@ -80,7 +80,7 @@ export async function POST(request: Request) {
             {
               orderId: metadata.orderId,
               userId: metadata.userId,
-              email: session.customer_details?.email ?? "unknown@viralbrain.ai",
+              email: session.customer_details?.email ?? "unknown@viralbrainxc.ai",
               plan: metadata.plan,
               billingCycle: metadata.billingCycle,
               paymentProvider: "stripe_checkout",

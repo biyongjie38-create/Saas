@@ -553,7 +553,7 @@ export function ApiConnectionPanel({
                 className="input"
                 value={config.pineconeIndexName}
                 onChange={(event) => updateField("pineconeIndexName", event.target.value)}
-                placeholder="viralbrain-library"
+                placeholder="viralbrainxc-library"
               />
             </label>
             <label className="integration-field">

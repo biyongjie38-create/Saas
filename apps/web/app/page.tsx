@@ -75,8 +75,8 @@ export default async function HomePage() {
       title: text(lang, "Operate everything from a single YouTube growth console.", "把所有动作都收进一个 YouTube 增长控制台。"),
       desc: text(
         lang,
-        "Instead of scattering tools across multiple products, ViralBrain.ai keeps trend discovery, page-specific API setup, analysis, report review, and library management inside one workflow.",
-        "不把能力拆散到多个产品里，ViralBrain.ai 把趋势发现、按页面归位的 API 配置、分析、报告查看和爆款库管理统一放在一个工作流里。"
+        "Instead of scattering tools across multiple products, viralbrainxc.ai keeps trend discovery, page-specific API setup, analysis, report review, and library management inside one workflow.",
+        "不把能力拆散到多个产品里，viralbrainxc.ai 把趋势发现、按页面归位的 API 配置、分析、报告查看和爆款库管理统一放在一个工作流里。"
       )
     },
     {
@@ -129,8 +129,8 @@ export default async function HomePage() {
         <p>
           {text(
             lang,
-            "ViralBrain.ai is built for operators who need one place to track hot trends, run deep video teardowns, manage a viral library, and work with their own APIs.",
-            "ViralBrain.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和自带 API 工作流统一到一个界面中。"
+            "viralbrainxc.ai is built for operators who need one place to track hot trends, run deep video teardowns, manage a viral library, and work with their own APIs.",
+            "viralbrainxc.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和自带 API 工作流统一到一个界面中。"
           )}
         </p>
         <div className="qa-banner landing-demo-banner">

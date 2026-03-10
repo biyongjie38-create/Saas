@@ -18,7 +18,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ViralBrain.ai",
+  title: "viralbrainxc.ai",
   description: "YouTube viral intelligence SaaS"
 };
 

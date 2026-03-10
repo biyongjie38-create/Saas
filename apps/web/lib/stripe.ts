@@ -36,7 +36,7 @@ export function getStripeClient() {
 
   return new Stripe(secretKey, {
     appInfo: {
-      name: "ViralBrain.ai",
+      name: "viralbrainxc.ai",
       version: "0.1.0"
     }
   });
@@ -105,10 +105,10 @@ function resolveStripeCurrency() {
 
 function planLabel(plan: UserPlan, cycle: BillingCycle) {
   if (plan !== "pro") {
-    return "ViralBrain.ai Free";
+    return "viralbrainxc.ai Free";
   }
 
-  return cycle === "yearly" ? "ViralBrain.ai Pro (Yearly)" : "ViralBrain.ai Pro (Monthly)";
+  return cycle === "yearly" ? "viralbrainxc.ai Pro (Yearly)" : "viralbrainxc.ai Pro (Monthly)";
 }
 
 export function buildStripeCheckoutLineItem(plan: UserPlan, billingCycle: BillingCycle): Stripe.Checkout.SessionCreateParams.LineItem {

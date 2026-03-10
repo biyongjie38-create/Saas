@@ -19,7 +19,7 @@ const supportContactSchema = z.object({
 
 function buildSupportMessage(input: z.infer<typeof supportContactSchema>) {
   return [
-    "New ViralBrain support request",
+    "New viralbrainxc.ai support request",
     "",
     `Name: ${input.name}`,
     `Email: ${input.email}`,
@@ -34,7 +34,7 @@ function buildConfirmationMessage(input: z.infer<typeof supportContactSchema>) {
   return [
     `Hi ${input.name},`,
     "",
-    "We received your support request for ViralBrain.ai.",
+    "We received your support request for viralbrainxc.ai.",
     "Our team will review it and reply as soon as possible.",
     "",
     "Your message:",
@@ -102,7 +102,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
   await sendTransactionalEmail({
     from,
     to: supportInbox,
-    subject: `[Support] ${payload.name} from ViralBrain.ai`,
+    subject: `[Support] ${payload.name} from viralbrainxc.ai`,
     text: buildSupportMessage(payload),
     replyTo: payload.email,
     tags: [
@@ -117,7 +117,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
     await sendTransactionalEmail({
       from,
       to: payload.email,
-      subject: "We received your ViralBrain.ai support request",
+      subject: "We received your viralbrainxc.ai support request",
       text: buildConfirmationMessage(payload),
       replyTo: supportInbox,
       tags: [

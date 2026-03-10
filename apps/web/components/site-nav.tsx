@@ -10,7 +10,7 @@ function resolveDisplayName(email: string | null | undefined, rawName: unknown):
   }
 
   if (!email) {
-    return "ViralBrain User";
+    return "viralbrainxc.ai User";
   }
 
   const local = email.split("@")[0] ?? email;
@@ -36,9 +36,9 @@ export async function SiteNav() {
   return (
     <header className="nav">
       <div className="shell nav-inner nav-inner-rich">
-        <Link href="/" className="brand" aria-label="ViralBrain homepage">
+        <Link href="/" className="brand" aria-label="viralbrainxc.ai homepage">
           <span className="brand-dot" />
-          <span>ViralBrain.ai</span>
+          <span>viralbrainxc.ai</span>
         </Link>
 
         <SiteNavClient lang={lang} user={navUser} />

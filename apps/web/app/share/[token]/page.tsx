@@ -55,7 +55,7 @@ export default async function SharedReportPage({ params }: Props) {
       <section className="shell section">
         <div className="section-intro share-hero">
           <span className="badge">{text(lang, "Shared Report", "分享报告")}</span>
-          <h1 style={{ marginTop: 18 }}>{text(lang, "A shared ViralBrain.ai report", "一份已分享的 ViralBrain.ai 报告")}</h1>
+          <h1 style={{ marginTop: 18 }}>{text(lang, "A shared viralbrainxc.ai report", "一份已分享的 viralbrainxc.ai 报告")}</h1>
           <p>
             {text(
               lang,

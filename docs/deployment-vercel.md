@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make ViralBrain accessible to external users with stable email/Google login.
+Make viralbrainxc.ai accessible to external users with stable email/Google login.
 
 ## 1) Deploy web app to public HTTPS domain
 
@@ -66,7 +66,7 @@ Recommended PostHog setup:
 - Use the region host that matches your PostHog project:
   - US cloud: `https://us.i.posthog.com`
   - EU cloud: `https://eu.i.posthog.com`
-- ViralBrain now tracks the main product funnel:
+- viralbrainxc.ai now tracks the main product funnel:
   - analysis started / completed / failed
   - membership checkout started / confirmed / cancelled / failed
   - share link created / revoked

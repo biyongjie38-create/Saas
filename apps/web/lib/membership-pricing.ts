@@ -54,9 +54,9 @@ export type MembershipMarketingCopy = {
 const copyByLang: Record<Lang, MembershipMarketingCopy> = {
   en: {
     badge: "Membership",
-    title: "Turn ViralBrain.ai into a repeatable research workflow",
+    title: "Turn viralbrainxc.ai into a repeatable research workflow",
     subtitle:
-      "ViralBrain.ai now runs in BYOK mode. Users pay their own model and data providers directly, while Pro charges for workflow depth, throughput, and client-ready outputs.",
+      "viralbrainxc.ai now runs in BYOK mode. Users pay their own model and data providers directly, while Pro charges for workflow depth, throughput, and client-ready outputs.",
     checkoutNote:
       "Checkout opens a real Stripe hosted payment flow. Access changes only after the payment session is verified.",
     monthly: "Monthly",
@@ -117,9 +117,9 @@ const copyByLang: Record<Lang, MembershipMarketingCopy> = {
   },
   zh: {
     badge: "会员方案",
-    title: "把 ViralBrain.ai 变成可复用的内容研究工作流",
+    title: "把 viralbrainxc.ai 变成可复用的内容研究工作流",
     subtitle:
-      "ViralBrain.ai 当前采用 BYOK 模式。用户自己承担模型和数据平台的调用费用，而 Pro 收费的是工作流深度、效率和可交付能力。",
+      "viralbrainxc.ai 当前采用 BYOK 模式。用户自己承担模型和数据平台的调用费用，而 Pro 收费的是工作流深度、效率和可交付能力。",
     checkoutNote:
       "当前支付会进入真实的 Stripe 托管结账流程。只有支付会话校验成功后，权限才会正式切换。",
     monthly: "月付",

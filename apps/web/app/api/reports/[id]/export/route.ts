@@ -83,7 +83,7 @@ const DEFAULT_CJK_BOLD_FONT_PATHS = [
 function resolvePdfCopy(lang: "en" | "zh"): PdfCopy {
   if (lang === "zh") {
     return {
-      reportTitle: "ViralBrain.ai 视频分析报告",
+      reportTitle: "viralbrainxc.ai 视频分析报告",
       reportId: "报告 ID",
       videoId: "视频 ID",
       status: "状态",
@@ -107,7 +107,7 @@ function resolvePdfCopy(lang: "en" | "zh"): PdfCopy {
   }
 
   return {
-    reportTitle: "ViralBrain.ai Viral Report",
+    reportTitle: "viralbrainxc.ai Viral Report",
     reportId: "report_id",
     videoId: "video_id",
     status: "status",

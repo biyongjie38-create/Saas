@@ -14,7 +14,7 @@ export function SiteFooter({ lang }: { lang: Lang }) {
         <div className="site-footer-brand">
           <div className="brand" aria-hidden="true">
             <span className="brand-dot" />
-            <span>ViralBrain.ai</span>
+            <span>viralbrainxc.ai</span>
           </div>
           <p>
             {text(
@@ -23,7 +23,7 @@ export function SiteFooter({ lang }: { lang: Lang }) {
               "一个聚焦 YouTube 增长的控制台，覆盖趋势发现、报告生成、自带 Key 接入和运营级工作流。"
             )}
           </p>
-          <small>{text(lang, `Copyright ${year} ViralBrain.ai. All rights reserved.`, `版权所有 ${year} ViralBrain.ai。保留所有权利。`)}</small>
+          <small>{text(lang, `Copyright ${year} viralbrainxc.ai. All rights reserved.`, `版权所有 ${year} viralbrainxc.ai。保留所有权利。`)}</small>
 
           <form className="site-footer-subscribe" action="/support" method="get">
             <label htmlFor="footer-email">{text(lang, "Subscribe for updates", "订阅我们的资讯")}</label>

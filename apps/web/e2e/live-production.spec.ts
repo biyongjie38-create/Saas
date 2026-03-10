@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 const TEST_USER_ID = "00000000-0000-4000-8000-000000000123";
-const TEST_USER_EMAIL = "live-smoke@viralbrain.ai";
+const TEST_USER_EMAIL = "live-smoke@viralbrainxc.ai";
 const TEST_VIDEO_ID = "dQw4w9WgXcQ";
 const TEST_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 const API_INTEGRATION_STORAGE_KEY = "vb_api_integrations_v2";

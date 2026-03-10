@@ -57,7 +57,7 @@ export function isE2EAuthBypassEnabled(): boolean {
 export function getDefaultE2EAuthPayload(): E2EAuthPayload {
   return {
     id: "local-user",
-    email: "local@viralbrain.ai",
+    email: "local@viralbrainxc.ai",
     plan: "free"
   };
 }

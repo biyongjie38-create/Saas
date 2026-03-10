@@ -1,4 +1,4 @@
-﻿-- ViralBrain.ai Supabase Schema (MVP)
+﻿-- viralbrainxc.ai Supabase Schema (MVP)
 
 create extension if not exists "pgcrypto";
 

@@ -9,7 +9,7 @@ const initialDb: MockDb = {
   users: [
     {
       id: "local-user",
-      email: "local@viralbrain.ai",
+      email: "local@viralbrainxc.ai",
       plan: "free",
       subscriptionStatus: "none",
       billingCycle: null,

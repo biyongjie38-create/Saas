@@ -94,7 +94,7 @@ const copyByLang: Record<Lang, Copy> = {
   en: {
     kicker: "Hot Trends",
     title: "Spot videos, channels, and topics worth following before everyone else.",
-    intro: "Use ViralBrain.ai to monitor breakout momentum, build a reusable topic pipeline, and decide what to analyze next in your console.",
+    intro: "Use viralbrainxc.ai to monitor breakout momentum, build a reusable topic pipeline, and decide what to analyze next in your console.",
     liveTitle: "Live YouTube trend feed",
     fallbackTitle: "Fallback preview feed",
     liveDesc: "This page is pulling real YouTube trend candidates with the key connected in your current browser session.",
@@ -149,7 +149,7 @@ const copyByLang: Record<Lang, Copy> = {
   zh: {
     kicker: "热门趋势",
     title: "先一步发现正在起量的视频、频道和主题，决定下一条内容该往哪做。",
-    intro: "用 ViralBrain.ai 跟踪爆款趋势、沉淀选题池，并把趋势洞察直接带回控制台分析和素材运营。",
+    intro: "用 viralbrainxc.ai 跟踪爆款趋势、沉淀选题池，并把趋势洞察直接带回控制台分析和素材运营。",
     liveTitle: "实时 YouTube 趋势数据",
     fallbackTitle: "样例回退数据",
     liveDesc: "这个页面会使用你当前浏览器会话里接入的 Key 拉取真实 YouTube 趋势候选。",

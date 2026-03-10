@@ -44,7 +44,7 @@ from app.services.scoring import (
 load_runtime_env()
 init_sentry()
 
-app = FastAPI(title="ViralBrain AI Service", version="0.4.0")
+app = FastAPI(title="viralbrainxc.ai AI Service", version="0.4.0")
 
 SERVICE_RUNTIME_ERRORS = {
     "AI_PROVIDER_LOCAL_MODE_DISABLED",

@@ -149,7 +149,7 @@ async function getSupabaseClient(options?: MembershipQueryOptions): Promise<Supa
 function toUserFromProfile(row: UserProfileRow): User {
   return {
     id: row.user_id,
-    email: row.email ?? "unknown@viralbrain.ai",
+    email: row.email ?? "unknown@viralbrainxc.ai",
     plan: row.plan === "pro" ? "pro" : "free",
     subscriptionStatus: row.subscription_status,
     billingCycle: row.billing_cycle,
@@ -564,7 +564,7 @@ export async function completeMembershipOrder(
     },
     options,
   );
-  const nextEmail = input.email === "unknown@viralbrain.ai" ? existingUser.email : input.email;
+  const nextEmail = input.email === "unknown@viralbrainxc.ai" ? existingUser.email : input.email;
 
   const user = await upsertUserSubscription(
     {
@@ -643,7 +643,7 @@ export async function syncMembershipSubscriptionState(
   const currentUser = await resolveAppUserProfile(
     {
       id: userId,
-      email: input.email ?? "unknown@viralbrain.ai",
+      email: input.email ?? "unknown@viralbrainxc.ai",
       fallbackPlan: input.subscriptionStatus === "active" ? "pro" : "free",
     },
     options,

@@ -14,7 +14,7 @@ function resolvePlan(user: SupabaseAuthUser): User["plan"] {
 export function toAppUser(user: SupabaseAuthUser): User {
   return {
     id: user.id,
-    email: user.email ?? "unknown@viralbrain.ai",
+    email: user.email ?? "unknown@viralbrainxc.ai",
     plan: resolvePlan(user),
     subscriptionStatus: resolvePlan(user) === "pro" ? "active" : "none",
     billingCycle: null,
@@ -30,7 +30,7 @@ export async function resolveAuthenticatedAppUser(
   return resolveAppUserProfile(
     {
       id: user.id,
-      email: user.email ?? "unknown@viralbrain.ai",
+      email: user.email ?? "unknown@viralbrainxc.ai",
       fallbackPlan: resolvePlan(user),
     },
     options,

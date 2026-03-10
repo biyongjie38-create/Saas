@@ -1,4 +1,4 @@
-# ViralBrain.ai
+# viralbrainxc.ai
 
 这是一个面向 YouTube 内容操盘手的 SaaS 项目。当前仓库包含：
 
