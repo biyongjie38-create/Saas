@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { MembershipUpgradeModal } from "@/components/membership-upgrade-modal";
 import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
@@ -225,6 +224,51 @@ function isVideoRow(row: TrendDetailRow): row is TrendVideoRow {
 
 function isChannelRow(row: TrendDetailRow): row is TrendChannelRow {
   return "growthScore" in row;
+}
+
+function buildTrendThumbnailCandidates(row: TrendVideoRow): string[] {
+  return Array.from(
+    new Set(
+      [
+        row.thumbnailUrl.trim(),
+        `https://i.ytimg.com/vi/${row.videoId}/hqdefault.jpg`,
+        `https://img.youtube.com/vi/${row.videoId}/hqdefault.jpg`
+      ].filter((value) => Boolean(value))
+    )
+  );
+}
+
+function TrendThumbnail({ row }: { row: TrendVideoRow }) {
+  const candidates = buildTrendThumbnailCandidates(row);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+
+  const activeSrc = candidates[candidateIndex] ?? "";
+
+  if (!activeSrc) {
+    return (
+      <div className="trend-thumb">
+        <div className="trend-thumb-fallback">{row.keyword}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="trend-thumb">
+      {/* Direct <img> keeps trend thumbnails loading in the browser instead of routing through the Next image optimizer. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className="trend-thumb-image"
+        src={activeSrc}
+        alt={row.title}
+        width={160}
+        height={90}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setCandidateIndex((current) => current + 1)}
+      />
+    </div>
+  );
 }
 
 function formatCompactNumber(value: number, lang: Lang) {
@@ -551,9 +595,7 @@ export function HotTrendsHub({ lang, plan, initialTab, signedIn, strictMode = fa
               visibleVideos.map((row, index) => (
                 <div key={row.id} className={`trends-video-grid trend-row ${!isPro ? "trend-row-locked" : ""}`}>
                   <span className="trend-rank">{index + 1}</span>
-                  <div className="trend-thumb">
-                    <Image className="trend-thumb-image" src={row.thumbnailUrl} alt={row.title} width={160} height={90} />
-                  </div>
+                  <TrendThumbnail row={row} />
                   <div className="trend-title-block">
                     <strong>{row.title}</strong>
                     <span>{row.hook}</span>

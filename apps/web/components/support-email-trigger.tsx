@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import type { Lang } from "@/lib/i18n-shared";
 import { text } from "@/lib/i18n-shared";
-import { SUPPORT_EMAIL } from "@/lib/support-contact";
+import { useRuntimeSupportEmail } from "@/lib/use-runtime-support-email";
 
 type Props = {
   lang: Lang;
   label: string;
+  initialEmail?: string;
 };
 
-export function SupportEmailTrigger({ lang, label }: Props) {
+export function SupportEmailTrigger({ lang, label, initialEmail }: Props) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const supportEmail = useRuntimeSupportEmail(initialEmail);
 
   useEffect(() => {
     if (!open) {
@@ -31,7 +33,7 @@ export function SupportEmailTrigger({ lang, label }: Props) {
 
   async function onCopyEmail() {
     try {
-      await navigator.clipboard.writeText(SUPPORT_EMAIL);
+      await navigator.clipboard.writeText(supportEmail);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -76,7 +78,7 @@ export function SupportEmailTrigger({ lang, label }: Props) {
               </p>
 
               <div className="support-email-box">
-                <strong>{SUPPORT_EMAIL}</strong>
+                <strong>{supportEmail}</strong>
               </div>
 
               <div className="support-email-actions">

@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { SupportContactForm } from "@/components/support-contact-form";
+import { SupportEmailLink } from "@/components/support-email-link";
 import { SiteNav } from "@/components/site-nav";
 import { getServerLang, text } from "@/lib/i18n";
-import { SUPPORT_EMAIL, buildSupportMailto } from "@/lib/support-contact";
+import { getPublicSupportEmail } from "@/lib/support-contact-server";
 
 type GuideCard = {
   key: string;
@@ -24,6 +25,7 @@ export default async function SupportPage({
   const lang = await getServerLang();
   const resolvedSearchParams = (await searchParams) ?? {};
   const initialEmail = typeof resolvedSearchParams.email === "string" ? resolvedSearchParams.email : "";
+  const supportEmail = getPublicSupportEmail();
 
   const manualItems: ReactNode[] = [
     text(lang, "Open Link Analysis and paste one YouTube URL.", "打开“链接分析”并粘贴一个 YouTube 链接。"),
@@ -394,9 +396,7 @@ export default async function SupportPage({
             </p>
           </div>
           <div className="support-contact-actions">
-            <a className="btn btn-primary" href={buildSupportMailto("ViralBrain.ai Support")}>
-              {SUPPORT_EMAIL}
-            </a>
+            <SupportEmailLink className="btn btn-primary" subject="ViralBrain.ai Support" initialEmail={supportEmail} />
             <a className="btn btn-ghost" href="https://github.com/biyongjie38-create/Saas" target="_blank" rel="noreferrer">
               {text(lang, "Open Repository", "查看仓库")}
             </a>
