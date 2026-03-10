@@ -17,7 +17,7 @@ export function isTransactionalEmailConfigured() {
 }
 
 export function getSupportInboxEmail() {
-  return readEnv("SUPPORT_TO_EMAIL") || readEnv("NEXT_PUBLIC_SUPPORT_EMAIL") || "support@viralbrain.ai";
+  return readEnv("SUPPORT_TO_EMAIL") || readEnv("NEXT_PUBLIC_SUPPORT_EMAIL") || "b2762925420@163.com";
 }
 
 export function getSupportFromEmail() {

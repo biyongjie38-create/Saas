@@ -1,4 +1,4 @@
-export const DEFAULT_SUPPORT_EMAIL = "support@viralbrain.ai";
+export const DEFAULT_SUPPORT_EMAIL = "b2762925420@163.com";
 
 export function buildSupportMailtoForEmail(email: string, subject?: string): string {
   const resolvedEmail = email.trim() || DEFAULT_SUPPORT_EMAIL;
