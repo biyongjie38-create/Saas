@@ -1,5 +1,11 @@
 ﻿import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  DEFAULT_COLLECT_DURATION_PRESET,
+  matchesCollectDurationPreset,
+  normalizeCollectDurationPreset,
+  type CollectDurationPreset
+} from "@/lib/collector-duration";
 import { demoVideos } from "@/lib/mock-data";
 import { readDb, writeDb } from "@/lib/db";
 import { allowPreviewFallbacks, isProductionRuntimeMode } from "@/lib/runtime-mode";
@@ -612,6 +618,7 @@ type CollectViralOptions = QueryOptions & {
   minViews: number;
   maxResults: number;
   regionCode?: string | null;
+  durationPreset?: CollectDurationPreset;
 };
 
 function buildCollectedItem(video: YoutubeVideo): CollectedViralItem {
@@ -623,6 +630,7 @@ function buildCollectedItem(video: YoutubeVideo): CollectedViralItem {
     summary: video.description || `${video.channelName} · ${video.stats.viewCount.toLocaleString()} views`,
     channelName: video.channelName,
     publishedAt: video.publishedAt,
+    durationSec: video.durationSec,
     stats: video.stats,
     thumbnailUrl: video.thumbnailUrl,
     tags: {
@@ -646,7 +654,12 @@ async function fetchMostPopularVideos(apiKey: string, regionCode: string, maxRes
   return payload.items ?? [];
 }
 
-function buildMockCollectedItems(input: { hoursWithin: number; minViews: number; maxResults: number }): CollectedViralItem[] {
+function buildMockCollectedItems(input: {
+  hoursWithin: number;
+  minViews: number;
+  maxResults: number;
+  durationPreset: CollectDurationPreset;
+}): CollectedViralItem[] {
   const now = Date.now();
   const candidates = Object.values(demoVideos).map((video, index) => ({
     ...video,
@@ -658,7 +671,11 @@ function buildMockCollectedItems(input: { hoursWithin: number; minViews: number;
   }));
 
   return candidates
-    .filter((video) => video.stats.viewCount >= input.minViews)
+    .filter(
+      (video) =>
+        video.stats.viewCount >= input.minViews &&
+        matchesCollectDurationPreset(video.durationSec, input.durationPreset)
+    )
     .slice(0, input.maxResults)
     .map((video) =>
       buildCollectedItem({
@@ -674,6 +691,7 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
   const minViews = Math.max(1000, Math.floor(options.minViews || 100_000));
   const maxResults = Math.min(50, Math.max(1, Math.floor(options.maxResults || 10)));
   const regionCode = (options.regionCode || "US").trim().toUpperCase() || "US";
+  const durationPreset = normalizeCollectDurationPreset(options.durationPreset);
   const mode = resolveFetchMode();
   const apiKey = (options.apiKeyOverride || "").trim();
 
@@ -681,12 +699,14 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
     if (!allowPreviewFallbacks()) {
       throw new Error("YOUTUBE_KEY_MISSING");
     }
-    return buildMockCollectedItems({ hoursWithin, minViews, maxResults });
+    return buildMockCollectedItems({ hoursWithin, minViews, maxResults, durationPreset });
   }
 
   try {
     const publishedAfter = Date.now() - hoursWithin * 3600 * 1000;
-    const items = await fetchMostPopularVideos(apiKey, regionCode, Math.max(maxResults, 20));
+    const fetchLimit =
+      durationPreset === DEFAULT_COLLECT_DURATION_PRESET ? Math.max(maxResults, 20) : 50;
+    const items = await fetchMostPopularVideos(apiKey, regionCode, fetchLimit);
     const collected = items
       .map((item) => {
         const videoId = item.id;
@@ -714,7 +734,12 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
         };
         return candidate;
       })
-      .filter((video) => new Date(video.publishedAt).getTime() >= publishedAfter && video.stats.viewCount >= minViews)
+      .filter(
+        (video) =>
+          new Date(video.publishedAt).getTime() >= publishedAfter &&
+          video.stats.viewCount >= minViews &&
+          matchesCollectDurationPreset(video.durationSec, durationPreset)
+      )
       .slice(0, maxResults)
       .map(buildCollectedItem);
 
@@ -731,6 +756,6 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
     throw new Error("YOUTUBE_COLLECT_EMPTY");
   }
 
-  return buildMockCollectedItems({ hoursWithin, minViews, maxResults });
+  return buildMockCollectedItems({ hoursWithin, minViews, maxResults, durationPreset });
 }
 

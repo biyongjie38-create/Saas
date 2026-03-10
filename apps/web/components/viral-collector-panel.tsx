@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { buildApiIntegrationHeaders, readApiIntegrationConfigFromStorage } from "@/lib/api-integrations";
+import type { CollectDurationPreset } from "@/lib/collector-duration";
 import type { Lang } from "@/lib/i18n-shared";
 import type { CollectedViralItem, UserPlan } from "@/lib/types";
 
@@ -34,6 +35,7 @@ const copyByLang = {
     hoursWithin: "Published within hours",
     minViews: "Minimum views",
     maxResults: "Max results",
+    durationRange: "Video length",
     regionCode: "Region code",
     button: "Collect and Import",
     collecting: "Collecting...",
@@ -49,6 +51,7 @@ const copyByLang = {
     hoursWithin: "采集最近多少小时",
     minViews: "最低播放量",
     maxResults: "最多采集条数",
+    durationRange: "作品时长范围",
     regionCode: "地区代码",
     button: "采集并导入",
     collecting: "采集中...",
@@ -60,8 +63,42 @@ const copyByLang = {
   }
 } as const;
 
+const durationOptionsByLang: Record<Lang, Array<{ value: CollectDurationPreset; label: string }>> = {
+  en: [
+    { value: "any", label: "Any length" },
+    { value: "shorts", label: "Shorts (0-1 min)" },
+    { value: "minutes_1_3", label: "1-3 min" },
+    { value: "minutes_3_5", label: "3-5 min" },
+    { value: "minutes_5_10", label: "5-10 min" },
+    { value: "minutes_10_20", label: "10-20 min" },
+    { value: "minutes_20_plus", label: "20+ min" }
+  ],
+  zh: [
+    { value: "any", label: "不限" },
+    { value: "shorts", label: "短视频（0-1 分钟）" },
+    { value: "minutes_1_3", label: "1-3 分钟" },
+    { value: "minutes_3_5", label: "3-5 分钟" },
+    { value: "minutes_5_10", label: "5-10 分钟" },
+    { value: "minutes_10_20", label: "10-20 分钟" },
+    { value: "minutes_20_plus", label: "20 分钟以上" }
+  ]
+};
+
+function formatDuration(durationSec: number): string {
+  const hours = Math.floor(durationSec / 3600);
+  const minutes = Math.floor((durationSec % 3600) / 60);
+  const seconds = durationSec % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export function ViralCollectorPanel({ lang, plan }: Props) {
   const copy = copyByLang[lang];
+  const durationOptions = durationOptionsByLang[lang];
   const [collecting, setCollecting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -70,6 +107,7 @@ export function ViralCollectorPanel({ lang, plan }: Props) {
     hoursWithin: 48,
     minViews: 100000,
     maxResults: plan === "pro" ? 20 : 10,
+    durationPreset: "any" as CollectDurationPreset,
     regionCode: "US"
   });
 
@@ -163,6 +201,25 @@ export function ViralCollectorPanel({ lang, plan }: Props) {
           />
         </label>
         <label className="collect-field">
+          <span className="small">{copy.durationRange}</span>
+          <select
+            className="input"
+            value={collectForm.durationPreset}
+            onChange={(event) =>
+              setCollectForm((current) => ({
+                ...current,
+                durationPreset: event.target.value as CollectDurationPreset
+              }))
+            }
+          >
+            {durationOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="collect-field">
           <span className="small">{copy.regionCode}</span>
           <input
             className="input"
@@ -189,7 +246,9 @@ export function ViralCollectorPanel({ lang, plan }: Props) {
           {collectPreview.map((item) => (
             <div key={item.id} className="collect-preview-card">
               <strong>{item.title}</strong>
-              <p className="small">{item.channelName} · {item.stats.viewCount.toLocaleString()}</p>
+              <p className="small">
+                {item.channelName} · {formatDuration(item.durationSec)} · {item.stats.viewCount.toLocaleString()}
+              </p>
             </div>
           ))}
         </div>

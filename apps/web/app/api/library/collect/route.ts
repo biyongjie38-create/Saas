@@ -6,6 +6,10 @@ import {
   unauthorizedJsonResponse
 } from "@/lib/auth";
 import { readApiIntegrationConfigFromHeaders } from "@/lib/api-integrations";
+import {
+  COLLECT_DURATION_PRESET_VALUES,
+  DEFAULT_COLLECT_DURATION_PRESET
+} from "@/lib/collector-duration";
 import { syncLibraryVectors } from "@/lib/library-vector-sync";
 import { assertPlanFeature } from "@/lib/plan-access";
 import { getPlanFeatures } from "@/lib/plan-features";
@@ -20,6 +24,7 @@ const schema = z.object({
   hoursWithin: z.coerce.number().int().min(1).max(168).default(48),
   minViews: z.coerce.number().int().min(1000).max(100000000).default(100000),
   maxResults: z.coerce.number().int().min(1).max(50).default(10),
+  durationPreset: z.enum(COLLECT_DURATION_PRESET_VALUES).default(DEFAULT_COLLECT_DURATION_PRESET),
   regionCode: z.string().trim().min(2).max(8).optional(),
   autoImport: z.boolean().default(true)
 });
@@ -58,6 +63,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
       hoursWithin: parsed.data.hoursWithin,
       minViews: parsed.data.minViews,
       maxResults,
+      durationPreset: parsed.data.durationPreset,
       regionCode: parsed.data.regionCode
     });
   } catch (error) {

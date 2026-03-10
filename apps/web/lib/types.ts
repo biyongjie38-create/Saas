@@ -205,6 +205,7 @@ export type CollectedViralItem = {
   summary: string;
   channelName: string;
   publishedAt: string;
+  durationSec: number;
   stats: VideoStats;
   thumbnailUrl: string;
   tags: ViralLibraryItem["tags"];
