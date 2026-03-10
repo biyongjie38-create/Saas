@@ -16,6 +16,10 @@ import type {
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL ?? "http://127.0.0.1:8000";
 const AI_SERVICE_MODE = (process.env.AI_SERVICE_MODE ?? "remote").toLowerCase();
+const AI_SERVICE_REQUEST_TIMEOUT_MS = Math.max(
+  15_000,
+  Number.parseInt(process.env.AI_SERVICE_REQUEST_TIMEOUT_MS ?? "90000", 10) || 90_000
+);
 
 type AiStats = {
   view_count: number;
@@ -200,7 +204,11 @@ function fromAiScore(payload: AiScoreResponse["score"]): ScoreJson {
 
 async function postJson<TResponse>(path: string, payload: unknown, providerConfig?: ApiIntegrationConfig): Promise<TResponse> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 18000);
+  let requestTimedOut = false;
+  const timeout = setTimeout(() => {
+    requestTimedOut = true;
+    controller.abort();
+  }, AI_SERVICE_REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(`${AI_SERVICE_URL}${path}`, {
@@ -239,6 +247,21 @@ async function postJson<TResponse>(path: string, payload: unknown, providerConfi
     }
 
     return (await response.json()) as TResponse;
+  } catch (error) {
+    const causeCode =
+      error && typeof error === "object" && "cause" in error && error.cause && typeof error.cause === "object" && "code" in error.cause
+        ? String(error.cause.code)
+        : "";
+
+    if (
+      requestTimedOut ||
+      (error instanceof Error && error.name === "AbortError") ||
+      causeCode === "UND_ERR_CONNECT_TIMEOUT"
+    ) {
+      throw new Error("AI_SERVICE_REQUEST_TIMEOUT");
+    }
+
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

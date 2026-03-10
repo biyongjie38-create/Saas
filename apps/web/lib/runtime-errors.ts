@@ -25,6 +25,10 @@ export function toUserFacingRuntimeMessage(error: unknown): string {
     return "Production mode requires the external AI service. Start apps/ai-service and disable local-only AI mode.";
   }
 
+  if (message === "AI_SERVICE_REQUEST_TIMEOUT") {
+    return "The request exceeded the web server timeout while waiting for the external AI service to finish.";
+  }
+
   if (message === "AI_PROVIDER_LOCAL_MODE_DISABLED") {
     return "Production mode requires a real model provider. Connect your own OpenAI-compatible credentials before running analysis.";
   }
