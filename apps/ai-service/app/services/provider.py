@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 try:
-    from openai import OpenAI
+    from openai import APITimeoutError, OpenAI
 except Exception:
+    APITimeoutError = None
     OpenAI = None
 
 
@@ -87,11 +88,17 @@ def allow_server_provider_fallback() -> bool:
 
 
 def _resolve_timeout() -> float:
-    raw = os.getenv("OPENAI_TIMEOUT_SEC", "20").strip()
+    raw = os.getenv("OPENAI_TIMEOUT_SEC", "90").strip()
     try:
-        return max(5.0, float(raw))
+        return max(15.0, float(raw))
     except ValueError:
-        return 20.0
+        return 90.0
+
+
+def _is_provider_timeout_error(error: Exception) -> bool:
+    if APITimeoutError is not None and isinstance(error, APITimeoutError):
+        return True
+    return error.__class__.__name__ == "APITimeoutError"
 
 
 def _has_openai_credentials(overrides: ProviderOverrides | None = None) -> bool:
@@ -306,6 +313,8 @@ def run_json_task(
 
     if not allow_local_fallbacks():
         if last_error is not None:
+            if _is_provider_timeout_error(last_error):
+                raise RuntimeError("AI_PROVIDER_REQUEST_TIMEOUT") from last_error
             raise RuntimeError("AI_PROVIDER_REQUEST_FAILED") from last_error
         raise RuntimeError("AI_PROVIDER_CREDENTIALS_MISSING")
 

@@ -113,6 +113,7 @@ Rules:
 - Output in English.
 - Be specific and actionable.
 - Keep each bullet concise.
+- `thumbnail_review.score` must be an integer between 0 and 100.
 - If an image is provided, use the visual evidence from the thumbnail instead of guessing from the URL alone.
 - Do not include markdown, code fences, or explanations outside JSON.
 """.strip()

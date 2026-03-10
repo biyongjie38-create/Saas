@@ -45,6 +45,10 @@ export function toUserFacingRuntimeMessage(error: unknown): string {
     return "The model provider request failed. Check provider credentials, quota, and outbound network access.";
   }
 
+  if (message === "AI_PROVIDER_REQUEST_TIMEOUT") {
+    return "The model provider timed out before finishing the response.";
+  }
+
   if (message === "RAG_PROVIDER_REQUEST_FAILED") {
     return "Vector retrieval failed. Check Pinecone connectivity, embedding credentials, and outbound network access.";
   }

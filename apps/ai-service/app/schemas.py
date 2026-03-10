@@ -2,7 +2,35 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+
+
+def _normalize_percent_score(value: object) -> object:
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return value
+        try:
+            value = float(value)
+        except ValueError:
+            return value
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, int):
+        numeric = float(value)
+    elif isinstance(value, float):
+        numeric = value
+    else:
+        return value
+
+    # Some OpenAI-compatible models answer on a 10-point scale even when the
+    # prompt asks for 0-100. Normalize those responses before validation.
+    if 0 < numeric <= 10:
+        numeric *= 10
+
+    return int(round(max(0, min(100, numeric))))
 
 
 class Stats(BaseModel):
@@ -38,6 +66,11 @@ class ThumbnailReview(BaseModel):
     score: int = Field(ge=0, le=100)
     diagnosis: str
     improvements: list[str]
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def normalize_score(cls, value: object) -> object:
+        return _normalize_percent_score(value)
 
 
 class CommentsInsights(BaseModel):
@@ -146,11 +179,29 @@ class ScoreBreakdown(BaseModel):
     value_density: int = Field(ge=0, le=100)
     emotion_resonance: int = Field(ge=0, le=100)
 
+    @field_validator(
+        "title",
+        "thumbnail",
+        "hook",
+        "pacing",
+        "value_density",
+        "emotion_resonance",
+        mode="before",
+    )
+    @classmethod
+    def normalize_scores(cls, value: object) -> object:
+        return _normalize_percent_score(value)
+
 
 class ScorePayload(BaseModel):
     total: int = Field(ge=0, le=100)
     breakdown: ScoreBreakdown
     top_actions: list[str]
+
+    @field_validator("total", mode="before")
+    @classmethod
+    def normalize_total(cls, value: object) -> object:
+        return _normalize_percent_score(value)
 
 
 class ScoreRequest(BaseModel):
