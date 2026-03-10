@@ -2,6 +2,7 @@
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: ["**/live-production.spec.ts"],
   fullyParallel: false,
   workers: 1,
   retries: 0,

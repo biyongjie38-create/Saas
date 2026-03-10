@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 
 const TEST_USER_ID = "00000000-0000-4000-8000-000000000123";
 const TEST_USER_EMAIL = "live-smoke@viralbrain.ai";
+const TEST_VIDEO_ID = "dQw4w9WgXcQ";
 const TEST_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
 const API_INTEGRATION_STORAGE_KEY = "vb_api_integrations_v2";
 
@@ -20,6 +21,10 @@ type ApiIntegrationConfig = {
   pineconeIndexName: string;
   pineconeNamespace: string;
 };
+
+type LivePreflightResult =
+  | { ok: true }
+  | { ok: false; reason: string };
 
 function loadEnvFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) {
@@ -71,6 +76,60 @@ function resolveLiveApiConfig(): ApiIntegrationConfig {
   };
 }
 
+function getMissingLivePrerequisites(config: ApiIntegrationConfig): string[] {
+  const missing: string[] = [];
+
+  if (!config.youtubeApiKey) {
+    missing.push("YOUTUBE_API_KEY");
+  }
+  if (!config.openaiApiKey) {
+    missing.push("OPENAI_API_KEY");
+  }
+  if (!config.pineconeApiKey) {
+    missing.push("PINECONE_API_KEY");
+  }
+  if (!config.pineconeIndexHost && !config.pineconeIndexName) {
+    missing.push("PINECONE_INDEX_HOST or PINECONE_INDEX_NAME");
+  }
+
+  return missing;
+}
+
+async function probeYoutubeLiveAccess(apiKey: string): Promise<LivePreflightResult> {
+  const url = new URL("https://www.googleapis.com/youtube/v3/videos");
+  url.searchParams.set("part", "id");
+  url.searchParams.set("id", TEST_VIDEO_ID);
+  url.searchParams.set("key", apiKey);
+
+  try {
+    await fetch(url.toString(), {
+      method: "GET",
+      signal: AbortSignal.timeout(8_000),
+    });
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      reason: `Live smoke requires outbound access to YouTube Data API: ${message}`,
+    };
+  }
+}
+
+async function verifyLivePreflight(): Promise<LivePreflightResult> {
+  const config = resolveLiveApiConfig();
+  const missing = getMissingLivePrerequisites(config);
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      reason: `Live smoke prerequisites are missing: ${missing.join(", ")}`,
+    };
+  }
+
+  return probeYoutubeLiveAccess(config.youtubeApiKey);
+}
+
 async function seedLiveApiConfig(page: import("@playwright/test").Page) {
   const config = resolveLiveApiConfig();
   await page.addInitScript(
@@ -94,6 +153,9 @@ async function loginWithBypass(page: import("@playwright/test").Page, href: stri
 }
 
 test("production mode uses real services instead of mock fallback", async ({ page }) => {
+  const preflight = await verifyLivePreflight();
+  test.skip(!preflight.ok, preflight.ok ? "" : preflight.reason);
+
   await seedLiveApiConfig(page);
   await loginWithBypass(
     page,

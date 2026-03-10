@@ -357,6 +357,7 @@ npm run qa:live
 - 以 `production` 运行模式启动 Next.js
 - 禁用 mock YouTube / 本地 AI 兜底
 - 保留测试专用的 mock 数据后端与测试登录旁路，避免 Supabase RLS 阻塞自动化
+- 预检 `YOUTUBE_API_KEY` / `OPENAI_API_KEY` / Pinecone 配置，以及当前机器到 YouTube Data API 的外连能力；前置条件不满足时会明确跳过测试
 
 也就是说，它重点验证的是“真实 YouTube + 真实 AI 提供商链路是否被正确调用”，而不是验证真实登录会话本身。
 
