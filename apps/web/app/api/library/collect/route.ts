@@ -84,6 +84,10 @@ export const POST = withApiRoute(async (request, { requestId }) => {
       title: item.title,
       sourceUrl: item.url,
       summary: item.summary,
+      channelName: item.channelName,
+      publishedAt: item.publishedAt,
+      durationSec: item.durationSec,
+      stats: item.stats,
       tags: item.tags
     }));
 

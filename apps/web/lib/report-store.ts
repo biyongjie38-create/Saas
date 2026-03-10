@@ -1,6 +1,7 @@
 ﻿import crypto from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readDb, writeDb } from "@/lib/db";
+import { normalizeLibraryFolder } from "@/lib/library-filters";
 import { fallbackLibrary } from "@/lib/mock-data";
 import {
   assertUsageWithinLimit,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/quota";
 import { isSupabaseBackendEnabled, normalizeUserIdForBackend } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { extractVideoId } from "@/lib/youtube";
 import type {
   Report,
   ReportShareAuditSummary,
@@ -57,6 +59,11 @@ type LibraryRow = {
   title: string;
   source_url: string | null;
   summary: string | null;
+  channel_name?: string | null;
+  published_at?: string | null;
+  duration_sec?: number | null;
+  stats?: unknown;
+  folder?: string | null;
   tags: unknown;
   created_at: string | null;
   deleted_at?: string | null;
@@ -67,6 +74,11 @@ export type LibraryImportInput = {
   title: string;
   sourceUrl?: string;
   summary: string;
+  channelName?: string | null;
+  publishedAt?: string | null;
+  durationSec?: number | null;
+  stats?: ViralLibraryItem["stats"];
+  folder?: string | null;
   tags?: Partial<ViralLibraryItem["tags"]>;
 };
 
@@ -687,12 +699,148 @@ function normalizeTags(value: unknown): ViralLibraryItem["tags"] {
   };
 }
 
+function normalizeStats(value: unknown): ViralLibraryItem["stats"] {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const viewCount = Number(candidate.viewCount ?? candidate.view_count ?? 0);
+  const likeCount = Number(candidate.likeCount ?? candidate.like_count ?? 0);
+  const commentCount = Number(candidate.commentCount ?? candidate.comment_count ?? 0);
+
+  if (![viewCount, likeCount, commentCount].some((entry) => Number.isFinite(entry) && entry > 0)) {
+    return null;
+  }
+
+  return {
+    viewCount: Math.max(0, Math.floor(Number.isFinite(viewCount) ? viewCount : 0)),
+    likeCount: Math.max(0, Math.floor(Number.isFinite(likeCount) ? likeCount : 0)),
+    commentCount: Math.max(0, Math.floor(Number.isFinite(commentCount) ? commentCount : 0))
+  };
+}
+
+function normalizeDurationSec(value: unknown): number | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+  return Math.floor(numeric);
+}
+
+function needsLibraryHydration(item: ViralLibraryItem) {
+  return !item.channelName || !item.publishedAt || !item.durationSec || !item.stats;
+}
+
+function mergeLibraryItemSupplement(
+  item: ViralLibraryItem,
+  supplement?: {
+    channelName?: string | null;
+    publishedAt?: string | null;
+    durationSec?: number | null;
+    stats?: ViralLibraryItem["stats"];
+  }
+): ViralLibraryItem {
+  if (!supplement) {
+    return item;
+  }
+
+  return {
+    ...item,
+    channelName: item.channelName || supplement.channelName || null,
+    publishedAt: item.publishedAt || supplement.publishedAt || null,
+    durationSec: item.durationSec || supplement.durationSec || null,
+    stats: item.stats || supplement.stats || null
+  };
+}
+
+async function hydrateLibraryItems(items: ViralLibraryItem[], options?: QueryOptions): Promise<ViralLibraryItem[]> {
+  const candidates = items.filter(needsLibraryHydration);
+  if (candidates.length === 0) {
+    return items;
+  }
+
+  const videoIds = Array.from(
+    new Set(
+      candidates
+        .map((item) => extractVideoId(item.sourceUrl))
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  if (videoIds.length === 0) {
+    return items;
+  }
+
+  const supplementByVideoId = new Map<
+    string,
+    {
+      channelName?: string | null;
+      publishedAt?: string | null;
+      durationSec?: number | null;
+      stats?: ViralLibraryItem["stats"];
+    }
+  >();
+
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { data, error } = await client
+      .from("videos")
+      .select("video_id,channel_name,published_at,duration_sec,stats")
+      .in("video_id", videoIds);
+
+    if (error) {
+      throw new Error(`SUPABASE_LIST_LIBRARY_VIDEOS_FAILED:${error.message}`);
+    }
+
+    for (const row of data ?? []) {
+      const candidate = row as Record<string, unknown>;
+      supplementByVideoId.set(String(candidate.video_id ?? ""), {
+        channelName: candidate.channel_name ? String(candidate.channel_name) : null,
+        publishedAt: candidate.published_at ? String(candidate.published_at) : null,
+        durationSec: normalizeDurationSec(candidate.duration_sec),
+        stats: normalizeStats(candidate.stats)
+      });
+    }
+  } else {
+    const db = await readDb();
+    for (const video of db.videos) {
+      if (!videoIds.includes(video.videoId)) {
+        continue;
+      }
+      supplementByVideoId.set(video.videoId, {
+        channelName: video.channelName,
+        publishedAt: video.publishedAt,
+        durationSec: video.durationSec,
+        stats: video.stats
+      });
+    }
+  }
+
+  if (supplementByVideoId.size === 0) {
+    return items;
+  }
+
+  return items.map((item) => {
+    const videoId = extractVideoId(item.sourceUrl);
+    if (!videoId) {
+      return item;
+    }
+    return mergeLibraryItemSupplement(item, supplementByVideoId.get(videoId));
+  });
+}
+
 function toLibraryItem(row: LibraryRow): ViralLibraryItem {
   return {
     id: String(row.id),
     title: String(row.title),
     sourceUrl: String(row.source_url ?? ""),
     summary: String(row.summary ?? ""),
+    channelName: row.channel_name ? String(row.channel_name) : null,
+    publishedAt: row.published_at ? String(row.published_at) : null,
+    durationSec: normalizeDurationSec(row.duration_sec),
+    stats: normalizeStats(row.stats),
+    folder: normalizeLibraryFolder(row.folder),
     tags: normalizeTags(row.tags),
     createdAt: String(row.created_at ?? new Date().toISOString()),
     deletedAt: row.deleted_at ? String(row.deleted_at) : null
@@ -704,6 +852,11 @@ function normalizeLibraryImportItem(input: LibraryImportInput): LibraryImportInp
     title: input.title.trim(),
     sourceUrl: (input.sourceUrl ?? "").trim(),
     summary: input.summary.trim(),
+    channelName: (input.channelName ?? "").trim() || null,
+    publishedAt: (input.publishedAt ?? "").trim() || null,
+    durationSec: normalizeDurationSec(input.durationSec),
+    stats: normalizeStats(input.stats),
+    folder: normalizeLibraryFolder(input.folder),
     tags: {
       hookType: input.tags?.hookType?.trim() || "unknown",
       topic: input.tags?.topic?.trim() || "general",
@@ -732,7 +885,9 @@ export async function listLibraryItems(options?: QueryOptions): Promise<ViralLib
   if (client) {
     let query = client
       .from("viral_library_items")
-      .select("id,title,source_url,summary,tags,created_at,deleted_at,embedding_key")
+      .select(
+        "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
+      )
       .order("created_at", { ascending: false })
       .limit(200);
 
@@ -748,15 +903,18 @@ export async function listLibraryItems(options?: QueryOptions): Promise<ViralLib
 
     const mapped = (data ?? []).map((item) => toLibraryItem(item as LibraryRow));
     if (mapped.length > 0) {
-      return mapped;
+      return hydrateLibraryItems(mapped, { ...options, supabaseClient: client });
     }
   }
 
   const db = await readDb();
   const list = db.library.length > 0 ? db.library : fallbackLibrary;
-  return list
+  return hydrateLibraryItems(
+    list
     .filter((item) => includeDeleted || !item.deletedAt)
-    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    options
+  );
 }
 
 export async function importLibraryItems(
@@ -777,18 +935,63 @@ export async function importLibraryItems(
 
   const client = await getSupabaseUserClient(options);
   if (client) {
-    const payload = deduped.map(([embeddingKey, item]) => ({
-      title: item.title,
-      source_url: item.sourceUrl || null,
-      summary: item.summary,
-      tags: {
-        hook_type: item.tags?.hookType ?? "unknown",
-        topic: item.tags?.topic ?? "general",
-        duration_bucket: item.tags?.durationBucket ?? "5-10m"
-      },
-      embedding_key: embeddingKey,
-      deleted_at: null
-    }));
+    const embeddingKeys = deduped.map(([embeddingKey]) => embeddingKey);
+    const existingByKey = new Map<string, LibraryRow>();
+
+    if (embeddingKeys.length > 0) {
+      const { data: existingRows, error: existingError } = await client
+        .from("viral_library_items")
+        .select(
+          "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
+        )
+        .in("embedding_key", embeddingKeys);
+
+      if (existingError) {
+        throw new Error(`SUPABASE_IMPORT_LIBRARY_FAILED:${existingError.message}`);
+      }
+
+      for (const row of existingRows ?? []) {
+        const mapped = row as LibraryRow;
+        if (mapped.embedding_key) {
+          existingByKey.set(String(mapped.embedding_key), mapped);
+        }
+      }
+    }
+
+    const payload = deduped.map(([embeddingKey, item]) => {
+      const existing = existingByKey.get(embeddingKey);
+      const existingItem = existing ? toLibraryItem(existing) : null;
+
+      return {
+        title: item.title,
+        source_url: item.sourceUrl || existingItem?.sourceUrl || null,
+        summary: item.summary,
+        channel_name: item.channelName ?? existingItem?.channelName ?? null,
+        published_at: item.publishedAt ?? existingItem?.publishedAt ?? null,
+        duration_sec: item.durationSec ?? existingItem?.durationSec ?? null,
+        stats: item.stats
+          ? {
+              view_count: item.stats.viewCount,
+              like_count: item.stats.likeCount,
+              comment_count: item.stats.commentCount
+            }
+          : existingItem?.stats
+            ? {
+                view_count: existingItem.stats.viewCount,
+                like_count: existingItem.stats.likeCount,
+                comment_count: existingItem.stats.commentCount
+              }
+            : null,
+        folder: item.folder ?? existingItem?.folder ?? null,
+        tags: {
+          hook_type: item.tags?.hookType ?? existingItem?.tags.hookType ?? "unknown",
+          topic: item.tags?.topic ?? existingItem?.tags.topic ?? "general",
+          duration_bucket: item.tags?.durationBucket ?? existingItem?.tags.durationBucket ?? "5-10m"
+        },
+        embedding_key: embeddingKey,
+        deleted_at: null
+      };
+    });
 
     const { error } = await client
       .from("viral_library_items")
@@ -818,8 +1021,13 @@ export async function importLibraryItems(
     const existing = existingByKey.get(embeddingKey);
     if (existing) {
       existing.title = item.title;
-      existing.sourceUrl = item.sourceUrl ?? "";
+      existing.sourceUrl = item.sourceUrl ?? existing.sourceUrl ?? "";
       existing.summary = item.summary;
+      existing.channelName = item.channelName ?? existing.channelName ?? null;
+      existing.publishedAt = item.publishedAt ?? existing.publishedAt ?? null;
+      existing.durationSec = item.durationSec ?? existing.durationSec ?? null;
+      existing.stats = item.stats ?? existing.stats ?? null;
+      existing.folder = item.folder ?? existing.folder ?? null;
       existing.tags = {
         hookType: item.tags?.hookType ?? "unknown",
         topic: item.tags?.topic ?? "general",
@@ -834,6 +1042,11 @@ export async function importLibraryItems(
       title: item.title,
       sourceUrl: item.sourceUrl ?? "",
       summary: item.summary,
+      channelName: item.channelName ?? null,
+      publishedAt: item.publishedAt ?? null,
+      durationSec: item.durationSec ?? null,
+      stats: item.stats ?? null,
+      folder: item.folder ?? null,
       tags: {
         hookType: item.tags?.hookType ?? "unknown",
         topic: item.tags?.topic ?? "general",
@@ -854,7 +1067,9 @@ export async function getLibraryItemById(id: string, options?: QueryOptions): Pr
   if (client) {
     const { data, error } = await client
       .from("viral_library_items")
-      .select("id,title,source_url,summary,tags,created_at,deleted_at,embedding_key")
+      .select(
+        "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -867,6 +1082,41 @@ export async function getLibraryItemById(id: string, options?: QueryOptions): Pr
 
   const db = await readDb();
   return db.library.find((item) => item.id === id) ?? null;
+}
+
+export async function updateLibraryItemFolder(
+  id: string,
+  folder: string | null,
+  options?: QueryOptions
+): Promise<ViralLibraryItem | null> {
+  const normalizedFolder = normalizeLibraryFolder(folder);
+  const client = await getSupabaseUserClient(options);
+  if (client) {
+    const { data, error } = await client
+      .from("viral_library_items")
+      .update({ folder: normalizedFolder })
+      .eq("id", id)
+      .select(
+        "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
+      )
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`SUPABASE_UPDATE_LIBRARY_FOLDER_FAILED:${error.message}`);
+    }
+
+    return data ? toLibraryItem(data as LibraryRow) : null;
+  }
+
+  const db = await readDb();
+  const item = db.library.find((entry) => entry.id === id);
+  if (!item) {
+    return null;
+  }
+
+  item.folder = normalizedFolder;
+  await writeDb(db);
+  return item;
 }
 
 export async function deleteLibraryItem(id: string, options?: QueryOptions): Promise<boolean> {

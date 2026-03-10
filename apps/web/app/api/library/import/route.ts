@@ -51,11 +51,39 @@ function parseCsvLine(line: string): string[] {
 
 function normalizeItem(input: Record<string, unknown>): LibraryImportInput {
   const tags = typeof input.tags === "object" && input.tags ? (input.tags as Record<string, unknown>) : {};
+  const stats = typeof input.stats === "object" && input.stats ? (input.stats as Record<string, unknown>) : {};
+  const toNumberOrNull = (value: unknown) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : null;
+  };
 
   return {
     title: String(input.title ?? "").trim(),
     sourceUrl: String(input.sourceUrl ?? input.source_url ?? input.url ?? "").trim(),
     summary: String(input.summary ?? input.description ?? "").trim(),
+    channelName: String(input.channelName ?? input.channel_name ?? input.channel ?? "").trim() || null,
+    publishedAt: String(input.publishedAt ?? input.published_at ?? "").trim() || null,
+    durationSec: toNumberOrNull(input.durationSec ?? input.duration_sec ?? input.duration),
+    folder: String(input.folder ?? input.category ?? input.folderName ?? input.folder_name ?? "").trim() || null,
+    stats:
+      toNumberOrNull(stats.viewCount ?? stats.view_count ?? input.viewCount ?? input.view_count ?? input.views) ||
+      toNumberOrNull(stats.likeCount ?? stats.like_count ?? input.likeCount ?? input.like_count ?? input.likes) ||
+      toNumberOrNull(
+        stats.commentCount ?? stats.comment_count ?? input.commentCount ?? input.comment_count ?? input.comments
+      )
+        ? {
+            viewCount:
+              toNumberOrNull(stats.viewCount ?? stats.view_count ?? input.viewCount ?? input.view_count ?? input.views) ??
+              0,
+            likeCount:
+              toNumberOrNull(stats.likeCount ?? stats.like_count ?? input.likeCount ?? input.like_count ?? input.likes) ??
+              0,
+            commentCount:
+              toNumberOrNull(
+                stats.commentCount ?? stats.comment_count ?? input.commentCount ?? input.comment_count ?? input.comments
+              ) ?? 0
+          }
+        : null,
     tags: {
       hookType: String(tags.hookType ?? tags.hook_type ?? input.hookType ?? input.hook_type ?? "unknown").trim(),
       topic: String(tags.topic ?? input.topic ?? "general").trim(),

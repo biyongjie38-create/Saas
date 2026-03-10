@@ -18,7 +18,7 @@ const FEATURES: Record<UserPlan, PlanFeatures> = {
     canUseBenchmarkRetrieval: false,
     canUseShareLinks: false,
     canRerunReports: false,
-    canManageRecycleBin: false,
+    canManageRecycleBin: true,
     canCollectVirals: true,
     canExportReports: false,
     canViewTrendDetails: false,

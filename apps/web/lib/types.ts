@@ -188,6 +188,11 @@ export type ViralLibraryItem = {
   title: string;
   sourceUrl: string;
   summary: string;
+  channelName?: string | null;
+  publishedAt?: string | null;
+  durationSec?: number | null;
+  stats?: VideoStats | null;
+  folder?: string | null;
   tags: {
     hookType: string;
     topic: string;

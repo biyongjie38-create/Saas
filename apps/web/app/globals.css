@@ -442,6 +442,13 @@ a {
   gap: 8px;
 }
 
+.library-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.9fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
 .library-grid {
   display: grid;
   gap: 14px;
@@ -465,6 +472,70 @@ a {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.library-card-head-start {
+  align-items: flex-start;
+}
+
+.library-card-heading {
+  display: grid;
+  gap: 8px;
+}
+
+.library-badge-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.library-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin-top: 14px;
+}
+
+.library-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+
+.library-stat-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at top left, rgba(76, 198, 255, 0.12), transparent 45%),
+    linear-gradient(160deg, rgba(12, 20, 37, 0.88), rgba(7, 13, 27, 0.8));
+}
+
+.library-stat-card strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.library-folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.library-folder-field {
+  display: grid;
+  gap: 6px;
+}
+
+.library-folder-save,
+.library-export-button {
+  min-height: 46px;
+  justify-content: center;
 }
 
 .library-link {
@@ -491,6 +562,15 @@ a {
   place-items: center;
   min-height: 160px;
   text-align: center;
+}
+
+@media (max-width: 980px) {
+  .library-toolbar,
+  .library-meta-grid,
+  .library-stats-row,
+  .library-folder-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 

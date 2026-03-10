@@ -82,6 +82,14 @@ export const fallbackLibrary: ViralLibraryItem[] = [
     sourceUrl: "https://youtube.com/watch?v=hook001",
     summary:
       "Open with outcome, then show risk of failure, then promise the roadmap. Works well for tutorial content.",
+    channelName: "Hook Lab",
+    publishedAt: "2025-09-01T08:00:00Z",
+    durationSec: 412,
+    stats: {
+      viewCount: 812340,
+      likeCount: 41210,
+      commentCount: 1934
+    },
     tags: {
       hookType: "result-first",
       topic: "education",
@@ -95,6 +103,14 @@ export const fallbackLibrary: ViralLibraryItem[] = [
     sourceUrl: "https://youtube.com/watch?v=arc002",
     summary:
       "Before/after storytelling increases contrast with 3 turning points. Good for product transformation videos.",
+    channelName: "Product Story OS",
+    publishedAt: "2025-09-09T09:00:00Z",
+    durationSec: 708,
+    stats: {
+      viewCount: 1542088,
+      likeCount: 78640,
+      commentCount: 2810
+    },
     tags: {
       hookType: "contrast",
       topic: "productivity",
@@ -108,6 +124,14 @@ export const fallbackLibrary: ViralLibraryItem[] = [
     sourceUrl: "https://youtube.com/watch?v=vlog003",
     summary:
       "Fast cuts and emotional spikes improve immersion. Place CTA 20 seconds after emotional peak.",
+    channelName: "Vlog Engine",
+    publishedAt: "2025-10-16T10:00:00Z",
+    durationSec: 932,
+    stats: {
+      viewCount: 2304109,
+      likeCount: 121090,
+      commentCount: 5320
+    },
     tags: {
       hookType: "emotion-spike",
       topic: "vlog",

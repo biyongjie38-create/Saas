@@ -80,6 +80,11 @@ create table if not exists viral_library_items (
   title text not null,
   source_url text,
   summary text not null,
+  channel_name text,
+  published_at timestamptz,
+  duration_sec int,
+  stats jsonb,
+  folder text,
   tags jsonb not null default '{}'::jsonb,
   embedding_key text unique,
   deleted_at timestamptz,
@@ -88,6 +93,11 @@ create table if not exists viral_library_items (
 
 alter table viral_library_items add column if not exists embedding_key text;
 alter table viral_library_items add column if not exists deleted_at timestamptz;
+alter table viral_library_items add column if not exists channel_name text;
+alter table viral_library_items add column if not exists published_at timestamptz;
+alter table viral_library_items add column if not exists duration_sec int;
+alter table viral_library_items add column if not exists stats jsonb;
+alter table viral_library_items add column if not exists folder text;
 
 create index if not exists idx_viral_library_created on viral_library_items(created_at desc);
 create index if not exists idx_viral_library_deleted_at on viral_library_items(deleted_at);
@@ -357,4 +367,3 @@ drop trigger if exists usage_logs_daily_limit_guard on usage_logs;
 create trigger usage_logs_daily_limit_guard
 before insert on usage_logs
 for each row execute function enforce_usage_logs_daily_limit();
-
