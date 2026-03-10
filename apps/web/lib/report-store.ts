@@ -83,6 +83,7 @@ export type LibraryImportInput = {
 };
 
 const REPORT_SHARE_TTL_HOURS = 24 * 7;
+const LIBRARY_SELECT_COLUMNS = "id,title,source_url,summary,tags,created_at,deleted_at,embedding_key";
 
 function toReport(row: ReportRow): Report {
   return {
@@ -687,7 +688,7 @@ function normalizeTags(value: unknown): ViralLibraryItem["tags"] {
     durationBucket: "5-10m"
   };
 
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return fallback;
   }
 
@@ -726,6 +727,95 @@ function normalizeDurationSec(value: unknown): number | null {
     return null;
   }
   return Math.floor(numeric);
+}
+
+function toTagObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return { ...(value as Record<string, unknown>) };
+}
+
+function extractLibrarySupplementFromTags(value: unknown): {
+  channelName?: string | null;
+  publishedAt?: string | null;
+  durationSec?: number | null;
+  stats?: ViralLibraryItem["stats"];
+  folder?: string | null;
+} {
+  const candidate = toTagObject(value);
+
+  return {
+    channelName:
+      typeof candidate.channelName === "string"
+        ? candidate.channelName
+        : typeof candidate.channel_name === "string"
+          ? candidate.channel_name
+          : null,
+    publishedAt:
+      typeof candidate.publishedAt === "string"
+        ? candidate.publishedAt
+        : typeof candidate.published_at === "string"
+          ? candidate.published_at
+          : null,
+    durationSec: normalizeDurationSec(candidate.durationSec ?? candidate.duration_sec),
+    stats: normalizeStats(candidate.stats),
+    folder: normalizeLibraryFolder(candidate.folder)
+  };
+}
+
+function serializeLibraryTags(
+  input: {
+    tags?: Partial<ViralLibraryItem["tags"]>;
+    channelName?: string | null;
+    publishedAt?: string | null;
+    durationSec?: number | null;
+    stats?: ViralLibraryItem["stats"];
+    folder?: string | null;
+  },
+  existing?: unknown
+): Record<string, unknown> {
+  const payload = toTagObject(existing);
+  payload.hook_type = input.tags?.hookType ?? "unknown";
+  payload.topic = input.tags?.topic ?? "general";
+  payload.duration_bucket = input.tags?.durationBucket ?? "5-10m";
+
+  if (input.channelName) {
+    payload.channel_name = input.channelName;
+  } else {
+    delete payload.channel_name;
+  }
+
+  if (input.publishedAt) {
+    payload.published_at = input.publishedAt;
+  } else {
+    delete payload.published_at;
+  }
+
+  if (input.durationSec) {
+    payload.duration_sec = input.durationSec;
+  } else {
+    delete payload.duration_sec;
+  }
+
+  if (input.stats) {
+    payload.stats = {
+      viewCount: input.stats.viewCount,
+      likeCount: input.stats.likeCount,
+      commentCount: input.stats.commentCount
+    };
+  } else {
+    delete payload.stats;
+  }
+
+  if (input.folder) {
+    payload.folder = input.folder;
+  } else {
+    delete payload.folder;
+  }
+
+  return payload;
 }
 
 function needsLibraryHydration(item: ViralLibraryItem) {
@@ -831,16 +921,18 @@ async function hydrateLibraryItems(items: ViralLibraryItem[], options?: QueryOpt
 }
 
 function toLibraryItem(row: LibraryRow): ViralLibraryItem {
+  const supplement = extractLibrarySupplementFromTags(row.tags);
+
   return {
     id: String(row.id),
     title: String(row.title),
     sourceUrl: String(row.source_url ?? ""),
     summary: String(row.summary ?? ""),
-    channelName: row.channel_name ? String(row.channel_name) : null,
-    publishedAt: row.published_at ? String(row.published_at) : null,
-    durationSec: normalizeDurationSec(row.duration_sec),
-    stats: normalizeStats(row.stats),
-    folder: normalizeLibraryFolder(row.folder),
+    channelName: row.channel_name ? String(row.channel_name) : supplement.channelName ?? null,
+    publishedAt: row.published_at ? String(row.published_at) : supplement.publishedAt ?? null,
+    durationSec: normalizeDurationSec(row.duration_sec) ?? supplement.durationSec ?? null,
+    stats: normalizeStats(row.stats) ?? supplement.stats ?? null,
+    folder: normalizeLibraryFolder(row.folder) ?? supplement.folder ?? null,
     tags: normalizeTags(row.tags),
     createdAt: String(row.created_at ?? new Date().toISOString()),
     deletedAt: row.deleted_at ? String(row.deleted_at) : null
@@ -885,9 +977,7 @@ export async function listLibraryItems(options?: QueryOptions): Promise<ViralLib
   if (client) {
     let query = client
       .from("viral_library_items")
-      .select(
-        "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
-      )
+      .select(LIBRARY_SELECT_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(200);
 
@@ -941,9 +1031,7 @@ export async function importLibraryItems(
     if (embeddingKeys.length > 0) {
       const { data: existingRows, error: existingError } = await client
         .from("viral_library_items")
-        .select(
-          "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
-        )
+        .select(LIBRARY_SELECT_COLUMNS)
         .in("embedding_key", embeddingKeys);
 
       if (existingError) {
@@ -966,28 +1054,21 @@ export async function importLibraryItems(
         title: item.title,
         source_url: item.sourceUrl || existingItem?.sourceUrl || null,
         summary: item.summary,
-        channel_name: item.channelName ?? existingItem?.channelName ?? null,
-        published_at: item.publishedAt ?? existingItem?.publishedAt ?? null,
-        duration_sec: item.durationSec ?? existingItem?.durationSec ?? null,
-        stats: item.stats
-          ? {
-              view_count: item.stats.viewCount,
-              like_count: item.stats.likeCount,
-              comment_count: item.stats.commentCount
-            }
-          : existingItem?.stats
-            ? {
-                view_count: existingItem.stats.viewCount,
-                like_count: existingItem.stats.likeCount,
-                comment_count: existingItem.stats.commentCount
-              }
-            : null,
-        folder: item.folder ?? existingItem?.folder ?? null,
-        tags: {
-          hook_type: item.tags?.hookType ?? existingItem?.tags.hookType ?? "unknown",
-          topic: item.tags?.topic ?? existingItem?.tags.topic ?? "general",
-          duration_bucket: item.tags?.durationBucket ?? existingItem?.tags.durationBucket ?? "5-10m"
-        },
+        tags: serializeLibraryTags(
+          {
+            tags: {
+              hookType: item.tags?.hookType ?? existingItem?.tags.hookType ?? "unknown",
+              topic: item.tags?.topic ?? existingItem?.tags.topic ?? "general",
+              durationBucket: item.tags?.durationBucket ?? existingItem?.tags.durationBucket ?? "5-10m"
+            },
+            channelName: item.channelName ?? existingItem?.channelName ?? null,
+            publishedAt: item.publishedAt ?? existingItem?.publishedAt ?? null,
+            durationSec: item.durationSec ?? existingItem?.durationSec ?? null,
+            stats: item.stats ?? existingItem?.stats ?? null,
+            folder: item.folder ?? existingItem?.folder ?? null
+          },
+          existing?.tags
+        ),
         embedding_key: embeddingKey,
         deleted_at: null
       };
@@ -1067,9 +1148,7 @@ export async function getLibraryItemById(id: string, options?: QueryOptions): Pr
   if (client) {
     const { data, error } = await client
       .from("viral_library_items")
-      .select(
-        "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
-      )
+      .select(LIBRARY_SELECT_COLUMNS)
       .eq("id", id)
       .maybeSingle();
 
@@ -1077,11 +1156,25 @@ export async function getLibraryItemById(id: string, options?: QueryOptions): Pr
       throw new Error(`SUPABASE_GET_LIBRARY_ITEM_FAILED:${error.message}`);
     }
 
-    return data ? toLibraryItem(data as LibraryRow) : null;
+    if (!data) {
+      return null;
+    }
+
+    const [hydrated] = await hydrateLibraryItems([toLibraryItem(data as LibraryRow)], {
+      ...options,
+      supabaseClient: client
+    });
+    return hydrated ?? null;
   }
 
   const db = await readDb();
-  return db.library.find((item) => item.id === id) ?? null;
+  const item = db.library.find((entry) => entry.id === id) ?? null;
+  if (!item) {
+    return null;
+  }
+
+  const [hydrated] = await hydrateLibraryItems([item], options);
+  return hydrated ?? null;
 }
 
 export async function updateLibraryItemFolder(
@@ -1092,13 +1185,38 @@ export async function updateLibraryItemFolder(
   const normalizedFolder = normalizeLibraryFolder(folder);
   const client = await getSupabaseUserClient(options);
   if (client) {
+    const { data: existingRow, error: existingError } = await client
+      .from("viral_library_items")
+      .select(LIBRARY_SELECT_COLUMNS)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`SUPABASE_UPDATE_LIBRARY_FOLDER_FAILED:${existingError.message}`);
+    }
+
+    if (!existingRow) {
+      return null;
+    }
+
+    const existingItem = toLibraryItem(existingRow as LibraryRow);
     const { data, error } = await client
       .from("viral_library_items")
-      .update({ folder: normalizedFolder })
+      .update({
+        tags: serializeLibraryTags(
+          {
+            tags: existingItem.tags,
+            channelName: existingItem.channelName,
+            publishedAt: existingItem.publishedAt,
+            durationSec: existingItem.durationSec,
+            stats: existingItem.stats,
+            folder: normalizedFolder
+          },
+          (existingRow as LibraryRow).tags
+        )
+      })
       .eq("id", id)
-      .select(
-        "id,title,source_url,summary,channel_name,published_at,duration_sec,stats,folder,tags,created_at,deleted_at,embedding_key"
-      )
+      .select(LIBRARY_SELECT_COLUMNS)
       .maybeSingle();
 
     if (error) {

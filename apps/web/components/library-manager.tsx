@@ -63,21 +63,28 @@ type UpdateFolderResponse = {
   error?: ApiError | null;
 };
 
+type ErrorEnvelope = {
+  ok: false;
+  data: null;
+  error?: ApiError | null;
+};
+
 const copyByLang = {
   en: {
     title: "Viral Library",
-    subtitle: "Search benchmarks, organize them into folders, export PDFs, and maintain your working library.",
+    subtitle: "Search references, import JSON/CSV, organize them into folders, and export each item to Excel.",
     searchLabel: "Search",
-    searchPlaceholder: "Search title, summary, topic, hook type...",
-    folderFilterLabel: "Folder",
+    searchPlaceholder: "Search by title, channel, folder, topic, hook...",
+    folderFilterLabel: "Folder Filter",
     allFolders: "All folders",
     uncategorized: "Uncategorized",
-    exportPdf: "Export PDF",
+    filterStatus: "Showing",
+    searchKeyword: "Keyword",
     importTitle: "Import Items",
     importHelpJson:
-      "JSON must be an array. Supported fields include title, sourceUrl, summary, channelName, publishedAt, durationSec, folder, stats, and tags.",
+      "JSON must be an array. Supported fields: title, sourceUrl, summary, channelName, publishedAt, durationSec, folder, stats, and tags.",
     importHelpCsv:
-      "CSV header can include: title,sourceUrl,summary,channelName,publishedAt,durationSec,viewCount,likeCount,commentCount,folder,hookType,topic,durationBucket",
+      "CSV headers can include: title,sourceUrl,summary,channelName,publishedAt,durationSec,viewCount,likeCount,commentCount,folder,hookType,topic,durationBucket",
     fileRule: "Only .json or .csv files can be imported. Unsupported files will be rejected.",
     json: "JSON",
     csv: "CSV",
@@ -91,12 +98,16 @@ const copyByLang = {
     fileReadFailed: "Could not read the selected file.",
     fileReady: "File loaded. Review content and click import.",
     loadedFile: "Loaded file",
-    emptyResult: "No library items match your current filters.",
+    emptyResult: "No library items matched the current filters.",
     imported: "Imported",
     items: "items",
     total: "Total",
     filtered: "Filtered",
-    open: "Open source",
+    open: "Open Source",
+    exportExcel: "Export Excel",
+    exportingExcel: "Exporting...",
+    exportDone: "Export completed",
+    exportFailed: "Export failed.",
     tagHook: "Hook",
     tagDuration: "Duration",
     channel: "Channel",
@@ -107,7 +118,7 @@ const copyByLang = {
     folder: "Folder",
     folderPlaceholder: "Type a folder name",
     folderSaved: "Folder updated.",
-    folderSave: "Save folder",
+    folderSave: "Save Folder",
     savingFolder: "Saving...",
     folderSaveFailed: "Could not update the folder.",
     folderHelp: "Leave blank to keep the item uncategorized.",
@@ -127,13 +138,14 @@ const copyByLang = {
   },
   zh: {
     title: "爆款库",
-    subtitle: "搜索对标素材、导入 JSON/CSV、按分类夹整理，并支持直接导出 PDF。",
+    subtitle: "搜索对标素材、导入 JSON/CSV、按分类夹整理，并支持逐条导出 Excel。",
     searchLabel: "搜索",
-    searchPlaceholder: "搜索标题、摘要、主题、钩子类型...",
+    searchPlaceholder: "搜索标题、频道、分类、主题、钩子类型...",
     folderFilterLabel: "分类筛选",
     allFolders: "全部分类",
     uncategorized: "未分类",
-    exportPdf: "导出 PDF",
+    filterStatus: "当前显示",
+    searchKeyword: "关键词",
     importTitle: "导入条目",
     importHelpJson:
       "JSON 必须是数组格式，支持字段：title、sourceUrl、summary、channelName、publishedAt、durationSec、folder、stats、tags。",
@@ -158,6 +170,10 @@ const copyByLang = {
     total: "总数",
     filtered: "筛选后",
     open: "打开来源",
+    exportExcel: "导出 Excel",
+    exportingExcel: "导出中...",
+    exportDone: "导出完成",
+    exportFailed: "导出失败。",
     tagHook: "钩子",
     tagDuration: "时长",
     channel: "频道",
@@ -217,6 +233,7 @@ function formatCount(value: number | undefined | null, lang: Lang) {
   if (!value || value <= 0) {
     return "--";
   }
+
   return new Intl.NumberFormat(lang === "zh" ? "zh-CN" : "en-US").format(value);
 }
 
@@ -227,9 +244,6 @@ function formatDuration(durationSec: number | undefined | null) {
 
   const minutes = Math.floor(durationSec / 60);
   const seconds = durationSec % 60;
-  if (minutes === 0) {
-    return `${seconds}s`;
-  }
   return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
 }
 
@@ -254,6 +268,11 @@ function resolveFolderLabel(item: ViralLibraryItem, copy: { uncategorizedBadge: 
   return item.folder || copy.uncategorizedBadge;
 }
 
+function inferFilenameFromDisposition(disposition: string | null, fallbackTitle: string) {
+  const match = disposition?.match(/filename="?([^"]+)"?/i);
+  return match?.[1] ?? `${fallbackTitle}.xlsx`;
+}
+
 export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }: Props) {
   const copy = copyByLang[lang];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -267,6 +286,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
   const [error, setError] = useState("");
   const [loadedFileName, setLoadedFileName] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [exportingId, setExportingId] = useState("");
   const [folderDrafts, setFolderDrafts] = useState<Record<string, string>>({});
   const [savingFolderId, setSavingFolderId] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -281,21 +301,15 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
   );
 
   const folderOptions = useMemo(() => listLibraryFolders(items), [items]);
-
-  const exportHref = useMemo(() => {
-    const params = new URLSearchParams();
-    if (query.trim()) {
-      params.set("query", query.trim());
-    }
-    if (folderFilter !== ALL_LIBRARY_FOLDERS) {
-      params.set("folder", folderFilter);
-    }
-    const search = params.toString();
-    return search ? `/api/library/export?${search}` : "/api/library/export";
-  }, [folderFilter, query]);
+  const hasActiveFilters = query.trim().length > 0 || folderFilter !== ALL_LIBRARY_FOLDERS;
 
   function getFolderDraft(item: ViralLibraryItem) {
     return folderDrafts[item.id] ?? item.folder ?? "";
+  }
+
+  function resetFeedback() {
+    setError("");
+    setMessage("");
   }
 
   function handleImport() {
@@ -305,8 +319,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
       return;
     }
 
-    setError("");
-    setMessage("");
+    resetFeedback();
 
     startTransition(async () => {
       try {
@@ -349,8 +362,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
 
   async function handleDelete(item: ViralLibraryItem) {
     setDeletingId(item.id);
-    setError("");
-    setMessage("");
+    resetFeedback();
 
     try {
       const response = await fetch(`/api/library/${item.id}`, {
@@ -378,8 +390,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
 
   async function handleRecycleAction(item: ViralLibraryItem, action: "restore" | "purge") {
     setDeletingId(`${action}:${item.id}`);
-    setError("");
-    setMessage("");
+    resetFeedback();
 
     try {
       const response = await fetch(`/api/library/${item.id}`, {
@@ -419,8 +430,7 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
 
   async function handleFolderSave(item: ViralLibraryItem) {
     setSavingFolderId(item.id);
-    setError("");
-    setMessage("");
+    resetFeedback();
 
     try {
       const response = await fetch(`/api/library/${item.id}`, {
@@ -449,6 +459,43 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
       setError(cause instanceof Error ? cause.message : copy.folderSaveFailed);
     } finally {
       setSavingFolderId("");
+    }
+  }
+
+  async function handleExportItem(item: ViralLibraryItem) {
+    setExportingId(item.id);
+    resetFeedback();
+
+    try {
+      const response = await fetch(`/api/library/${item.id}/export`, {
+        headers: {
+          ...buildApiIntegrationHeaders(readApiIntegrationConfigFromStorage())
+        }
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as ErrorEnvelope | null;
+        setError(payload?.error?.message ?? copy.exportFailed);
+        return;
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = inferFilenameFromDisposition(
+        response.headers.get("content-disposition"),
+        item.title.replace(/[\\/:*?"<>|]+/g, "-")
+      );
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(objectUrl);
+      setMessage(`${copy.exportDone}: ${item.title}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.exportFailed);
+    } finally {
+      setExportingId("");
     }
   }
 
@@ -537,12 +584,14 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
                 ))}
               </select>
             </div>
-
-            <a className="btn btn-ghost library-export-button" href={exportHref}>
-              {copy.exportPdf}
-            </a>
           </div>
 
+          {hasActiveFilters ? (
+            <p className="small library-filter-status">
+              {copy.filterStatus} {filtered.length} {copy.items}
+              {query.trim() ? ` · ${copy.searchKeyword}: ${query.trim()}` : ""}
+            </p>
+          ) : null}
           {message ? <p className="status-done small">{message}</p> : null}
           {error ? <p className="status-failed small">{error}</p> : null}
 
@@ -622,13 +671,23 @@ export function LibraryManager({ lang, plan, initialItems, initialDeletedItems }
                   </div>
 
                   <div className="library-card-actions">
-                    {item.sourceUrl ? (
-                      <a href={item.sourceUrl} className="small library-link" target="_blank" rel="noreferrer">
-                        {copy.open}
-                      </a>
-                    ) : (
-                      <span className="small">{copy.sourceMissing}</span>
-                    )}
+                    <div className="library-card-action-group">
+                      {item.sourceUrl ? (
+                        <a href={item.sourceUrl} className="small library-link" target="_blank" rel="noreferrer">
+                          {copy.open}
+                        </a>
+                      ) : (
+                        <span className="small">{copy.sourceMissing}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-ghost library-export-inline"
+                        onClick={() => handleExportItem(item)}
+                        disabled={exportingId === item.id}
+                      >
+                        {exportingId === item.id ? copy.exportingExcel : copy.exportExcel}
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className="btn btn-ghost library-delete-button"
