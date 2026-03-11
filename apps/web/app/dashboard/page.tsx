@@ -32,8 +32,8 @@ export default async function DashboardPage() {
         <p>
           {text(
             lang,
-            "Paste a YouTube URL to generate a report. Provider and Pinecone setup now lives directly below the analysis workspace.",
-            "在这里输入 YouTube 链接生成报告。模型供应商和 Pinecone 配置现在直接放在链接分析区域下方。"
+            "Paste one YouTube URL to generate a report. Any analysis settings you need are available directly below this workspace.",
+            "在这里输入 YouTube 链接生成报告。分析所需设置会直接放在当前工作区下方。"
           )}
         </p>
         <div className="content-stack">
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
               <h3>{text(lang, "Recent Report Snapshot", "最近报告摘要")}</h3>
               <div className="usage-metric">{recentReports.data.length}</div>
               <p className="small">
-                {text(lang, "Latest report status follows your live reruns and exports.", "最新报告状态会随重跑和导出实时更新。")}
+                {text(lang, "Latest report status follows your live reruns and exports.", "最新报告状态会随着重跑和导出实时更新。")}
               </p>
               <Link className="btn btn-ghost compact-button" href="/dashboard/reports">
                 {text(lang, "Open Report History", "打开历史报告")}
@@ -82,16 +82,21 @@ export default async function DashboardPage() {
             lang={lang}
             plan={user.plan}
             sections={["llm", "pinecone"]}
-            title={text(lang, "APIs Required for Link Analysis", "链接分析所需 API")}
+            title={text(lang, "Connections for Link Analysis", "链接分析所需连接")}
             subtitle={text(
               lang,
-              "Configure your model provider and optional Pinecone retrieval here. The YouTube Data API key is now managed on the Viral Collector page and is shared across the same browser session.",
-              "在这里配置链接分析所需的模型供应商，以及可选的 Pinecone 对标检索。YouTube Data API Key 已移动到“爆款作品采集”页面下方，并会在同一浏览器里共享给单视频抓取和热门趋势。"
+              "Complete the connections needed for report generation and comparison here. Saved settings will be reused automatically in the same browser.",
+              "在这里补全报告生成与对比所需连接。保存后的设置会在同一浏览器里自动复用。"
+            )}
+            storageHint={text(
+              lang,
+              "These settings stay in the current browser and only support the workflows tied to this workspace.",
+              "这些设置只会保存在当前浏览器，并用于这个工作区关联的流程。"
             )}
             activeNotice={text(
               lang,
-              "These settings are reused by link analysis, report reruns, and benchmark retrieval.",
-              "这里保存的配置会被链接分析、报告重跑和对标检索自动复用。"
+              "Saved analysis connections are reused by link analysis, report reruns, and comparison workflows.",
+              "这里保存的分析连接会自动用于链接分析、报告重跑和对比流程。"
             )}
           />
         </div>

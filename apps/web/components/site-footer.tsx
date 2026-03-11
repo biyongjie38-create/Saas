@@ -19,8 +19,8 @@ export function SiteFooter({ lang }: { lang: Lang }) {
           <p>
             {text(
               lang,
-              "A focused YouTube growth console for trend discovery, report generation, BYOK integrations, and operator-ready workflows.",
-              "一个聚焦 YouTube 增长的控制台，覆盖趋势发现、报告生成、自带 Key 接入和运营级工作流。"
+              "A focused YouTube growth console for trend discovery, report generation, reusable references, and operator-ready workflows.",
+              "一个聚焦 YouTube 增长的控制台，覆盖趋势发现、报告生成、可复用素材沉淀和运营级工作流。"
             )}
           </p>
           <small>{text(lang, `Copyright ${year} viralbrainxc.ai. All rights reserved.`, `版权所有 ${year} viralbrainxc.ai。保留所有权利。`)}</small>
@@ -53,15 +53,13 @@ export function SiteFooter({ lang }: { lang: Lang }) {
             <h4>{text(lang, "Support", "支持")}</h4>
             <Link href="/support#manual">{text(lang, "User Manual", "用户手册")}</Link>
             <Link href="/support#faq">{text(lang, "FAQ", "常见问题")}</Link>
-            <SupportEmailTrigger lang={lang} label={text(lang, "Contact Us", "联系我们")} initialEmail={supportEmail} />
+            <SupportEmailTrigger lang={lang} label={text(lang, "Contact Us", "联系支持")} initialEmail={supportEmail} />
           </div>
           <div>
             <h4>{text(lang, "Company", "公司")}</h4>
             <Link href="/settings">{text(lang, "Personal Center", "个人中心")}</Link>
+            <Link href="/membership">{text(lang, "Membership", "会员方案")}</Link>
             <SupportEmailTrigger lang={lang} label={text(lang, "Get in touch", "获取支持")} initialEmail={supportEmail} />
-            <a href="https://github.com/biyongjie38-create/Saas" target="_blank" rel="noreferrer">
-              GitHub
-            </a>
           </div>
         </div>
       </div>

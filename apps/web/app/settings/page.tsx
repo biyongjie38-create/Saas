@@ -32,7 +32,7 @@ export default async function SettingsPage() {
             {text(
               lang,
               "Membership and profile controls are separated so users can clearly manage plan status, usage, and sign-out in one place.",
-              "会员体系和个人资料已经拆开，用户可以在这里清晰管理套餐状态、用量和退出登录。"
+              "会员和个人资料已经拆开，方便你在这里清晰查看套餐状态、额度和登录会话。"
             )}
           </p>
         </div>
@@ -67,8 +67,8 @@ export default async function SettingsPage() {
             <p className="small">
               {text(
                 lang,
-                "Usage is hard-limited in the API and the database. Free and Pro plan capabilities are enforced server-side.",
-                "额度限制已经在接口层和数据库层硬拦截，免费版和专业版能力也已经在服务端做了权限控制。"
+                "Your daily limit updates automatically with your current plan, so you can always see how much room is left today.",
+                "每日额度会跟随当前套餐自动更新，你可以随时看到今天还剩多少可用次数。"
               )}
             </p>
           </article>
@@ -101,20 +101,20 @@ export default async function SettingsPage() {
         <div className="split-grid" style={{ marginTop: 18 }}>
           <article className="card panel profile-card">
             <p className="card-kicker">{text(lang, "Preferences", "偏好设置")}</p>
-            <h3>{text(lang, "Language & Integrations", "语言与 API 配置")}</h3>
+            <h3>{text(lang, "Language & Workspace", "语言与工作区")}</h3>
             <ul className="list">
               <li>{text(lang, "Use the top EN / 中文 switch to change the current interface language.", "使用顶部 EN / 中文 切换当前界面语言。")}</li>
-              <li>{text(lang, "Configure model providers below Link Analysis, and configure YouTube below Viral Collector.", "在“链接分析”下方配置模型供应商，在“爆款作品采集”下方配置 YouTube。")}</li>
-              <li>{text(lang, "Reports, library operations, and rerun capability follow the current plan permissions.", "报告、爆款库和重跑能力都会跟随当前套餐权限。")}</li>
+              <li>{text(lang, "Use the dedicated workspaces for link analysis, viral collection, report review, and library management.", "把链接分析、爆款采集、报告查看和爆款库管理分别放在对应工作区里完成。")}</li>
+              <li>{text(lang, "Reports, library actions, and advanced workflows follow your current plan permissions.", "报告、爆款库操作和进阶工作流会跟随当前套餐权限。")}</li>
             </ul>
           </article>
 
           <article className="card panel profile-card">
             <p className="card-kicker">{text(lang, "Security", "安全")}</p>
-            <h3>{text(lang, "Session & Sign Out", "会话与退出登录")}</h3>
+            <h3>{text(lang, "Account & Session", "账号与会话")}</h3>
             <ul className="list">
-              <li>{text(lang, "Supabase Auth manages Google OAuth and Email Magic Link sign-in.", "当前登录由 Supabase Auth 统一管理，支持 Google OAuth 和邮箱魔法链接。")}</li>
-              <li>{text(lang, "All report and usage writes remain bound to the signed-in user by RLS.", "报告和用量写入都通过 RLS 绑定到当前登录用户。")}</li>
+              <li>{text(lang, "You can continue to sign in with Google or email, depending on the login option shown on the sign-in page.", "你可以继续使用 Google 或邮箱方式登录，具体取决于登录页展示的选项。")}</li>
+              <li>{text(lang, "Your reports, library content, and membership information stay with the account you are currently using.", "你的报告、爆款库内容和会员信息都会跟随当前使用的账号。")}</li>
             </ul>
             <form action="/auth/signout" method="post" style={{ marginTop: 18 }}>
               <button className="btn btn-ghost compact-button" type="submit">

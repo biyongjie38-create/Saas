@@ -21,16 +21,21 @@ export default async function DashboardCollectorPage() {
             lang={lang}
             plan={user.plan}
             sections={["youtube"]}
-            title={text(lang, "APIs Required for Viral Collection", "爆款作品采集所需 API")}
+            title={text(lang, "Connections for Viral Collection", "爆款作品采集所需连接")}
             subtitle={text(
               lang,
-              "Configure your YouTube Data API key here. This same browser-level key is also reused by single-video fetch and the Hot Trends page.",
-              "在这里配置爆款作品采集所需的 YouTube Data API Key。这个 Key 也会在同一浏览器里复用给单视频抓取和“热门趋势”页面。"
+              "Complete the collection connection here. Once saved, it can also support related fetch and trend workflows in the same browser.",
+              "在这里完成采集所需连接。保存后，也会在同一浏览器里支持相关抓取和趋势流程。"
+            )}
+            storageHint={text(
+              lang,
+              "These settings stay in the current browser and support collection plus related discovery workflows.",
+              "这些设置只会保存在当前浏览器，并支持采集和相关发现流程。"
             )}
             activeNotice={text(
               lang,
-              "This YouTube key is reused by viral collection, single-video fetch, and live trend refresh.",
-              "这里保存的 YouTube Key 会被爆款采集、单视频抓取和热门趋势实时刷新自动复用。"
+              "Saved collection settings are reused by viral collection and nearby content discovery workflows.",
+              "这里保存的采集连接会自动复用于爆款采集和相关内容发现流程。"
             )}
           />
         </div>

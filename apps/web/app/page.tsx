@@ -52,11 +52,11 @@ export default async function HomePage() {
       )
     },
     {
-      title: text(lang, "Context-Aware API Setup", "按工作流分布的 API 配置"),
+      title: text(lang, "Workspace Setup Guidance", "按工作区整理的连接设置"),
       desc: text(
         lang,
-        "Configure model providers below link analysis, and configure YouTube below viral collection, so each workflow makes its required APIs obvious.",
-        "把模型供应商配置放在链接分析下面，把 YouTube 配置放在爆款采集下面，让用户一眼就知道每个工作流分别需要哪些 API。"
+        "Each workspace keeps its own required setup nearby, so users can complete analysis or collection without jumping across pages.",
+        "每个工作区都会把需要的连接放在附近，让用户不用来回跳页面，也能完成分析或采集。"
       )
     },
     {
@@ -75,8 +75,8 @@ export default async function HomePage() {
       title: text(lang, "Operate everything from a single YouTube growth console.", "把所有动作都收进一个 YouTube 增长控制台。"),
       desc: text(
         lang,
-        "Instead of scattering tools across multiple products, viralbrainxc.ai keeps trend discovery, page-specific API setup, analysis, report review, and library management inside one workflow.",
-        "不把能力拆散到多个产品里，viralbrainxc.ai 把趋势发现、按页面归位的 API 配置、分析、报告查看和爆款库管理统一放在一个工作流里。"
+        "Instead of scattering tools across multiple products, viralbrainxc.ai keeps trend discovery, analysis, report review, collection, and library management inside one workflow.",
+        "不把能力拆散到多个产品里，viralbrainxc.ai 把趋势发现、分析、报告查看、采集和爆款库管理统一放在一个工作流里。"
       )
     },
     {
@@ -129,23 +129,23 @@ export default async function HomePage() {
         <p>
           {text(
             lang,
-            "viralbrainxc.ai is built for operators who need one place to track hot trends, run deep video teardowns, manage a viral library, and work with their own APIs.",
-            "viralbrainxc.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和自带 API 工作流统一到一个界面中。"
+            "viralbrainxc.ai is built for operators who need one place to track hot trends, run deep video teardowns, manage a viral library, and keep research workflows moving fast.",
+            "viralbrainxc.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和研究工作流统一到一个界面中。"
           )}
         </p>
         <div className="qa-banner landing-demo-banner">
-          <strong>{strictMode ? text(lang, "Production mode", "生产模式") : text(lang, "Product preview mode", "产品预览模式")}</strong>
+          <strong>{strictMode ? text(lang, "Live service mode", "实时服务模式") : text(lang, "Experience mode", "体验模式")}</strong>
           <p>
             {strictMode
               ? text(
                   lang,
-                  "This deployment is configured for production use. Real provider paths are required for analysis, hot trends, collection, and report generation.",
-                  "当前部署按生产模式运行。分析、热门趋势、作品采集和报告生成都要求真实服务可用。"
+                  "Analysis, trend discovery, collection, and report generation are using live service paths in this deployment.",
+                  "当前部署中的分析、趋势、采集和报告生成会优先走实时服务链路。"
                 )
               : text(
                   lang,
-                  "The homepage is intentionally a marketing overview. It does not bind to live provider data. Real data paths now exist in single-video analysis, Hot Trends, viral collection, and BYOK connection tests.",
-                  "首页本身是产品能力展示页，并不直接绑定实时数据源。当前真实接入已经覆盖单视频分析、热门趋势、爆款采集，以及用户自带 Key 的连接测试。"
+                  "You can preview the full workflow first. Some pages may use sample content to keep the experience stable before live services are connected.",
+                  "你可以先体验完整工作流。在实时服务尚未接通前，部分页面会使用示例内容保持体验稳定。"
                 )}
           </p>
         </div>
@@ -156,8 +156,8 @@ export default async function HomePage() {
           <Link href="/dashboard" className="btn btn-ghost">
             {text(lang, "Open Console", "进入控制台")}
           </Link>
-          <Link href="/support#api-guide" className="btn btn-ghost">
-            {text(lang, "See API Setup Guide", "查看 API 配置教程")}
+          <Link href="/support#manual" className="btn btn-ghost">
+            {text(lang, "See User Guide", "查看用户手册")}
           </Link>
         </div>
       </section>
