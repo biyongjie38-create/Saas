@@ -25,7 +25,7 @@ const schema = z.object({
   minViews: z.coerce.number().int().min(1000).max(100000000).default(100000),
   maxResults: z.coerce.number().int().min(1).max(50).default(10),
   durationPreset: z.enum(COLLECT_DURATION_PRESET_VALUES).default(DEFAULT_COLLECT_DURATION_PRESET),
-  regionCode: z.string().trim().min(2).max(8).optional(),
+  keywordQuery: z.string().trim().max(80).optional(),
   autoImport: z.boolean().default(true)
 });
 
@@ -64,7 +64,7 @@ export const POST = withApiRoute(async (request, { requestId }) => {
       minViews: parsed.data.minViews,
       maxResults,
       durationPreset: parsed.data.durationPreset,
-      regionCode: parsed.data.regionCode
+      keywordQuery: parsed.data.keywordQuery
     });
   } catch (error) {
     return errorJsonResponse(

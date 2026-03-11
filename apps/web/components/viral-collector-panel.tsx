@@ -31,15 +31,16 @@ type CollectResponse = {
 const copyByLang = {
   en: {
     title: "Viral Work Collector",
-    subtitle: "Pull recent breakout YouTube candidates into your library with a configurable time window and view threshold. The YouTube Data API key for this workflow now lives below this panel.",
+    subtitle: "Pull recent breakout YouTube candidates into your library with a configurable time window, view threshold, and optional keyword targeting. The YouTube Data API key for this workflow now lives below this panel.",
     hoursWithin: "Published within hours",
     minViews: "Minimum views",
     maxResults: "Max results",
     durationRange: "Video length",
-    regionCode: "Region code",
+    keywordQuery: "Keyword collection",
+    keywordPlaceholder: "Leave blank for the default viral feed, or enter a topic like skincare, finance, or movie trailer",
     button: "Collect and Import",
     collecting: "Collecting...",
-    summary: "Recommended starting point: 24-48h and 100k+ views.",
+    summary: "Recommended starting point: 24-48h, 100k+ views, and a focused keyword when you want a niche library.",
     loaded: "Imported",
     items: "items",
     previewTitle: "Latest candidates",
@@ -47,15 +48,16 @@ const copyByLang = {
   },
   zh: {
     title: "爆款作品采集",
-    subtitle: "按发布时间窗口和最低播放量筛选近期爆款作品，并直接导入你的爆款库。这个工作流所需的 YouTube Data API Key 现在就在当前面板下方配置。",
+    subtitle: "按发布时间窗口、最低播放量以及可选关键词筛选近期爆款作品，并直接导入你的爆款库。这个工作流所需的 YouTube Data API Key 现在就在当前面板下方配置。",
     hoursWithin: "采集最近多少小时",
     minViews: "最低播放量",
     maxResults: "最多采集条数",
     durationRange: "作品时长范围",
-    regionCode: "地区代码",
+    keywordQuery: "关键词采集",
+    keywordPlaceholder: "留空则沿用默认热门采集，也可以输入如护肤、理财、电影预告等关键词",
     button: "采集并导入",
     collecting: "采集中...",
-    summary: "推荐起始条件：24-48 小时、10 万以上播放量。",
+    summary: "推荐起始条件：24-48 小时、10 万以上播放量；如果要做细分方向，直接补一个关键词。",
     loaded: "已导入",
     items: "条",
     previewTitle: "最近命中的爆款候选",
@@ -108,7 +110,7 @@ export function ViralCollectorPanel({ lang, plan }: Props) {
     minViews: 100000,
     maxResults: plan === "pro" ? 20 : 10,
     durationPreset: "any" as CollectDurationPreset,
-    regionCode: "US"
+    keywordQuery: ""
   });
 
   async function handleCollect() {
@@ -220,12 +222,17 @@ export function ViralCollectorPanel({ lang, plan }: Props) {
           </select>
         </label>
         <label className="collect-field">
-          <span className="small">{copy.regionCode}</span>
+          <span className="small">{copy.keywordQuery}</span>
           <input
             className="input"
-            value={collectForm.regionCode}
-            onChange={(event) => setCollectForm((current) => ({ ...current, regionCode: event.target.value.toUpperCase() }))}
-            placeholder="US"
+            value={collectForm.keywordQuery}
+            onChange={(event) =>
+              setCollectForm((current) => ({
+                ...current,
+                keywordQuery: event.target.value
+              }))
+            }
+            placeholder={copy.keywordPlaceholder}
           />
         </label>
       </div>

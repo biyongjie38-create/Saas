@@ -78,6 +78,16 @@ type YoutubeApiVideoResponse = {
   items?: YoutubeApiVideoItem[];
 };
 
+type YoutubeApiSearchItem = {
+  id?: {
+    videoId?: string;
+  };
+};
+
+type YoutubeApiSearchResponse = {
+  items?: YoutubeApiSearchItem[];
+};
+
 type YoutubeApiCommentsResponse = {
   items?: Array<{
     snippet?: {
@@ -617,11 +627,70 @@ type CollectViralOptions = QueryOptions & {
   hoursWithin: number;
   minViews: number;
   maxResults: number;
-  regionCode?: string | null;
+  keywordQuery?: string | null;
   durationPreset?: CollectDurationPreset;
 };
 
-function buildCollectedItem(video: YoutubeVideo): CollectedViralItem {
+function normalizeKeywordQuery(value: string | null | undefined): string | null {
+  const normalized = (value ?? "").trim().replace(/\s+/g, " ");
+  return normalized || null;
+}
+
+function resolveCollectTopic(keywordQuery: string | null): string {
+  if (!keywordQuery) {
+    return "youtube-trending";
+  }
+
+  const normalized = keywordQuery
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+
+  return normalized || "youtube-trending";
+}
+
+function matchesKeywordQuery(
+  video: Pick<YoutubeVideo, "title" | "description" | "channelName">,
+  keywordQuery: string | null
+): boolean {
+  if (!keywordQuery) {
+    return true;
+  }
+
+  const haystack = `${video.title} ${video.description} ${video.channelName}`.toLowerCase();
+  return haystack.includes(keywordQuery.toLowerCase());
+}
+
+function toCollectedVideoCandidate(item: YoutubeApiVideoItem): YoutubeVideo {
+  const videoId = item.id;
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+
+  return {
+    id: crypto.randomUUID(),
+    videoId,
+    url,
+    title: item.snippet?.title ?? `Popular Video ${videoId}`,
+    description: item.snippet?.description ?? "",
+    channelId: item.snippet?.channelId ?? "",
+    channelName: item.snippet?.channelTitle ?? "Unknown channel",
+    publishedAt: item.snippet?.publishedAt ?? new Date().toISOString(),
+    durationSec: Math.max(1, parseIsoDurationToSeconds(item.contentDetails?.duration)),
+    stats: {
+      viewCount: toInt(item.statistics?.viewCount),
+      likeCount: toInt(item.statistics?.likeCount),
+      commentCount: toInt(item.statistics?.commentCount)
+    },
+    thumbnailUrl: pickThumbnail(item, videoId),
+    topComments: [],
+    captionsText: null,
+    dataSource: "youtube_api",
+    fetchedAt: new Date().toISOString()
+  };
+}
+
+function buildCollectedItem(video: YoutubeVideo, keywordQuery: string | null = null): CollectedViralItem {
   return {
     id: `collect-${video.videoId}`,
     videoId: video.videoId,
@@ -635,10 +704,10 @@ function buildCollectedItem(video: YoutubeVideo): CollectedViralItem {
     thumbnailUrl: video.thumbnailUrl,
     tags: {
       hookType: video.stats.viewCount >= 1_000_000 ? "spike" : "emerging",
-      topic: "youtube-trending",
-      durationBucket: video.durationSec >= 600 ? "10m+" : video.durationSec >= 300 ? "5-10m" : "0-5m",
+      topic: resolveCollectTopic(keywordQuery),
+      durationBucket: video.durationSec >= 600 ? "10m+" : video.durationSec >= 300 ? "5-10m" : "0-5m"
     },
-    dataSource: video.dataSource,
+    dataSource: video.dataSource
   };
 }
 
@@ -654,13 +723,56 @@ async function fetchMostPopularVideos(apiKey: string, regionCode: string, maxRes
   return payload.items ?? [];
 }
 
+async function fetchVideosByKeyword(
+  apiKey: string,
+  keywordQuery: string,
+  publishedAfterIso: string,
+  maxResults: number
+): Promise<YoutubeApiVideoItem[]> {
+  const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+  searchUrl.searchParams.set("part", "snippet");
+  searchUrl.searchParams.set("type", "video");
+  searchUrl.searchParams.set("order", "viewCount");
+  searchUrl.searchParams.set("publishedAfter", publishedAfterIso);
+  searchUrl.searchParams.set("q", keywordQuery);
+  searchUrl.searchParams.set("maxResults", String(Math.min(50, Math.max(10, maxResults))));
+  searchUrl.searchParams.set("key", apiKey);
+
+  const searchPayload = await fetchJson<YoutubeApiSearchResponse>(searchUrl.toString());
+  const videoIds = Array.from(
+    new Set(
+      (searchPayload.items ?? [])
+        .map((item) => item.id?.videoId?.trim())
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  if (videoIds.length === 0) {
+    return [];
+  }
+
+  const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+  detailsUrl.searchParams.set("part", "snippet,contentDetails,statistics");
+  detailsUrl.searchParams.set("id", videoIds.join(","));
+  detailsUrl.searchParams.set("key", apiKey);
+
+  const detailsPayload = await fetchJson<YoutubeApiVideoResponse>(detailsUrl.toString());
+  const itemsById = new Map((detailsPayload.items ?? []).map((item) => [item.id, item]));
+
+  return videoIds
+    .map((videoId) => itemsById.get(videoId))
+    .filter((item): item is YoutubeApiVideoItem => Boolean(item));
+}
+
 function buildMockCollectedItems(input: {
   hoursWithin: number;
   minViews: number;
   maxResults: number;
   durationPreset: CollectDurationPreset;
+  keywordQuery?: string | null;
 }): CollectedViralItem[] {
   const now = Date.now();
+  const keywordQuery = normalizeKeywordQuery(input.keywordQuery);
   const candidates = Object.values(demoVideos).map((video, index) => ({
     ...video,
     publishedAt: new Date(now - Math.min(input.hoursWithin, 48) * 3600 * 1000 + index * 1800 * 1000).toISOString(),
@@ -674,6 +786,7 @@ function buildMockCollectedItems(input: {
     .filter(
       (video) =>
         video.stats.viewCount >= input.minViews &&
+        matchesKeywordQuery(video, keywordQuery) &&
         matchesCollectDurationPreset(video.durationSec, input.durationPreset)
     )
     .slice(0, input.maxResults)
@@ -681,8 +794,8 @@ function buildMockCollectedItems(input: {
       buildCollectedItem({
         id: crypto.randomUUID(),
         ...video,
-        fetchedAt: new Date().toISOString(),
-      }),
+        fetchedAt: new Date().toISOString()
+      }, keywordQuery)
     );
 }
 
@@ -690,7 +803,7 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
   const hoursWithin = Math.min(168, Math.max(1, Math.floor(options.hoursWithin || 24)));
   const minViews = Math.max(1000, Math.floor(options.minViews || 100_000));
   const maxResults = Math.min(50, Math.max(1, Math.floor(options.maxResults || 10)));
-  const regionCode = (options.regionCode || "US").trim().toUpperCase() || "US";
+  const keywordQuery = normalizeKeywordQuery(options.keywordQuery);
   const durationPreset = normalizeCollectDurationPreset(options.durationPreset);
   const mode = resolveFetchMode();
   const apiKey = (options.apiKeyOverride || "").trim();
@@ -699,41 +812,19 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
     if (!allowPreviewFallbacks()) {
       throw new Error("YOUTUBE_KEY_MISSING");
     }
-    return buildMockCollectedItems({ hoursWithin, minViews, maxResults, durationPreset });
+    return buildMockCollectedItems({ hoursWithin, minViews, maxResults, durationPreset, keywordQuery });
   }
 
   try {
     const publishedAfter = Date.now() - hoursWithin * 3600 * 1000;
+    const publishedAfterIso = new Date(publishedAfter).toISOString();
     const fetchLimit =
       durationPreset === DEFAULT_COLLECT_DURATION_PRESET ? Math.max(maxResults, 20) : 50;
-    const items = await fetchMostPopularVideos(apiKey, regionCode, fetchLimit);
+    const items = keywordQuery
+      ? await fetchVideosByKeyword(apiKey, keywordQuery, publishedAfterIso, fetchLimit)
+      : await fetchMostPopularVideos(apiKey, "US", fetchLimit);
     const candidates = items
-      .map((item) => {
-        const videoId = item.id;
-        const url = `https://www.youtube.com/watch?v=${videoId}`;
-        const candidate: YoutubeVideo = {
-          id: crypto.randomUUID(),
-          videoId,
-          url,
-          title: item.snippet?.title ?? `Popular Video ${videoId}`,
-          description: item.snippet?.description ?? "",
-          channelId: item.snippet?.channelId ?? "",
-          channelName: item.snippet?.channelTitle ?? "Unknown channel",
-          publishedAt: item.snippet?.publishedAt ?? new Date().toISOString(),
-          durationSec: Math.max(1, parseIsoDurationToSeconds(item.contentDetails?.duration)),
-          stats: {
-            viewCount: toInt(item.statistics?.viewCount),
-            likeCount: toInt(item.statistics?.likeCount),
-            commentCount: toInt(item.statistics?.commentCount),
-          },
-          thumbnailUrl: pickThumbnail(item, videoId),
-          topComments: [],
-          captionsText: null,
-          dataSource: "youtube_api",
-          fetchedAt: new Date().toISOString(),
-        };
-        return candidate;
-      })
+      .map(toCollectedVideoCandidate)
       .filter(
         (video) =>
           new Date(video.publishedAt).getTime() >= publishedAfter &&
@@ -743,7 +834,7 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
       .slice(0, maxResults);
 
     const savedVideos = await Promise.all(candidates.map((video) => saveVideo(video, options)));
-    const collected = savedVideos.map(buildCollectedItem);
+    const collected = savedVideos.map((video) => buildCollectedItem(video, keywordQuery));
 
     if (collected.length > 0) {
       return collected;
@@ -758,6 +849,6 @@ export async function collectViralYoutubeItems(options: CollectViralOptions): Pr
     throw new Error("YOUTUBE_COLLECT_EMPTY");
   }
 
-  return buildMockCollectedItems({ hoursWithin, minViews, maxResults, durationPreset });
+  return buildMockCollectedItems({ hoursWithin, minViews, maxResults, durationPreset, keywordQuery });
 }
 
