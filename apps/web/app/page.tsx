@@ -17,27 +17,30 @@ export default async function HomePage() {
 
   const workflowCards = [
     {
-      title: text(lang, "Hot Video Discovery", "热门视频发现"),
+      kicker: text(lang, "Step 1", "步骤 1"),
+      title: text(lang, "See which videos, channels, and topics are starting to move.", "先判断哪些视频、频道和主题正在起量。"),
       desc: text(
         lang,
-        "Track breakout YouTube videos before they become obvious, then route the best ones into your report workflow.",
-        "在爆款完全扩散之前追踪起量视频，再把高价值样本送进报告工作流。"
+        "Use Hot Trends to spot movement early, then decide what deserves a deeper teardown instead of following random inspiration.",
+        "先用热门趋势看清哪些内容开始起量，再决定什么值得深拆，而不是靠随机灵感做判断。"
       )
     },
     {
-      title: text(lang, "Hot Channel Analysis", "热门频道分析"),
+      kicker: text(lang, "Step 2", "步骤 2"),
+      title: text(lang, "Turn one YouTube URL into a reusable teardown.", "把一个 YouTube 链接拆成可复用的分析。"),
       desc: text(
         lang,
-        "Spot channels that are accelerating fast and understand which content systems they are repeating.",
-        "找到增长加速更快的频道，并看清它们在重复什么内容系统。"
+        "Go from title, thumbnail, comments, and structure to a report you can actually reuse in planning and review.",
+        "把标题、封面、评论和结构转成真正可用于策划和复盘的报告，而不只是看一遍就忘。"
       )
     },
     {
-      title: text(lang, "Hot Topic Tracking", "热门主题追踪"),
+      kicker: text(lang, "Step 3", "步骤 3"),
+      title: text(lang, "Keep the strongest references in a library you can reuse.", "把最有价值的参考样本沉淀成可复用资料库。"),
       desc: text(
         lang,
-        "Build a topic pipeline from recurring themes instead of chasing random inspiration.",
-        "从持续重复出现的话题中建立选题池，而不是随机找灵感。"
+        "Save examples, organize them by topic, and bring them back into future research instead of losing them in bookmarks.",
+        "把高价值案例保存下来、按主题整理，并在之后的研究里反复调用，而不是淹没在收藏夹里。"
       )
     }
   ];
@@ -47,24 +50,24 @@ export default async function HomePage() {
       title: text(lang, "YouTube Link Analysis", "YouTube 链接分析"),
       desc: text(
         lang,
-        "Drop one URL and get structure, thumbnail, audience, benchmark, and action output in one place.",
-        "输入一个链接，即可在一个界面里拿到结构、封面、受众、对标和行动建议。"
+        "Drop one URL and get structure, thumbnail, audience, and next-step output in one place.",
+        "输入一个链接，就能在一个界面里拿到结构、封面、受众和下一步建议。"
       )
     },
     {
-      title: text(lang, "Workspace Setup Guidance", "按工作区整理的连接设置"),
+      title: text(lang, "Benchmark Retrieval", "爆款对标检索"),
       desc: text(
         lang,
-        "Each workspace keeps its own required setup nearby, so users can complete analysis or collection without jumping across pages.",
-        "每个工作区都会把需要的连接放在附近，让用户不用来回跳页面，也能完成分析或采集。"
+        "Compare a video against saved references so you can see what is shared, what is different, and what is worth borrowing.",
+        "把当前视频和你保存的参考样本做对比，看清共同点、差异点，以及真正值得借鉴的部分。"
       )
     },
     {
       title: text(lang, "Report Review & Export", "报告查看与导出"),
       desc: text(
         lang,
-        "Preview recent reports, rerun with live data, share links, and export action-ready output.",
-        "预览最近报告、用实时数据重跑、分享链接，并导出可执行结果。"
+        "Reopen reports, rerun with live data, share links, and export work that is ready for review.",
+        "重新打开报告、用实时数据重跑、分享链接，并导出可以直接进入复盘或评审的结果。"
       )
     }
   ];
@@ -72,20 +75,47 @@ export default async function HomePage() {
   const featureBlocks = [
     {
       kicker: text(lang, "Control Center", "控制台"),
-      title: text(lang, "Operate everything from a single YouTube growth console.", "把所有动作都收进一个 YouTube 增长控制台。"),
+      title: text(lang, "Run trend discovery, teardown, benchmarking, and library work from one console.", "把趋势发现、深拆、对标和资料沉淀放进同一个控制台。"),
       desc: text(
         lang,
-        "Instead of scattering tools across multiple products, viralbrainxc.ai keeps trend discovery, analysis, report review, collection, and library management inside one workflow.",
-        "不把能力拆散到多个产品里，viralbrainxc.ai 把趋势发现、分析、报告查看、采集和爆款库管理统一放在一个工作流里。"
+        "Instead of jumping between trend pages, notes, spreadsheets, and separate summary tools, viralbrainxc.ai keeps research, teardown, comparison, and library management in one workflow.",
+        "你不需要在趋势页、笔记、表格和零散总结工具之间来回切换，viralbrainxc.ai 把研究、拆解、对比和资料管理放进同一条工作流里。"
       )
     },
     {
-      kicker: text(lang, "Trend Radar", "趋势雷达"),
-      title: text(lang, "Find what is heating up before you decide what to make next.", "在决定下一条内容之前，先判断什么正在起量。"),
+      kicker: text(lang, "Trend To Action", "从趋势到行动"),
+      title: text(lang, "Start with what is moving, then decide what deserves deeper analysis.", "先看什么在起量，再决定什么值得深度分析。"),
       desc: text(
         lang,
-        "Hot trends helps you watch videos, channels, and topics, then pull the strongest candidates back into analysis and benchmarking.",
-        "热门趋势会帮你监控视频、频道和主题，再把最强样本拉回分析和对标流程。"
+        "Use the trend radar to see what is heating up, move into link analysis when something is worth studying, and keep the strongest references in your library for the next round.",
+        "先用趋势雷达判断什么正在升温，再把值得研究的样本拉进链接分析，最后把最强参考案例沉淀进爆款库。"
+      )
+    }
+  ];
+
+  const differenceCards = [
+    {
+      title: text(lang, "Not just one-video summaries", "不只是单条视频总结"),
+      desc: text(
+        lang,
+        "You do not stop at a single teardown. The workflow continues into comparison, report review, and reusable references.",
+        "它不是看完一条视频就结束，而是把拆解继续推进到对标、报告复盘和资料沉淀。"
+      )
+    },
+    {
+      title: text(lang, "Not just a trend list", "不只是趋势榜单"),
+      desc: text(
+        lang,
+        "Trend discovery is only the starting signal. The product is built to help you explain why something is working and what to do next.",
+        "趋势发现只是起点，这个产品真正想帮你解决的是：为什么它有效，以及接下来该做什么。"
+      )
+    },
+    {
+      title: text(lang, "One workflow instead of scattered tools", "不是零散工具，而是一条完整工作流"),
+      desc: text(
+        lang,
+        "Instead of splitting research across tabs, docs, and bookmarks, you can move from signal to teardown to reusable library inside one product.",
+        "你不用再把研究拆散到网页、文档和收藏夹里，而是可以在一个产品里完成从信号判断到深拆再到资料库沉淀。"
       )
     }
   ];
@@ -93,18 +123,26 @@ export default async function HomePage() {
   const pricingHighlights = [
     {
       name: membershipCopy.freeName,
-      desc: membershipCopy.freeDesc,
+      desc: text(
+        lang,
+        "Built for first-time validation. Bring your own keys, run a few analyses, and confirm whether this workflow fits how you research content.",
+        "适合第一次验证工作流。自带密钥、跑几次分析，先确认这套研究流程是不是适合你的内容方式。"
+      ),
       price: "CNY 0",
       cycle: text(lang, "/ month", "/ 月"),
       features: membershipCopy.freeFeatures,
       cta: text(lang, "Start Free", "免费开始"),
       href: "/dashboard",
-      secondary: text(lang, "No payment setup required", "无需先接支付"),
+      secondary: text(lang, "Bring your own YouTube and LLM keys to test the full workflow", "自带 YouTube 和 LLM 密钥即可体验完整工作流"),
       tone: "free" as const,
     },
     {
       name: membershipCopy.proName,
-      desc: membershipCopy.proDesc,
+      desc: text(
+        lang,
+        "Built for creators and small teams that need repeatable research, benchmark retrieval, exports, and larger collection batches.",
+        "适合需要可重复研究、爆款对标、导出能力和更大采集批量的创作者与小团队。"
+      ),
       price: `CNY ${PRO_MONTHLY_PRICE_CNY}`,
       cycle: text(lang, "/ month", "/ 月"),
       features: membershipCopy.proFeatures,
@@ -124,37 +162,41 @@ export default async function HomePage() {
       <SiteNav />
 
       <section className="shell hero hero-landing">
-        <span className="badge landing-kicker">{text(lang, "Trend discovery + AI growth console", "趋势发现 + AI 增长控制台")}</span>
-        <h1>{text(lang, "Find breakout ideas, dissect winners, and turn them into your next YouTube playbook.", "找爆款、拆逻辑、做增长，把热门内容变成你的下一套 YouTube 方案。")}</h1>
+        <span className="badge landing-kicker">{text(lang, "For YouTube creators and content operators", "面向 YouTube 创作者与内容操盘手")}</span>
+        <h1>{text(lang, "Turn YouTube videos into clear content decisions your team can reuse.", "把 YouTube 视频变成团队可以反复复用的内容判断。")}</h1>
         <p>
           {text(
             lang,
-            "viralbrainxc.ai is built for operators who need one place to track hot trends, run deep video teardowns, manage a viral library, and keep research workflows moving fast.",
-            "viralbrainxc.ai 面向内容操盘手，把热门趋势、视频深度拆解、爆款库管理和研究工作流统一到一个界面中。"
+            "viralbrainxc.ai helps YouTube creators, operators, and small content teams spot rising signals, break down why one video works, compare it against strong references, and save the best examples in one workflow.",
+            "viralbrainxc.ai 帮助 YouTube 创作者、内容操盘手和小团队先看信号、再拆逻辑、再做对标、再沉淀资料，把研究工作流收进一个界面里。"
           )}
         </p>
         <div className="qa-banner landing-demo-banner">
-          <strong>{strictMode ? text(lang, "Live service mode", "实时服务模式") : text(lang, "Experience mode", "体验模式")}</strong>
+          <strong>
+            {strictMode
+              ? text(lang, "Real workflow, live service paths", "真实工作流，实时服务链路")
+              : text(lang, "Full workflow preview", "完整工作流预览")}
+          </strong>
           <p>
             {strictMode
               ? text(
                   lang,
-                  "Analysis, trend discovery, collection, and report generation are using live service paths in this deployment.",
-                  "当前部署中的分析、趋势、采集和报告生成会优先走实时服务链路。"
+                  "This deployment runs analysis, trend discovery, collection, and report generation through live service paths. It is built for real analysis workflows and has already been used for paid validation.",
+                  "当前部署中的分析、趋势、采集和报告生成都走实时服务链路。这个产品面向真实研究工作流设计，并且已经被用于真实分析和付费验证。"
                 )
               : text(
                   lang,
-                  "You can preview the full workflow first. Some pages may use sample content to keep the experience stable before live services are connected.",
-                  "你可以先体验完整工作流。在实时服务尚未接通前，部分页面会使用示例内容保持体验稳定。"
+                  "You can preview the full workflow here first. Some pages may still use sample content before live services are connected, but the product itself is designed around real analysis workflows.",
+                  "你可以先在这里体验完整工作流。在部分实时服务尚未接通前，某些页面可能会使用示例内容，但产品本身仍然按真实分析工作流来设计。"
                 )}
           </p>
         </div>
         <div className="hero-actions">
-          <Link href="/dashboard/trends" className="btn btn-primary">
-            {text(lang, "Discover Hot Trends", "发现热门趋势")}
-          </Link>
-          <Link href="/dashboard" className="btn btn-ghost">
+          <Link href="/dashboard" className="btn btn-primary">
             {text(lang, "Open Console", "进入控制台")}
+          </Link>
+          <Link href="/dashboard/trends" className="btn btn-ghost">
+            {text(lang, "Discover Hot Trends", "发现热门趋势")}
           </Link>
           <Link href="/support#manual" className="btn btn-ghost">
             {text(lang, "See User Guide", "查看用户手册")}
@@ -165,7 +207,7 @@ export default async function HomePage() {
       <section className="shell section landing-feature-grid">
         {workflowCards.map((item) => (
           <article className="card panel landing-mini-card" key={item.title}>
-            <p className="card-kicker">{text(lang, "Trend Layer", "趋势层")}</p>
+            <p className="card-kicker">{item.kicker}</p>
             <h3>{item.title}</h3>
             <p>{item.desc}</p>
           </article>
@@ -223,8 +265,8 @@ export default async function HomePage() {
 
       <section className="shell section">
         <div className="section-intro">
-          <span className="badge">{text(lang, "Capabilities", "功能矩阵")}</span>
-          <h2>{text(lang, "Everything you need to go from trend to action", "从趋势到执行，所需能力都在这里")}</h2>
+          <span className="badge">{text(lang, "Workflow", "工作流")}</span>
+          <h2>{text(lang, "A workflow built for research, teardown, and reuse", "一条为研究、拆解和复用而设计的工作流")}</h2>
         </div>
         <div className="landing-capability-grid">
           {consoleCards.concat(workflowCards).map((item) => (
@@ -238,9 +280,30 @@ export default async function HomePage() {
 
       <section className="shell section">
         <div className="section-intro">
+          <span className="badge">{text(lang, "Why It Differs", "为什么不一样")}</span>
+          <h2>{text(lang, "Built for a full research workflow, not just one feature", "它服务的是完整研究流程，不只是某一个功能")}</h2>
+        </div>
+        <div className="landing-capability-grid">
+          {differenceCards.map((item) => (
+            <article className="card panel landing-capability-card" key={item.title}>
+              <h3>{item.title}</h3>
+              <p>{item.desc}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="shell section">
+        <div className="section-intro">
           <span className="badge">{text(lang, "Pricing", "定价方案")}</span>
-          <h2>{text(lang, "Start free, then upgrade when you need deeper research ops", "先免费验证，再在需要更深研究工作流时升级")}</h2>
-          <p>{membershipCopy.billingHint}</p>
+          <h2>{text(lang, "Start free to validate the workflow, then upgrade for repeatable research", "先免费验证工作流，再在需要可重复研究时升级")}</h2>
+          <p>
+            {text(
+              lang,
+              "You bring your own YouTube, LLM, and optional Pinecone keys. The free plan is for first-time validation; Pro is for repeatable research, benchmark retrieval, exports, and larger collection runs.",
+              "你自带 YouTube、LLM 和可选的 Pinecone 密钥。免费版适合先验证工作流，专业版适合做可重复的研究、对标检索、导出和更大批量的采集。"
+            )}
+          </p>
         </div>
         <div className="plan-grid landing-pricing-grid">
           {pricingHighlights.map((plan) => (
